@@ -1,0 +1,101 @@
+# H3 long-form capture bible
+
+**Lock the pack before you spend GPU.** A song map and a Wikipedia tab are not a generate list.
+
+This repo is the public capture framework SMF Works now uses before MiniMax H3 long-form on a DGX Spark (Comfy native H3 + Motion-Context). It is paper and templates. It is not model weights and not generated video.
+
+MiniMax H3 weights are under the MiniMax Community License. Generated MP4s stay internal. This repo is MIT.
+
+Companion writeup: [Lock the bible before the GPU](https://www.smfclearinghouse.com/blog/2026-09-17-h3-longform-capture-bible) (Clearinghouse, 2026-09-17).
+
+Measured origin: [28 windows on one Spark: Sigils in the Steel](https://www.smfclearinghouse.com/blog/2026-09-16-h3-sigils-four-minutes).
+
+## What this is for
+
+Long-form H3 (story takes, lyric-timed music videos) that must hold:
+
+- a prop (length, mass, edge, wood — not “research the axe”)
+- a face / wardrobe
+- one grade and location per take
+- music timing (verse = take, chorus = cuts)
+
+If you are generating a single 2/5/8 s smoke, stop. You do not need this pack.
+
+## How to use this repo on GitHub
+
+### 1. Get the templates
+
+```bash
+git clone https://github.com/smfworks/h3-longform-capture.git
+cd h3-longform-capture
+```
+
+Or fork, then clone your fork.
+
+### 2. Copy a pack for your job
+
+```bash
+mkdir -p packs/my-title
+cp templates/capture-pack.md packs/my-title/README.md
+cp templates/edit-list.md    packs/my-title/edit-list.md
+cp templates/look-card.md    packs/my-title/look.md
+cp templates/continuity-log.md packs/my-title/continuity-log.md
+# one file per person / prop
+cp templates/character-card.md packs/my-title/character-smith.md
+cp templates/prop-card.md      packs/my-title/prop-francisca.md
+```
+
+Fill every `{TITLE}` / blank. Empty “still” fields must say `none` and why.
+
+### 3. Gate (do not queue Comfy)
+
+Refuse generate until all nine exist:
+
+1. Log line (one sentence)
+2. Map (song clock or narrative beats — **not** shots)
+3. Edit list (every row has a join type)
+4. Take cards (one location + one grade)
+5. Character cards (verbatim lock + forbidden)
+6. Prop cards (numbers + units + still or `none`)
+7. Look card (one style line)
+8. Audio path (exactly one of: `N/A` + mute in the NLE, prompt score, silence)
+9. Hop-1 smoke plan (one T2V per take, watched, before hopping)
+
+### 4. Join types (only three)
+
+| Join | Tool on spark-56bc | Use |
+|---|---|---|
+| `continue` | Motion-Context hop, trim 22, `ffmpeg -c copy` | Same camera, same room, action continues |
+| `cut` | New T2V, hard cut, **no hold** | Chorus, beat, new angle |
+| `fadeblack` | New take hop-1 + 8-frame `xfade=fadeblack` | New location, grade, or time of day |
+
+A pasted wardrobe paragraph is not Ref2VA. Identity holds **inside** `continue`. Expect drift at `cut` and `fadeblack` until a still conditions hop-1.
+
+### 5. Smoke, then spend
+
+One hop-1 per take with `MiniMaxH3MotionContextSaveLatent` and a unique prefix. Join the planned fades. Watch. Only then hop.
+
+Serving pins (1344×768, 6-step turbo, 10.125 s hop-1, 85°C abort) live in SMF ops, not here. See [the Sigils post](https://www.smfclearinghouse.com/blog/2026-09-16-h3-sigils-four-minutes) for the measured stack.
+
+## Layout
+
+```
+templates/          blank cards (copy these)
+docs/FRAMEWORK.md   why the pack looks like this
+docs/HOW-TO.md      GitHub + local workflow, step by step
+docs/SOURCES.md     citations
+examples/           Sigils lessons (process only, no MP4s)
+```
+
+## Rules we will not bend
+
+- Lyric numbers (45 cm / 600 g / 10 cm) go on a **prop card** before any browser call.
+- “Research the axe” is treatment homework, not generate-time.
+- One camera verb per window (type + amplitude + speed).
+- Speech and chorus hits finish by **8.0 s** in a 10.125 s window. Hold only before `fadeblack`.
+- `non_diegetic_music: N/A` + mute in the editor **or** a prompt score. Not both.
+- Do not publish MiniMax-generated MP4s from this workflow.
+
+## License
+
+MIT for this repo (templates + docs). MiniMax H3 weights and outputs are a separate license.

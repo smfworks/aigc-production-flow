@@ -1,0 +1,6 @@
+.DS_Store
+*.mp4
+*.mov
+*.safetensors
+packs/**
+!packs/.gitkeep
