@@ -2,7 +2,7 @@
 
 **Lock the pack before you spend GPU.** A song map and a Wikipedia tab are not a generate list.
 
-This repo is the public capture framework SMF Works now uses before MiniMax H3 long-form on a DGX Spark (Comfy native H3 + Motion-Context). It is paper and templates. It is not model weights and not generated video.
+This repo is the public capture framework SMF Works now uses before MiniMax H3 long-form on a DGX Spark (Comfy native H3 + Motion-Context). It is paper, templates, and a client-side pack builder. It is not model weights and not generated video.
 
 MiniMax H3 weights are under the MiniMax Community License. Generated MP4s stay internal. This repo is MIT.
 
@@ -77,10 +77,23 @@ One hop-1 per take with `MiniMaxH3MotionContextSaveLatent` and a unique prefix. 
 
 Serving pins (1344×768, 6-step turbo, 10.125 s hop-1, 85°C abort) live in SMF ops, not here. See [the Sigils post](https://www.smfclearinghouse.com/blog/2026-09-16-h3-sigils-four-minutes) for the measured stack.
 
+## App
+
+Fill the pack in the browser. The nine gates above are a live checklist. Export is a markdown zip in the same shape as `templates/` — not a generate, and not an MP4.
+
+```bash
+cd app && npm i && npm run dev
+```
+
+Open the Vite URL (default http://localhost:5173). First visit loads the Sigils lessons sample so the demo is green; **New pack** starts blank. The current pack autosaves in `localStorage`.
+
+Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
+
 ## Layout
 
 ```
-templates/          blank cards (copy these)
+app/                client-side pack builder (Vite + React)
+templates/          blank cards (copy these) — source of truth
 docs/FRAMEWORK.md   why the pack looks like this
 docs/HOW-TO.md      GitHub + local workflow, step by step
 docs/SOURCES.md     citations
@@ -98,4 +111,4 @@ examples/           Sigils lessons (process only, no MP4s)
 
 ## License
 
-MIT for this repo (templates + docs). MiniMax H3 weights and outputs are a separate license.
+MIT for this repo (templates, docs, and the client-side app). MiniMax H3 weights and outputs are a separate license.

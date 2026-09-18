@@ -4,3 +4,5 @@
 *.safetensors
 packs/**
 !packs/.gitkeep
+app/node_modules/
+app/dist/
