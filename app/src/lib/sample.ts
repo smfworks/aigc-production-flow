@@ -49,6 +49,7 @@ function francisca(): PropCard {
 /**
  * Sigils lessons as a loadable pack: documented numbers and clocks,
  * template defaults, explicit `none` fills for unpublished stills/likeness.
+ * Haft is unpinned on purpose — public example, not generate-ready.
  */
 export function sigilsSample(): CapturePack {
   const takeA = uid();
@@ -63,7 +64,7 @@ export function sigilsSample(): CapturePack {
     speech: "none",
     forbiddenGlobal: DEFAULT_GLOBAL_FORBIDDEN,
     map: [
-      { id: uid(), clock: "0:00", beat: "title overlay", energy: "verse" },
+      { id: uid(), clock: "0:00", beat: "title overlay", energy: "title" },
       { id: uid(), clock: "0:18", beat: "verse", energy: "verse" },
       { id: uid(), clock: "0:46", beat: "chorus", energy: "chorus" },
     ],
@@ -204,4 +205,14 @@ export function sigilsSample(): CapturePack {
     continuityRows: [emptyContinuity()],
     polaroidPath: "none — fill during generate",
   };
+}
+
+/**
+ * Same lessons pack with a clearly fake numeric haft so tests can cover a
+ * 9/9 path. Not a public still; source says measured stand-in.
+ */
+export function sigilsGenerateReady(): CapturePack {
+  const pack = sigilsSample();
+  pack.props[0].fields.haftLength = m("32", "cm", "measured stand-in — demo only");
+  return pack;
 }

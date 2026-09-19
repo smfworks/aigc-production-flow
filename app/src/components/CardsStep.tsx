@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  DEFAULT_LOOK_STYLE,
   CHARACTER_LOCK_FIELDS,
   PROP_FIELDS,
   type CapturePack,
@@ -366,6 +367,7 @@ function LookEditor({ pack, onChange }: Props) {
       <TextArea
         label="One style line (paste into every [Shot 1])"
         value={pack.look.styleLine}
+        placeholder={DEFAULT_LOOK_STYLE}
         onChange={(styleLine) =>
           onChange({ ...pack, look: { ...pack.look, styleLine } })
         }

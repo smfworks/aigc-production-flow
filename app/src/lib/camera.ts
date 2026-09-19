@@ -69,10 +69,11 @@ export function defaultHold(join: string): string {
 }
 
 export function holdOkForJoin(join: string, hold: string): boolean {
-  const h = hold.trim().toLowerCase().replace(/\*/g, "");
+  const h = hold.trim().toLowerCase().replace(/\*/g, "").replace(/\s+/g, " ");
   if (!h) return false;
-  if (join === "cut") {
-    return h === "no" || h === "no hold";
-  }
-  return true;
+  const noHold = h === "no" || h === "no hold";
+  const yesHold = h === "yes" || h === "yes before fade" || h === "yes before fadeblack";
+  if (join === "cut" || join === "continue") return noHold;
+  if (join === "fadeblack") return yesHold;
+  return false;
 }

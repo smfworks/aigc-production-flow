@@ -41,12 +41,26 @@ export default function App() {
   const complete = useMemo(() => allGatesGreen(pack), [pack]);
 
   const loadSample = useCallback(() => {
+    if (
+      !window.confirm(
+        "Replace the current pack with the Sigils lessons sample? Autosaved work in this browser will be overwritten.",
+      )
+    ) {
+      return;
+    }
     setPack(clonePack(sigilsSample()));
     setStep("pack");
-    showToast("Loaded Sigils lessons sample.");
+    showToast("Loaded Sigils lessons sample — not generate-ready until the axe is pinned.");
   }, [showToast]);
 
   const newPack = useCallback(() => {
+    if (
+      !window.confirm(
+        "Start a new blank pack? Autosaved work in this browser will be overwritten.",
+      )
+    ) {
+      return;
+    }
     setPack(emptyPack());
     setStep("pack");
     showToast("New pack.");

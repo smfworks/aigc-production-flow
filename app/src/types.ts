@@ -21,7 +21,7 @@ export type AudioPath = (typeof AUDIO_PATHS)[number];
 export const SPEECH_MODES = ["none", "finish-by-8s"] as const;
 export type SpeechMode = (typeof SPEECH_MODES)[number];
 
-export const ENERGY_VALUES = ["verse", "chorus", "bridge"] as const;
+export const ENERGY_VALUES = ["title", "verse", "chorus", "bridge", "outro"] as const;
 export type EnergyValue = (typeof ENERGY_VALUES)[number];
 
 export const STACK_LINE =

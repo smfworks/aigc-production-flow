@@ -254,6 +254,12 @@ select:focus {
   outline-offset: 1px;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
 .mono {
   font-family: var(--font-mono);
   font-size: 12px;

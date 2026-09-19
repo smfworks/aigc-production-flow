@@ -23,7 +23,7 @@ export function MapStep({ pack, onChange }: Props) {
             <tr>
               <th>Clock</th>
               <th>Beat</th>
-              <th>Energy (verse/chorus/bridge)</th>
+              <th>Energy (title/verse/chorus/bridge/outro)</th>
               <th></th>
             </tr>
           </thead>

@@ -29,6 +29,13 @@ export function GatePanel({
       <p className="gate-score">
         {green} / 9 green
       </p>
+      {complete ? (
+        <p className="ok-note">Nine lights honest. Export is the pack zip, not a render.</p>
+      ) : (
+        <p className="danger">
+          Incomplete. Export pack zip stays off until every light is honest.
+        </p>
+      )}
       <ol className="gate-list">
         {gates.map((gate) => (
           <li
