@@ -1,5 +1,5 @@
 import { formatCameraCell, holdOkForJoin, isSingleOfficialCamera } from "./camera.ts";
-import { filled, mentionsResearch, stillOk } from "./pack.ts";
+import { filled, isNumericPin, mentionsResearch, stillOk } from "./pack.ts";
 import {
   ENERGY_VALUES,
   JOIN_TYPES,
@@ -37,8 +37,7 @@ function looksLikeShot(text: string): boolean {
 
 function energyOk(energy: string): boolean {
   const e = energy.trim().toLowerCase();
-  if (!e) return false;
-  return (ENERGY_VALUES as readonly string[]).includes(e) || e === "title" || e === "outro";
+  return (ENERGY_VALUES as readonly string[]).includes(e);
 }
 
 function joinOk(join: string): join is JoinType {
@@ -46,10 +45,10 @@ function joinOk(join: string): join is JoinType {
 }
 
 function propUnresolved(prop: PropCard): { overallHaft: boolean; still: boolean } {
-  const overall = prop.fields.overallLength.value.trim();
-  const haft = prop.fields.haftLength.value.trim();
   return {
-    overallHaft: !overall || !haft,
+    overallHaft:
+      !isNumericPin(prop.fields.overallLength.value) ||
+      !isNumericPin(prop.fields.haftLength.value),
     still: !stillOk(prop.stillFile),
   };
 }
@@ -107,6 +106,20 @@ function evaluateMap(pack: CapturePack): GateResult {
   };
 }
 
+function takeOk(join: string, take: string): boolean {
+  const t = take.trim();
+  if (!t) return false;
+  if (t === "—" || t === "-") return join === "cut";
+  return true;
+}
+
+function holdProblem(join: string, n: number): string {
+  if (join === "fadeblack") return `#${n} fadeblack hold must be yes before fade`;
+  if (join === "continue") return `#${n} continue must hold = no`;
+  if (join === "cut") return `#${n} cut must hold = no`;
+  return `#${n} needs a Hold? value`;
+}
+
 function evaluateEditList(pack: CapturePack): GateResult {
   if (pack.editList.length === 0) {
     return { ...GATE_DEFS[2], ok: false, detail: "Edit list is empty." };
@@ -117,16 +130,29 @@ function evaluateEditList(pack: CapturePack): GateResult {
     if (!joinOk(row.join)) {
       problems.push(`#${n} join must be continue, cut, or fadeblack`);
     }
+    if (!filled(row.songT)) {
+      problems.push(`#${n} needs song t`);
+    }
+    if (!takeOk(row.join, row.take)) {
+      problems.push(`#${n} needs a take`);
+    }
+    if (!filled(row.locationGrade)) {
+      problems.push(`#${n} needs location / grade`);
+    }
+    if (!filled(row.action)) {
+      problems.push(`#${n} needs action`);
+    }
     const camera = formatCameraCell(row.cameraVerb, row.cameraAmplitude, row.cameraSpeed);
-    if (!row.cameraVerb || !isSingleOfficialCamera(camera)) {
+    if (
+      !row.cameraVerb ||
+      !filled(row.cameraAmplitude) ||
+      !filled(row.cameraSpeed) ||
+      !isSingleOfficialCamera(camera)
+    ) {
       problems.push(`#${n} needs exactly one official camera verb (type + amplitude + speed)`);
     }
     if (row.join && !holdOkForJoin(row.join, row.hold)) {
-      problems.push(
-        row.join === "cut"
-          ? `#${n} cut must hold = no`
-          : `#${n} needs a Hold? value`,
-      );
+      problems.push(holdProblem(row.join, n));
     }
   });
   if (problems.length) {
@@ -135,7 +161,7 @@ function evaluateEditList(pack: CapturePack): GateResult {
   return {
     ...GATE_DEFS[2],
     ok: true,
-    detail: `${pack.editList.length} row(s), each one join and one verb.`,
+    detail: `${pack.editList.length} row(s), each one join, clock, take, action, and one verb.`,
   };
 }
 

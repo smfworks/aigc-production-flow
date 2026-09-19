@@ -53,4 +53,18 @@ describe("hold vs join", () => {
     assert.equal(holdOkForJoin("cut", "yes before fade"), false);
     assert.equal(holdOkForJoin("cut", ""), false);
   });
+
+  it("continue must not count as a hold", () => {
+    assert.equal(holdOkForJoin("continue", "no"), true);
+    assert.equal(holdOkForJoin("continue", "yes before fade"), false);
+    assert.equal(holdOkForJoin("continue", "yes"), false);
+    assert.equal(holdOkForJoin("continue", "banana"), false);
+  });
+
+  it("fadeblack only accepts yes / yes before fade", () => {
+    assert.equal(holdOkForJoin("fadeblack", "yes before fade"), true);
+    assert.equal(holdOkForJoin("fadeblack", "yes"), true);
+    assert.equal(holdOkForJoin("fadeblack", "no"), false);
+    assert.equal(holdOkForJoin("fadeblack", "banana"), false);
+  });
 });

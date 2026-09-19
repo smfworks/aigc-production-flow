@@ -2,7 +2,6 @@ import {
   DEFAULT_CHARACTER_FORBIDDEN,
   DEFAULT_GLOBAL_FORBIDDEN,
   DEFAULT_LOOK_FORBIDDEN,
-  DEFAULT_LOOK_STYLE,
   DEFAULT_PROP_FORBIDDEN,
   DEFAULT_SMOKE_NOTES,
   PROP_FIELDS,
@@ -27,6 +26,22 @@ export function uid(): string {
 
 export function filled(value: string | undefined | null): boolean {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+/** Values that look filled but are not pinned measurements. */
+const PIN_PLACEHOLDER =
+  /^(none|tbd|n\/?a|n\.a\.|na|unknown|unresolved|unset|todo)(\b|$)/i;
+
+export function isPlaceholderPin(value: string): boolean {
+  const v = value.trim();
+  if (!v) return true;
+  return PIN_PLACEHOLDER.test(v.replace(/[*_]/g, "").trim());
+}
+
+/** Overall / haft length: a real number, not none / TBD / unknown. */
+export function isNumericPin(value: string): boolean {
+  if (isPlaceholderPin(value)) return false;
+  return /\d/.test(value);
 }
 
 export function slugify(raw: string, fallback = "untitled-pack"): string {
@@ -159,7 +174,7 @@ export function emptyPack(): CapturePack {
     characters: [emptyCharacter()],
     props: [emptyProp()],
     look: {
-      styleLine: DEFAULT_LOOK_STYLE,
+      styleLine: "",
       paletteGrade: "",
       era: "",
       lensGrain: "",
@@ -179,13 +194,15 @@ export function clonePack(pack: CapturePack): CapturePack {
 /**
  * Still fields must be a path or `none` plus why.
  * Template: empty still fields must say `none` and why.
+ * Wikipedia is not a still. `none.` is not a why.
  */
 export function stillOk(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
+  if (/\bwikipedia\b/i.test(v)) return false;
   if (/^none\b/i.test(v)) {
-    const rest = v.replace(/^none\b/i, "").replace(/^[\s:—-]+/, "");
-    return rest.length > 0;
+    const rest = v.replace(/^none\b/i, "").replace(/^[\s.:;,!—-]+/, "");
+    return /[a-zA-Z]/.test(rest);
   }
   return true;
 }

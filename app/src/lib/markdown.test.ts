@@ -13,7 +13,7 @@ import {
   renderReadme,
 } from "./markdown.ts";
 import { emptyPack } from "./pack.ts";
-import { sigilsSample } from "./sample.ts";
+import { sigilsGenerateReady, sigilsSample } from "./sample.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -43,6 +43,9 @@ describe("export matches template shapes", () => {
     headerLine(out, "Entity \\| File \\| Conditions hop");
     assert.match(out, /## Map \(clock → beat, not shots\)/);
     assert.match(out, /Wikipedia is not a still/);
+    assert.match(out, /^> DRAFT — gates red/m);
+    headerLine(out, "Take \\| Prefix \\| T2V planned \\| Watched");
+    assert.match(out, /\| sigils-a \| yes \| yes \|/);
   });
 
   it("edit-list keeps join legend and columns", () => {
@@ -113,8 +116,13 @@ describe("export matches template shapes", () => {
     }
     assert.match(out, /45/);
     assert.match(out, /600/);
-    assert.match(out, /- \[ \] overall vs haft length unresolved/);
+    assert.match(out, /- \[x\] overall vs haft length unresolved/);
     assert.match(out, /- \[ \] no still and no reason/);
+  });
+
+  it("pinned numeric haft clears the unresolved checkbox", () => {
+    const out = renderProp(sigilsGenerateReady().props[0]);
+    assert.match(out, /- \[ \] overall vs haft length unresolved/);
   });
 
   it("continuity log keeps the landed-vs-intent columns", () => {
@@ -147,10 +155,17 @@ describe("export matches template shapes", () => {
   it("empty pack still serializes template filenames", () => {
     const files = packToFiles(emptyPack());
     assert.ok(files["README.md"]);
+    assert.match(files["README.md"], /^> DRAFT — gates red/m);
     assert.ok(files["edit-list.md"]);
     assert.ok(files["look.md"]);
     assert.ok(files["continuity-log.md"]);
     assert.ok(Object.keys(files).some((name) => name.startsWith("character-")));
     assert.ok(Object.keys(files).some((name) => name.startsWith("prop-")));
+  });
+
+  it("generate-ready zip README is not a DRAFT", () => {
+    const out = renderReadme(sigilsGenerateReady());
+    assert.equal(out.startsWith("> DRAFT"), false);
+    assert.match(out, /^# Capture pack — Sigils in the Steel/m);
   });
 });

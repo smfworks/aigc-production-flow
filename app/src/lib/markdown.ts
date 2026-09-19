@@ -1,6 +1,6 @@
 import { formatCameraCell } from "./camera.ts";
 import { fileSlug, filled } from "./pack.ts";
-import { propGenerateFlags } from "./gate.ts";
+import { allGatesGreen, propGenerateFlags } from "./gate.ts";
 import {
   CHARACTER_LOCK_FIELDS,
   PROP_FIELDS,
@@ -39,12 +39,6 @@ function joinCell(pack: CapturePack, index: number): string {
   return row.join;
 }
 
-function holdCell(hold: string): string {
-  const h = hold.trim();
-  if (h.toLowerCase() === "no" && !h.includes("*")) return h;
-  return h;
-}
-
 export function renderReadme(pack: CapturePack): string {
   const title = filled(pack.title) ? pack.title.trim() : "{TITLE}";
   const audio = pack.audioPath;
@@ -64,13 +58,25 @@ export function renderReadme(pack: CapturePack): string {
       row.hop1Seed,
     ]),
   );
+  const smokeTakes = table(
+    ["Take", "Prefix", "T2V planned", "Watched"],
+    pack.takes.map((row) => [
+      row.take,
+      row.prefix,
+      row.t2vPlanned ? "yes" : "no",
+      row.watched ? "yes" : "no",
+    ]),
+  );
   const stills = table(
     ["Entity", "File", "Conditions hop"],
     pack.stills.map((row) => [row.entity, row.file, row.conditionsHop]),
   );
   const lookLock = filled(pack.look.styleLine) ? pack.look.styleLine : "";
+  const draft = allGatesGreen(pack)
+    ? ""
+    : "> DRAFT — gates red. Do not queue Comfy.\n\n";
 
-  return `# Capture pack — ${title}
+  return `${draft}# Capture pack — ${title}
 
 Log line (one sentence):
 ${quote(pack.logLine)}
@@ -117,6 +123,8 @@ Wikipedia is not a still.
 
 ${pack.smokeNotes.trim() || "One T2V per take + planned fades. Watch identity at cuts. Do not hop until this join is watchable."}
 
+${smokeTakes}
+
 ## Continuity log
 
 Fill \`continuity-log.md\` during generate.
@@ -134,7 +142,7 @@ export function renderEditList(pack: CapturePack): string {
     row.locationGrade,
     formatCameraCell(row.cameraVerb, row.cameraAmplitude, row.cameraSpeed),
     row.action,
-    holdCell(row.hold),
+    row.hold,
     row.notes,
   ]);
   return `# Edit list — ${title}

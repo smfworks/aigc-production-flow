@@ -32,20 +32,20 @@ export function PackStep({ pack, onChange }: Props) {
           label="Title"
           value={pack.title}
           onChange={(title) => onChange({ ...pack, title })}
-          placeholder="Sigils in the Steel"
+          placeholder="Working title"
         />
         <TextArea
           label="Log line (one sentence)"
           value={pack.logLine}
           onChange={(logLine) => onChange({ ...pack, logLine })}
-          placeholder="Verse as take, chorus as cut, prop numbers pinned before generate."
+          placeholder="One sentence. Prop numbers pinned before generate."
         />
         <div className="grid-2">
           <TextField
             label="Duration target"
             value={pack.durationTarget}
             onChange={(durationTarget) => onChange({ ...pack, durationTarget })}
-            placeholder="≥4:12"
+            placeholder="4:00"
             mono
           />
           <TextField
@@ -54,7 +54,7 @@ export function PackStep({ pack, onChange }: Props) {
             onChange={(songNarrativeClock) =>
               onChange({ ...pack, songNarrativeClock })
             }
-            placeholder="0:18 verse · 0:46 chorus"
+            placeholder="0:00 · 0:18 · 0:46"
             mono
           />
         </div>

@@ -81,11 +81,13 @@ Serving pins (1344×768, 6-step turbo, 10.125 s hop-1, 85°C abort) live in SMF 
 
 Fill the pack in the browser. The nine gates above are a live checklist. Export is a markdown zip in the same shape as `templates/` — not a generate, and not an MP4.
 
+Live demo: [h3-longform-capture.vercel.app](https://h3-longform-capture.vercel.app)
+
 ```bash
 cd app && npm i && npm run dev
 ```
 
-Open the Vite URL (default http://localhost:5173). First visit loads the Sigils lessons sample so the demo is green; **New pack** starts blank. The current pack autosaves in `localStorage`.
+Open the Vite URL (default http://localhost:5173). First visit loads the Sigils **lessons** sample so the clocks and lyric numbers are visible; it is not a generate pack until overall vs haft is a real measurement (gate 6 stays red while haft is `none`). **New pack** starts blank, including Look. The current pack autosaves in `localStorage`; New pack and Load sample ask before they wipe it.
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
