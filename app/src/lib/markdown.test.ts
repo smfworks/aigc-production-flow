@@ -39,8 +39,8 @@ describe("export matches template shapes", () => {
     headerLine(out, "Clock \\| Beat \\| Energy \\(verse/chorus/bridge\\)");
     headerLine(tpl, "Take \\| Location \\| Grade \\| Windows \\| Prefix \\| Hop-1 seed");
     headerLine(out, "Take \\| Location \\| Grade \\| Windows \\| Prefix \\| Hop-1 seed");
-    headerLine(tpl, "Entity \\| File \\| Conditions hop");
-    headerLine(out, "Entity \\| File \\| Conditions hop");
+    headerLine(tpl, "Entity \\| Role \\| File \\| Source \\| Canvas \\| Conditions hop");
+    headerLine(out, "Entity \\| Role \\| File \\| Source \\| Canvas \\| Conditions hop");
     assert.match(out, /## Map \(clock → beat, not shots\)/);
     assert.match(out, /Wikipedia is not a still/);
     assert.match(out, /^> DRAFT — gates red/m);

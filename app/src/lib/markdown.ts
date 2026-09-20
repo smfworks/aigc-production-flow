@@ -68,8 +68,15 @@ export function renderReadme(pack: CapturePack): string {
     ]),
   );
   const stills = table(
-    ["Entity", "File", "Conditions hop"],
-    pack.stills.map((row) => [row.entity, row.file, row.conditionsHop]),
+    ["Entity", "Role", "File", "Source", "Canvas", "Conditions hop"],
+    pack.stills.map((row) => [
+      row.entity,
+      row.role ?? "",
+      row.file,
+      row.source ?? "",
+      row.canvas ?? "",
+      row.conditionsHop,
+    ]),
   );
   const lookLock = filled(pack.look.styleLine) ? pack.look.styleLine : "";
   const draft = allGatesGreen(pack)
@@ -117,11 +124,11 @@ ${quote(pack.forbiddenGlobal)}
 
 ${stills}
 
-Wikipedia is not a still.
+A sheet is the bible. A plate is the first frame. Wikipedia is not a still. Do not stretch 1024². Procedure: \`docs/IMAGE-STILLS.md\`.
 
 ## Smoke
 
-${pack.smokeNotes.trim() || "One T2V per take + planned fades. Watch identity at cuts. Do not hop until this join is watchable."}
+${pack.smokeNotes.trim() || "One hop-1 per take (I2VA if a plate exists, else T2V) + planned fades. Watch identity at cuts. Do not hop until this join is watchable."}
 
 ${smokeTakes}
 
@@ -147,7 +154,7 @@ export function renderEditList(pack: CapturePack): string {
   ]);
   return `# Edit list — ${title}
 
-Join: \`continue\` = Motion-Context hop. \`cut\` = new T2V hard cut (no hold). \`fadeblack\` = new take + 8-frame dip.
+Join: \`continue\` = Motion-Context hop. \`cut\` = new I2VA/T2V hard cut (no hold). \`fadeblack\` = new take + 8-frame dip. A plate still conditions hop-1; hop 2+ is the latent.
 
 Camera: one verb, amplitude, speed. Official: push/pull, pan, truck, tilt, pedestal, arc, track, static, shake.
 
@@ -217,6 +224,9 @@ export function renderCharacter(card: CharacterCard): string {
 
 Still file (or \`none\`):
 ${card.stillFile.trim()}
+Still role: sheet (bible) — plates live on \`still-card.md\`
+Still source: photo / qwen-t2i / qwen-edit / none
+Still canvas (must match H3; default 1344×768):
 Speaker ID (if any): ${filled(card.speakerId) ? card.speakerId.trim() : "none"}
 
 ${table(["Field", "Lock (same words every hop)"], lockRows)}
@@ -243,6 +253,9 @@ export function renderProp(card: PropCard): string {
 
 Still file (or \`none\`):
 ${card.stillFile.trim()}
+Still role: sheet (bible) — plates live on \`still-card.md\`
+Still source: photo / qwen-t2i / qwen-edit / none
+Still canvas (must match H3; default 1344×768):
 
 ${table(["Field", "Value", "Unit", "Source (lyric / photo / measured)"], rows)}
 

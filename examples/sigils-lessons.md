@@ -9,5 +9,6 @@ What the 28-window night taught the pack:
 3. “Pan and zoom and circle” is three camera verbs. Official H3 wants one. We collapsed to slow single-verb windows so takes would hold. That was a generate choice, not a model limit.
 4. `non_diegetic_music: N/A` was correct for a later mix. Picture still has to be cut to the waveform. Holds at the end of every window are not cuts.
 5. Motion-Context held identity **inside** a take. Fadeblacks drifted. That is expected until hop-1 is still-conditioned.
+6. A sheet is not a plate. Generate character/prop stills on the image Spark (Qwen-Image-2.1, native 1344×768), edit the sheet into each hop-1 location/grade, and condition `MiniMaxH3ImageToVideo.first_frame`. Independent T2Vs with a pasted lock are thirteen faces. See [IMAGE-STILLS.md](../docs/IMAGE-STILLS.md).
 
-Fill a reshoot pack with `cut` chorus rows and a locked francisca card (still or explicit `none`) before another 9 h of denoise.
+Fill a reshoot pack with `cut` chorus rows, a locked francisca **sheet**, and hop-1 **plates** (or explicit `none`) before another 9 h of denoise.

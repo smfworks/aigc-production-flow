@@ -122,6 +122,9 @@ export type StillRow = {
   id: string;
   entity: string;
   file: string;
+  role: string;
+  source: string;
+  canvas: string;
   conditionsHop: string;
 };
 
@@ -186,7 +189,7 @@ export const DEFAULT_LOOK_STYLE =
   "Live-action, photoreal cinematic, crushed blacks, hot ember highlights, 24fps.";
 
 export const DEFAULT_SMOKE_NOTES =
-  "One T2V per take + planned fades. Watch identity at cuts. Do not hop until this join is watchable.";
+  "One hop-1 per take (I2VA if a plate exists, else T2V) + planned fades. Watch identity at cuts. Do not hop until this join is watchable.";
 
 export const STEPS = [
   { id: "pack", n: 1, label: "New pack" },

@@ -1,6 +1,9 @@
 # Prop card — {NAME}
 
 Still file (or `none`):
+Still role: sheet (bible) — plates live on `still-card.md`
+Still source: photo / qwen-t2i / qwen-edit / none
+Still canvas (must match H3; default 1344×768):
 
 | Field | Value | Unit | Source (lyric / photo / measured) |
 |---|---|---|---|

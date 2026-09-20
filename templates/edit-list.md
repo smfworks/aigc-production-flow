@@ -1,6 +1,6 @@
 # Edit list — {TITLE}
 
-Join: `continue` = Motion-Context hop. `cut` = new T2V hard cut (no hold). `fadeblack` = new take + 8-frame dip.
+Join: `continue` = Motion-Context hop. `cut` = new I2VA/T2V hard cut (no hold). `fadeblack` = new take + 8-frame dip. A plate still conditions hop-1; hop 2+ is the latent.
 
 Camera: one verb, amplitude, speed. Official: push/pull, pan, truck, tilt, pedestal, arc, track, static, shake.
 
