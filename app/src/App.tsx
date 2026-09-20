@@ -65,7 +65,7 @@ export default function App() {
   const jumpGate = useCallback((id: GateId) => {
     const dest = GATE_DESTINATION[id];
     setStep(dest.step);
-    if (dest.cardsTab) setCardsTab(dest.cardsTab);
+    setCardsTab(dest.cardsTab ?? "characters");
   }, []);
 
   const loadSample = useCallback(() => {
@@ -78,6 +78,7 @@ export default function App() {
     }
     setPack(clonePack(sigilsSample()));
     setStep("pack");
+    setCardsTab("characters");
     showToast("Loaded Sigils lessons sample — not generate-ready until the axe is pinned.");
   }, [showToast]);
 
@@ -91,6 +92,7 @@ export default function App() {
     }
     setPack(emptyPack());
     setStep("pack");
+    setCardsTab("characters");
     showToast("New pack.");
   }, [showToast]);
 
@@ -130,6 +132,7 @@ export default function App() {
         const next = await packFromZipBlob(file);
         setPack(next);
         setStep("pack");
+        setCardsTab("characters");
         showToast("Imported pack zip.");
       } catch (error) {
         showToast(error instanceof Error ? error.message : "Import failed.");
