@@ -1,7 +1,7 @@
 import { formatCameraCell } from "./camera.ts";
 import { fileSlug, filled } from "./pack.ts";
 import { allGatesGreen, propGenerateFlags } from "./gate.ts";
-import { cutRowFromConditions, hop1ModeLabel, takeFromConditions } from "./stills.ts";
+import { cutRowFromConditions, hop1ModeLabel, isBlankStill, takeFromConditions } from "./stills.ts";
 import {
   CHARACTER_LOCK_FIELDS,
   DEFAULT_STILL_CANVAS,
@@ -365,8 +365,11 @@ export function packToFiles(pack: CapturePack): PackFiles {
     files[name] = renderProp(card);
   }
   for (const card of pack.stills) {
+    if (isBlankStill(card)) continue;
     const name = uniqueFilename(used, stillBasename(card));
     files[name] = renderStill(card);
   }
+  files["pack.json"] = JSON.stringify({ v: 2, pack }, null, 2);
+  used.add("pack.json");
   return files;
 }

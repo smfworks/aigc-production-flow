@@ -8,27 +8,49 @@ import { SmokeStep } from "./components/SmokeStep";
 import { StepNav } from "./components/StepNav";
 import { TakesStep } from "./components/TakesStep";
 import { Toast } from "./components/Toast";
-import { allGatesGreen, evaluateGates } from "./lib/gate";
+import {
+  GATE_DESTINATION,
+  allGatesGreen,
+  evaluateGates,
+  packSummaryMarkdown,
+  type CardsTab,
+  type GateId,
+} from "./lib/gate";
 import { downloadBlob, packToZipBlob, zipFilename } from "./lib/exportZip";
+import { packFromZipBlob } from "./lib/importZip";
 import { clonePack, emptyPack } from "./lib/pack";
 import { sigilsSample } from "./lib/sample";
-import { initialPack, saveStoredPack } from "./lib/storage";
-import type { CapturePack, StepId } from "./types";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { consumeLoadNote, initialPack, saveStoredPack } from "./lib/storage";
+import { STEPS, type CapturePack, type StepId } from "./types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+function typingInField(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+}
 
 export default function App() {
   const [pack, setPack] = useState<CapturePack>(() => initialPack(sigilsSample()));
   const [step, setStep] = useState<StepId>("pack");
+  const [cardsTab, setCardsTab] = useState<CardsTab>("characters");
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
   }, []);
 
   useEffect(() => {
+    const note = consumeLoadNote();
+    if (note) showToast(note);
+  }, [showToast]);
+
+  useEffect(() => {
     if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), 2400);
+    const id = window.setTimeout(() => setToast(null), 2800);
     return () => window.clearTimeout(id);
   }, [toast]);
 
@@ -39,6 +61,12 @@ export default function App() {
 
   const gates = useMemo(() => evaluateGates(pack), [pack]);
   const complete = useMemo(() => allGatesGreen(pack), [pack]);
+
+  const jumpGate = useCallback((id: GateId) => {
+    const dest = GATE_DESTINATION[id];
+    setStep(dest.step);
+    if (dest.cardsTab) setCardsTab(dest.cardsTab);
+  }, []);
 
   const loadSample = useCallback(() => {
     if (
@@ -68,7 +96,10 @@ export default function App() {
 
   const exportZip = useCallback(
     async (asDraft: boolean) => {
-      if (asDraft === false && !complete) return;
+      if (asDraft === false && !complete) {
+        showToast("Nine gates not green. Use D for an incomplete draft.");
+        return;
+      }
       setBusy(true);
       try {
         const blob = await packToZipBlob(pack);
@@ -83,36 +114,142 @@ export default function App() {
     [complete, pack, showToast],
   );
 
+  const copyChecklist = useCallback(async () => {
+    const text = packSummaryMarkdown(pack);
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Pack summary copied.");
+    } catch {
+      showToast("Could not copy summary.");
+    }
+  }, [pack, showToast]);
+
+  const importZip = useCallback(
+    async (file: File) => {
+      try {
+        const next = await packFromZipBlob(file);
+        setPack(next);
+        setStep("pack");
+        showToast("Imported pack zip.");
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "Import failed.");
+      }
+    },
+    [showToast],
+  );
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (typingInField(event.target)) return;
+      if (event.key === "1" || event.key === "2" || event.key === "3" || event.key === "4" || event.key === "5" || event.key === "6") {
+        const dest = STEPS[Number(event.key) - 1];
+        if (dest) {
+          event.preventDefault();
+          setStep(dest.id);
+        }
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "e") {
+        event.preventDefault();
+        void exportZip(false);
+        return;
+      }
+      if (key === "d") {
+        event.preventDefault();
+        void exportZip(true);
+        return;
+      }
+      if (key === "c") {
+        event.preventDefault();
+        void copyChecklist();
+        return;
+      }
+      if (key === "?") {
+        event.preventDefault();
+        setHelpOpen((open) => !open);
+        return;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [complete, copyChecklist, exportZip]);
+
   return (
     <div className="page">
       <div className="ambient" aria-hidden="true" />
-      <Header onLoadSample={loadSample} onNewPack={newPack} />
+      <Header
+        onLoadSample={loadSample}
+        onNewPack={newPack}
+        onImport={() => importRef.current?.click()}
+      />
+      <input
+        ref={importRef}
+        className="sr-only"
+        type="file"
+        accept=".zip,application/zip"
+        aria-label="Import pack zip"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (!file) return;
+          if (
+            !window.confirm(
+              "Replace the current pack with this zip? Autosaved work in this browser will be overwritten.",
+            )
+          ) {
+            return;
+          }
+          void importZip(file);
+        }}
+      />
       <div className="workspace">
         <main className="editor">
           <StepNav step={step} onStep={setStep} />
           {step === "pack" ? (
-            <PackStep pack={pack} onChange={setPack} />
+            <PackStep pack={pack} onChange={setPack} gates={gates} />
           ) : null}
-          {step === "map" ? <MapStep pack={pack} onChange={setPack} /> : null}
+          {step === "map" ? (
+            <MapStep pack={pack} onChange={setPack} gates={gates} />
+          ) : null}
           {step === "takes" ? (
-            <TakesStep pack={pack} onChange={setPack} />
+            <TakesStep pack={pack} onChange={setPack} gates={gates} />
           ) : null}
           {step === "edit" ? (
-            <EditListStep pack={pack} onChange={setPack} />
+            <EditListStep
+              pack={pack}
+              onChange={setPack}
+              gates={gates}
+              onOpenStills={() => {
+                setCardsTab("stills");
+                setStep("cards");
+              }}
+            />
           ) : null}
           {step === "cards" ? (
-            <CardsStep pack={pack} onChange={setPack} />
+            <CardsStep
+              pack={pack}
+              onChange={setPack}
+              gates={gates}
+              tab={cardsTab}
+              onTab={setCardsTab}
+            />
           ) : null}
           {step === "smoke" ? (
-            <SmokeStep pack={pack} onChange={setPack} />
+            <SmokeStep pack={pack} onChange={setPack} gates={gates} />
           ) : null}
         </main>
         <GatePanel
           gates={gates}
           complete={complete}
           busy={busy}
+          helpOpen={helpOpen}
           onExport={() => void exportZip(false)}
           onExportDraft={() => void exportZip(true)}
+          onCopyChecklist={() => void copyChecklist()}
+          onPrint={() => window.print()}
+          onJump={jumpGate}
         />
       </div>
       <footer className="site-foot">
@@ -136,6 +273,7 @@ export default function App() {
           no uploads. Intelligence is abundant. Judgment is the product.
         </p>
       </footer>
+      <pre className="print-summary">{packSummaryMarkdown(pack)}</pre>
       <Toast message={toast} />
     </div>
   );

@@ -6,17 +6,22 @@ import {
 } from "../types";
 import { defaultHold, formatCameraCell, isSingleOfficialCamera } from "../lib/camera";
 import { emptyEditRow } from "../lib/pack";
+import { ensurePlateStill, missingIdentityPlate } from "../lib/stills";
+import type { GateResult } from "../lib/gate";
 import { SelectField, TextField } from "./Field";
+import { EmptyHint, StepIssues } from "./StepIssues";
 
 type Props = {
   pack: CapturePack;
   onChange: (pack: CapturePack) => void;
+  gates: GateResult[];
+  onOpenStills: () => void;
 };
 
 const JOIN_OPTIONS = JOIN_TYPES.map((value) => ({ value, label: value }));
 const CAMERA_OPTIONS = CAMERA_VERBS.map((value) => ({ value, label: value }));
 
-export function EditListStep({ pack, onChange }: Props) {
+export function EditListStep({ pack, onChange, gates, onOpenStills }: Props) {
   return (
     <section>
       <div className="editor-head">
@@ -30,6 +35,10 @@ export function EditListStep({ pack, onChange }: Props) {
           is three rows or it is refused.
         </p>
       </div>
+      <StepIssues gates={gates} ids={["edit-list"]} />
+      {pack.editList.length === 0 ? (
+        <EmptyHint>No edit rows. Add continue / cut / fadeblack before generate.</EmptyHint>
+      ) : null}
       {pack.editList.map((row, index) => {
         const camera = formatCameraCell(
           row.cameraVerb,
@@ -38,10 +47,11 @@ export function EditListStep({ pack, onChange }: Props) {
         );
         const mush =
           Boolean(row.cameraVerb) && camera && !isSingleOfficialCamera(camera);
+        const plateGap = missingIdentityPlate(pack, index);
         return (
           <article
             key={row.id}
-            className={mush ? "row-card is-bad" : "row-card"}
+            className={mush || plateGap ? "row-card is-bad" : "row-card"}
           >
             <div className="row-top">
               <span className="row-kicker">Row {index + 1}</span>
@@ -51,10 +61,7 @@ export function EditListStep({ pack, onChange }: Props) {
                 onClick={() =>
                   onChange({
                     ...pack,
-                    editList:
-                      pack.editList.length === 1
-                        ? pack.editList
-                        : pack.editList.filter((item) => item.id !== row.id),
+                    editList: pack.editList.filter((item) => item.id !== row.id),
                   })
                 }
               >
@@ -202,6 +209,21 @@ export function EditListStep({ pack, onChange }: Props) {
             {mush ? (
               <p className="danger">
                 Multi-verb mush: {camera}. Official H3 wants one verb.
+              </p>
+            ) : null}
+            {plateGap ? (
+              <p className="danger">
+                {plateGap}{" "}
+                <button
+                  type="button"
+                  className="btn btn-inline"
+                  onClick={() => {
+                    onChange(ensurePlateStill(pack, index));
+                    onOpenStills();
+                  }}
+                >
+                  Add plate still
+                </button>
               </p>
             ) : null}
             <div className="grid-2">

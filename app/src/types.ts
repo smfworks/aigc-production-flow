@@ -218,7 +218,7 @@ export const DEFAULT_SMOKE_NOTES =
   "One hop-1 per take — I2VA if a plate exists, else T2V — watched before hopping. continue = plate on hop-1 only; hop 2+ is Motion-Context latent (no new Qwen still). cut / fadeblack = new plate → I2VA hop-1. Chorus independent takes = independent plates → I2VA.";
 
 export const STEPS = [
-  { id: "pack", n: 1, label: "New pack" },
+  { id: "pack", n: 1, label: "Pack" },
   { id: "map", n: 2, label: "Map" },
   { id: "takes", n: 3, label: "Takes" },
   { id: "edit", n: 4, label: "Edit list" },

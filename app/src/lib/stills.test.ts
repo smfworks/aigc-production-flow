@@ -6,10 +6,12 @@ import {
   applyStillsToTakes,
   canvasLooksStretched,
   canvasMatchesHop1,
+  ensureSheetStill,
   hop1ModeForPlate,
   identityPlateNeeded,
   isHop1EditRow,
   isRealStillFile,
+  missingIdentityPlate,
   stillCardProblems,
   stillSourceAgrees,
   takeFromConditions,
@@ -73,5 +75,33 @@ describe("sheet vs plate helpers", () => {
     const next = applyStillsToTakes(pack);
     assert.match(next.takes[0].hop1Plate, /^none/);
     assert.equal(next.takes[0].hop1Mode, "t2v");
+  });
+
+  it("adds a matching sheet still from a character card", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.stills = pack.stills.filter((card) => card.entity !== "smith");
+    const next = ensureSheetStill(
+      pack,
+      "smith",
+      pack.characters[0].stillFile,
+      pack.characters[0].stillSource,
+      pack.characters[0].stillCanvas,
+    );
+    const sheet = next.stills.find((card) => card.role === "sheet" && card.entity === "smith");
+    assert.ok(sheet);
+    assert.equal(sheet.conditions, "none");
+    assert.equal(sheet.lookLock, pack.look.styleLine);
+    assert.equal(ensureSheetStill(next, "smith", "stills/other.png", "photo", "1344×768"), next);
+  });
+
+  it("reports a missing cut plate with none + why language", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.editList.push({
+      ...pack.editList[2],
+      id: "extra-cut",
+      songT: "0:51",
+    });
+    assert.match(missingIdentityPlate(pack, pack.editList.length - 1) ?? "", /cut needs a plate/);
+    assert.equal(missingIdentityPlate(pack, 1), null);
   });
 });

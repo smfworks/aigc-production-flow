@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   DEFAULT_LOOK_STYLE,
   DEFAULT_STILL_CANVAS,
@@ -12,35 +11,37 @@ import {
   type StillRole,
   type StillSource,
 } from "../types";
-import { propGenerateFlags } from "../lib/gate";
 import {
   emptyCharacter,
   emptyProp,
   emptyStill,
   stillOk,
 } from "../lib/pack";
+import { propGenerateFlags, type CardsTab, type GateResult } from "../lib/gate";
 import {
   canvasLooksStretched,
   canvasMatchesHop1,
+  ensureSheetStill,
   isBlankStill,
   sheetStillForEntity,
   stillCardProblems,
   stillSourceAgrees,
 } from "../lib/stills";
 import { Field, SelectField, TextArea, TextField } from "./Field";
+import { EmptyHint, StepIssues } from "./StepIssues";
 
 type Props = {
   pack: CapturePack;
   onChange: (pack: CapturePack) => void;
+  gates: GateResult[];
+  tab: CardsTab;
+  onTab: (tab: CardsTab) => void;
 };
-
-type Tab = "characters" | "props" | "look" | "stills";
 
 const SOURCE_OPTIONS = STILL_SOURCES.map((value) => ({ value, label: value }));
 const ROLE_OPTIONS = STILL_ROLES.map((value) => ({ value, label: value }));
 
-export function CardsStep({ pack, onChange }: Props) {
-  const [tab, setTab] = useState<Tab>("characters");
+export function CardsStep({ pack, onChange, gates, tab, onTab }: Props) {
   return (
     <section>
       <div className="editor-head">
@@ -52,6 +53,10 @@ export function CardsStep({ pack, onChange }: Props) {
           sheet. Lyric numbers belong on a prop card before any browser call.
         </p>
       </div>
+      <StepIssues
+        gates={gates}
+        ids={tab === "stills" ? ["smoke"] : ["characters", "props", "look"]}
+      />
       <div className="subnav">
         {(
           [
@@ -65,23 +70,48 @@ export function CardsStep({ pack, onChange }: Props) {
             key={id}
             type="button"
             className={tab === id ? "chip is-on" : "chip"}
-            onClick={() => setTab(id)}
+            aria-current={tab === id ? "true" : undefined}
+            onClick={() => onTab(id)}
           >
             {label}
           </button>
         ))}
       </div>
       {tab === "characters" ? (
-        <Characters pack={pack} onChange={onChange} />
+        <Characters pack={pack} onChange={onChange} onOpenStills={() => onTab("stills")} />
       ) : null}
-      {tab === "props" ? <PropsEditor pack={pack} onChange={onChange} /> : null}
+      {tab === "props" ? (
+        <PropsEditor pack={pack} onChange={onChange} onOpenStills={() => onTab("stills")} />
+      ) : null}
       {tab === "look" ? <LookEditor pack={pack} onChange={onChange} /> : null}
       {tab === "stills" ? <StillsEditor pack={pack} onChange={onChange} /> : null}
     </section>
   );
 }
 
-function Characters({ pack, onChange }: Props) {
+type EditorProps = {
+  pack: CapturePack;
+  onChange: (pack: CapturePack) => void;
+  onOpenStills?: () => void;
+};
+
+function Characters({ pack, onChange, onOpenStills }: EditorProps) {
+  if (pack.characters.length === 0) {
+    return (
+      <>
+        <EmptyHint>No character cards. Add one with lock, forbidden, and a sheet or none + why.</EmptyHint>
+        <button
+          type="button"
+          className="btn btn-inline"
+          onClick={() =>
+            onChange({ ...pack, characters: [...pack.characters, emptyCharacter()] })
+          }
+        >
+          Add character
+        </button>
+      </>
+    );
+  }
   return (
     <>
       {pack.characters.map((card) => (
@@ -194,6 +224,26 @@ function Characters({ pack, onChange }: Props) {
               ),
             })
           } />
+          {!sheetStillForEntity(pack, card.name) && card.name.trim() ? (
+            <button
+              type="button"
+              className="btn btn-inline"
+              onClick={() => {
+                onChange(
+                  ensureSheetStill(
+                    pack,
+                    card.name,
+                    card.stillFile,
+                    card.stillSource,
+                    card.stillCanvas,
+                  ),
+                );
+                onOpenStills?.();
+              }}
+            >
+              Add matching sheet still
+            </button>
+          ) : null}
           <div className="grid-2">
             {CHARACTER_LOCK_FIELDS.map((field) => (
               <TextField
@@ -264,7 +314,21 @@ function Characters({ pack, onChange }: Props) {
   );
 }
 
-function PropsEditor({ pack, onChange }: Props) {
+function PropsEditor({ pack, onChange, onOpenStills }: EditorProps) {
+  if (pack.props.length === 0) {
+    return (
+      <>
+        <EmptyHint>No prop cards. Pin numbers and units before any browser call.</EmptyHint>
+        <button
+          type="button"
+          className="btn btn-inline"
+          onClick={() => onChange({ ...pack, props: [...pack.props, emptyProp()] })}
+        >
+          Add prop
+        </button>
+      </>
+    );
+  }
   return (
     <>
       {pack.props.map((card) => {
@@ -360,6 +424,26 @@ function PropsEditor({ pack, onChange }: Props) {
                 ),
               })
             } />
+            {!sheetStillForEntity(pack, card.name) && card.name.trim() ? (
+              <button
+                type="button"
+                className="btn btn-inline"
+                onClick={() => {
+                  onChange(
+                    ensureSheetStill(
+                      pack,
+                      card.name,
+                      card.stillFile,
+                      card.stillSource,
+                      card.stillCanvas,
+                    ),
+                  );
+                  onOpenStills?.();
+                }}
+              >
+                Add matching sheet still
+              </button>
+            ) : null}
             <p className={flags.overallHaftUnresolved ? "danger" : "ok-note"}>
               {flags.overallHaftUnresolved
                 ? "Overall vs haft length unresolved"
@@ -466,7 +550,7 @@ function patchMeasurement(
   });
 }
 
-function LookEditor({ pack, onChange }: Props) {
+function LookEditor({ pack, onChange }: EditorProps) {
   return (
     <div className="stack">
       <TextArea
@@ -507,7 +591,26 @@ function LookEditor({ pack, onChange }: Props) {
   );
 }
 
-function StillsEditor({ pack, onChange }: Props) {
+function StillsEditor({ pack, onChange }: EditorProps) {
+  const cards = pack.stills;
+  if (cards.length === 0) {
+    return (
+      <>
+        <p className="field-hint">
+          A <strong>sheet</strong> is the bible. A <strong>plate</strong> is hop-1
+          first_frame. Native 1344×768. Do not stretch 1024².
+        </p>
+        <EmptyHint>No still cards. Add a sheet, then plates for hop-1 / cut / fadeblack.</EmptyHint>
+        <button
+          type="button"
+          className="btn btn-inline"
+          onClick={() => onChange({ ...pack, stills: [emptyStill()] })}
+        >
+          Add still card
+        </button>
+      </>
+    );
+  }
   function patch(id: string, next: Partial<StillCard>) {
     onChange({
       ...pack,
@@ -540,10 +643,7 @@ function StillsEditor({ pack, onChange }: Props) {
                 onClick={() =>
                   onChange({
                     ...pack,
-                    stills:
-                      pack.stills.length === 1
-                        ? pack.stills
-                        : pack.stills.filter((item) => item.id !== row.id),
+                    stills: pack.stills.filter((item) => item.id !== row.id),
                   })
                 }
               >

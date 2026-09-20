@@ -1,9 +1,10 @@
 type Props = {
   onLoadSample: () => void;
   onNewPack: () => void;
+  onImport: () => void;
 };
 
-export function Header({ onLoadSample, onNewPack }: Props) {
+export function Header({ onLoadSample, onNewPack, onImport }: Props) {
   return (
     <header className="mast">
       <div className="mast-brand">
@@ -38,6 +39,9 @@ export function Header({ onLoadSample, onNewPack }: Props) {
         </button>
         <button type="button" className="btn" onClick={onNewPack}>
           New pack
+        </button>
+        <button type="button" className="btn" onClick={onImport}>
+          Import zip
         </button>
       </div>
     </header>

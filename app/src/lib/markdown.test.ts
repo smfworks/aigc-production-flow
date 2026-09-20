@@ -155,6 +155,7 @@ describe("export matches template shapes", () => {
       "continuity-log.md",
       "edit-list.md",
       "look.md",
+      "pack.json",
       "prop-francisca.md",
       "still-cut-3.md",
       "still-francisca-sheet.md",
@@ -163,6 +164,9 @@ describe("export matches template shapes", () => {
       "still-smith-sheet.md",
       "still-thrower-sheet.md",
     ]);
+    const parsed = JSON.parse(files["pack.json"]) as { v: number; pack: { title: string } };
+    assert.equal(parsed.v, 2);
+    assert.equal(parsed.pack.title, "Sigils in the Steel");
   });
 
   it("empty pack still serializes template filenames", () => {
@@ -172,9 +176,26 @@ describe("export matches template shapes", () => {
     assert.ok(files["edit-list.md"]);
     assert.ok(files["look.md"]);
     assert.ok(files["continuity-log.md"]);
+    assert.ok(files["pack.json"]);
     assert.ok(Object.keys(files).some((name) => name.startsWith("character-")));
     assert.ok(Object.keys(files).some((name) => name.startsWith("prop-")));
-    assert.ok(Object.keys(files).some((name) => name.startsWith("still-")));
+    assert.equal(
+      Object.keys(files).some((name) => name.startsWith("still-")),
+      false,
+      "blank still cards must not become still-*.md",
+    );
+  });
+
+  it("disambiguates duplicate character names and empty titles", () => {
+    const pack = emptyPack();
+    pack.title = "";
+    pack.characters = [
+      { ...pack.characters[0], name: 'Smith "A"/B' },
+      { ...pack.characters[0], id: "dup", name: 'Smith "A"/B' },
+    ];
+    const files = packToFiles(pack);
+    assert.ok(files["character-smith-a-b.md"]);
+    assert.ok(files["character-smith-a-b-2.md"]);
   });
 
   it("generate-ready zip README is not a DRAFT", () => {

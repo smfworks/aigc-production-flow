@@ -1,15 +1,18 @@
 import type { CapturePack } from "../types";
 import { emptyTake, nextTakeLetter } from "../lib/pack";
 import { applyStillsToTakes } from "../lib/stills";
+import type { GateResult } from "../lib/gate";
 import { Hop1Fields } from "./Hop1Fields";
 import { TextField } from "./Field";
+import { EmptyHint, StepIssues } from "./StepIssues";
 
 type Props = {
   pack: CapturePack;
   onChange: (pack: CapturePack) => void;
+  gates: GateResult[];
 };
 
-export function TakesStep({ pack, onChange }: Props) {
+export function TakesStep({ pack, onChange, gates }: Props) {
   return (
     <section>
       <div className="editor-head">
@@ -22,6 +25,10 @@ export function TakesStep({ pack, onChange }: Props) {
           dusk / amber are three takes, not one prompt.
         </p>
       </div>
+      <StepIssues gates={gates} ids={["takes"]} />
+      {pack.takes.length === 0 ? (
+        <EmptyHint>No takes. One location and one grade each. Unique hop-1 prefix.</EmptyHint>
+      ) : null}
       {pack.takes.map((row) => (
         <article key={row.id} className="row-card">
           <div className="row-top">
@@ -32,10 +39,7 @@ export function TakesStep({ pack, onChange }: Props) {
               onClick={() =>
                 onChange({
                   ...pack,
-                  takes:
-                    pack.takes.length === 1
-                      ? pack.takes
-                      : pack.takes.filter((item) => item.id !== row.id),
+                  takes: pack.takes.filter((item) => item.id !== row.id),
                 })
               }
             >

@@ -13,6 +13,7 @@ export function StepNav({ step, onStep }: Props) {
           key={item.id}
           type="button"
           className={item.id === step ? "step is-on" : "step"}
+          aria-current={item.id === step ? "step" : undefined}
           onClick={() => onStep(item.id)}
         >
           <span className="step-n">{item.n}</span>

@@ -66,6 +66,7 @@ export function Hop1Fields({ pack, take, onChange, showAttestation }: Props) {
           label="Hop-1 plate (or none + why)"
           value={take.hop1Plate}
           mono
+          title={take.hop1Plate}
           placeholder={
             take.hop1Mode === "i2va"
               ? "stills/a-hop1-plate.png"

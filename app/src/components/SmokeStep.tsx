@@ -1,15 +1,18 @@
 import type { CapturePack } from "../types";
 import { emptyContinuity } from "../lib/pack";
 import { applyStillsToTakes } from "../lib/stills";
+import type { GateResult } from "../lib/gate";
 import { Hop1Fields } from "./Hop1Fields";
 import { TextArea, TextField } from "./Field";
+import { EmptyHint, StepIssues } from "./StepIssues";
 
 type Props = {
   pack: CapturePack;
   onChange: (pack: CapturePack) => void;
+  gates: GateResult[];
 };
 
-export function SmokeStep({ pack, onChange }: Props) {
+export function SmokeStep({ pack, onChange, gates }: Props) {
   return (
     <section>
       <div className="editor-head">
@@ -18,9 +21,10 @@ export function SmokeStep({ pack, onChange }: Props) {
           One hop-1 per take — <strong>I2VA if a plate exists, else T2V</strong> —
           with SaveLatent and a unique prefix. Watch identity at cuts. Only then
           hop. Gate 9 refuses a missing plate (or missing <code>none</code> +
-          why). The continuity log is a stub until generate.
+          why). Continuity log and polaroid path are what landed, not intent.
         </p>
       </div>
+      <StepIssues gates={gates} ids={["smoke"]} />
       <TextArea
         label="Smoke plan"
         value={pack.smokeNotes}
@@ -49,6 +53,9 @@ export function SmokeStep({ pack, onChange }: Props) {
         <h2>Continuity log stub</h2>
         <p>Fill during generate from history: seed, peak °C, ffprobe, NG reason.</p>
       </div>
+      {pack.continuityRows.length === 0 ? (
+        <EmptyHint>No continuity rows yet. Fill during generate — this is what landed, not intent.</EmptyHint>
+      ) : null}
       {pack.continuityRows.map((row) => (
         <article key={row.id} className="row-card">
           <div className="row-top">
@@ -59,10 +66,7 @@ export function SmokeStep({ pack, onChange }: Props) {
               onClick={() =>
                 onChange({
                   ...pack,
-                  continuityRows:
-                    pack.continuityRows.length === 1
-                      ? pack.continuityRows
-                      : pack.continuityRows.filter((item) => item.id !== row.id),
+                  continuityRows: pack.continuityRows.filter((item) => item.id !== row.id),
                 })
               }
             >

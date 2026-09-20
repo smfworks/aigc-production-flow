@@ -45,10 +45,6 @@ function asBool(value: unknown, fallback = false): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
-function asArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
 function migrateMap(row: unknown): MapRow {
   const rec = asRecord(row) ?? {};
   return {
@@ -208,6 +204,12 @@ function migrateLook(row: unknown): LookCard {
   };
 }
 
+function migrateList<T>(value: unknown, fallback: T[], map: (row: unknown) => T): T[] {
+  if (value === undefined || value === null) return fallback;
+  if (!Array.isArray(value)) return fallback;
+  return value.map(map);
+}
+
 export function migratePack(raw: unknown): CapturePack | null {
   const rec = asRecord(raw);
   if (!rec) return null;
@@ -215,27 +217,25 @@ export function migratePack(raw: unknown): CapturePack | null {
   const look = rec.look;
   if (!look || typeof look !== "object") return null;
   const blank = emptyPack();
+  const audio = asString(rec.audioPath);
+  const speech = asString(rec.speech);
   return {
     title: asString(rec.title),
     logLine: asString(rec.logLine),
     durationTarget: asString(rec.durationTarget),
     songNarrativeClock: asString(rec.songNarrativeClock),
-    audioPath: (asString(rec.audioPath) as CapturePack["audioPath"]) || "",
-    speech: (asString(rec.speech) as CapturePack["speech"]) || "",
+    audioPath: audio === "na-mute" || audio === "prompt-score" || audio === "silence" ? audio : "",
+    speech: speech === "none" || speech === "finish-by-8s" ? speech : "",
     forbiddenGlobal: asString(rec.forbiddenGlobal, DEFAULT_GLOBAL_FORBIDDEN),
-    map: asArray(rec.map).map(migrateMap),
-    takes: asArray(rec.takes).length ? asArray(rec.takes).map(migrateTake) : blank.takes,
-    editList: asArray(rec.editList).length ? asArray(rec.editList).map(migrateEdit) : blank.editList,
-    characters: asArray(rec.characters).length
-      ? asArray(rec.characters).map(migrateCharacter)
-      : blank.characters,
-    props: asArray(rec.props).length ? asArray(rec.props).map(migrateProp) : blank.props,
+    map: migrateList(rec.map, blank.map, migrateMap),
+    takes: migrateList(rec.takes, blank.takes, migrateTake),
+    editList: migrateList(rec.editList, blank.editList, migrateEdit),
+    characters: migrateList(rec.characters, blank.characters, migrateCharacter),
+    props: migrateList(rec.props, blank.props, migrateProp),
     look: migrateLook(look),
-    stills: asArray(rec.stills).length ? asArray(rec.stills).map(migrateStill) : blank.stills,
+    stills: migrateList(rec.stills, blank.stills, migrateStill),
     smokeNotes: asString(rec.smokeNotes, DEFAULT_SMOKE_NOTES),
-    continuityRows: asArray(rec.continuityRows).length
-      ? asArray(rec.continuityRows).map(migrateContinuity)
-      : blank.continuityRows,
+    continuityRows: migrateList(rec.continuityRows, blank.continuityRows, migrateContinuity),
     polaroidPath: asString(rec.polaroidPath),
   };
 }
@@ -247,26 +247,56 @@ function readRaw(key: string): unknown {
   return JSON.parse(raw);
 }
 
+let loadNote: string | null = null;
+
+export function consumeLoadNote(): string | null {
+  const note = loadNote;
+  loadNote = null;
+  return note;
+}
+
+function recoverCorrupt(message: string): CapturePack {
+  loadNote = message;
+  return emptyPack();
+}
+
 export function loadStoredPack(): CapturePack | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    const v2 = readRaw(STORAGE_KEY) as StoredV2 | null;
-    if (v2?.v === 2) {
-      const pack = migratePack(v2.pack);
-      return pack ? clonePack(pack) : null;
+    const v2raw = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    if (v2raw) {
+      try {
+        const parsed = JSON.parse(v2raw) as StoredV2;
+        if (parsed?.v === 2) {
+          const pack = migratePack(parsed.pack);
+          if (pack) return clonePack(pack);
+        }
+      } catch {
+        /* fall through to recover */
+      }
+      return recoverCorrupt(
+        "Autosave was unreadable. Opened a blank pack so the Sigils sample does not overwrite it.",
+      );
     }
     const v1 = readRaw(LEGACY_STORAGE_KEY) as StoredV1 | null;
     if (v1?.v === 1) {
       const pack = migratePack(v1.pack);
-      if (!pack) return null;
+      if (!pack) {
+        return recoverCorrupt(
+          "v1 autosave could not be migrated. Opened a blank pack so nothing is silently replaced.",
+        );
+      }
       const cloned = clonePack(pack);
       saveStoredPack(cloned);
       localStorage.removeItem(LEGACY_STORAGE_KEY);
+      loadNote = "Migrated a v1 pack. Hop-1 is T2V until you add a plate still.";
       return cloned;
     }
     return null;
   } catch {
-    return null;
+    return recoverCorrupt(
+      "Autosave was unreadable. Opened a blank pack so the Sigils sample does not overwrite it.",
+    );
   }
 }
 

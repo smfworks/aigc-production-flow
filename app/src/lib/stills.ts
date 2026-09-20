@@ -9,7 +9,7 @@ import {
   type StillSource,
   type TakeCard,
 } from "../types.ts";
-import { filled, stillOk } from "./pack.ts";
+import { emptyStill, filled, stillOk } from "./pack.ts";
 
 export function isStillRole(value: string): value is StillRole {
   return (STILL_ROLES as readonly string[]).includes(value);
@@ -211,4 +211,86 @@ export function applyStillsToTakes(pack: CapturePack): CapturePack {
 
 export function inUseStills(pack: CapturePack): StillCard[] {
   return pack.stills.filter((card) => !isBlankStill(card));
+}
+
+/** Plate file that conditions this edit row, if any. */
+export function identityPlateFile(pack: CapturePack, index: number): string {
+  const row = pack.editList[index];
+  if (!row) return "";
+  const take = pack.takes.find((item) => item.take.trim() === row.take.trim());
+  const takePlate = take ? plateFileForTake(pack, take) : "";
+  if (row.join === "continue" && isHop1EditRow(pack, index)) return takePlate;
+  if (row.join === "fadeblack") return takePlate;
+  if (row.join === "cut") {
+    const cutStill = cutPlateStills(pack, index + 1, row.take)[0];
+    if (cutStill && filled(cutStill.file)) return cutStill.file;
+    if (isHop1EditRow(pack, index)) return takePlate;
+    return "";
+  }
+  return "";
+}
+
+export function missingIdentityPlate(pack: CapturePack, index: number): string | null {
+  if (!identityPlateNeeded(pack, index)) return null;
+  const file = identityPlateFile(pack, index);
+  if (stillOk(file)) return null;
+  const row = pack.editList[index];
+  const n = index + 1;
+  if (row.join === "continue") return `#${n} continue hop-1 needs a plate (or none + why)`;
+  if (row.join === "fadeblack") {
+    return `#${n} fadeblack hop-1 needs a plate in the new location/grade (or none + why)`;
+  }
+  if (row.join === "cut") return `#${n} cut needs a plate → I2VA (or none + why)`;
+  return `#${n} needs a plate (or none + why)`;
+}
+
+export function ensureSheetStill(
+  pack: CapturePack,
+  entity: string,
+  file: string,
+  source: StillSource | "",
+  canvas: string,
+): CapturePack {
+  const name = entity.trim();
+  if (!name) return pack;
+  if (sheetStillForEntity(pack, name)) return pack;
+  const card: StillCard = {
+    ...emptyStill(),
+    entity: name,
+    role: "sheet",
+    source: isStillSource(source) ? source : file && !isNoneStill(file) ? "qwen-t2i" : "none",
+    canvas: canvas || DEFAULT_STILL_CANVAS,
+    file,
+    conditions: "none",
+    lookLock: pack.look.styleLine,
+  };
+  const stills = [...pack.stills.filter((row) => !isBlankStill(row)), card];
+  return { ...pack, stills };
+}
+
+export function ensurePlateStill(pack: CapturePack, index: number): CapturePack {
+  const row = pack.editList[index];
+  if (!row?.join) return pack;
+  if (row.join === "cut") {
+    if (cutPlateStills(pack, index + 1, row.take).length) return pack;
+    const card: StillCard = {
+      ...emptyStill(),
+      entity: `cut ${index + 1}`,
+      role: "cut plate",
+      conditions: `cut row ${index + 1}`,
+    };
+    return { ...pack, stills: [...pack.stills.filter((item) => !isBlankStill(item)), card] };
+  }
+  if (row.join === "fadeblack" || (row.join === "continue" && isHop1EditRow(pack, index))) {
+    const take = row.take.trim();
+    if (!take || hop1PlateStills(pack, take).length) return pack;
+    const card: StillCard = {
+      ...emptyStill(),
+      entity: `take ${take} hop-1`,
+      role: "hop-1 plate",
+      conditions: `hop-1 of take ${take}`,
+    };
+    return { ...pack, stills: [...pack.stills.filter((item) => !isBlankStill(item)), card] };
+  }
+  return pack;
 }

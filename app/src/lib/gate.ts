@@ -4,23 +4,25 @@ import {
   canvasLooksStretched,
   canvasMatchesHop1,
   hop1ModeForPlate,
-  identityPlateNeeded,
   inUseStills,
-  isHop1EditRow,
   isRealStillFile,
+  missingIdentityPlate,
   plateFileForTake,
   stillCardProblems,
   stillSourceAgrees,
 } from "./stills.ts";
 import {
+  AUDIO_PATHS,
   DEFAULT_STILL_CANVAS,
   ENERGY_VALUES,
   JOIN_TYPES,
   PROP_FIELDS,
+  SPEECH_MODES,
   type CapturePack,
   type CharacterCard,
   type JoinType,
   type PropCard,
+  type StepId,
 } from "../types.ts";
 
 export const GATE_DEFS = [
@@ -37,6 +39,20 @@ export const GATE_DEFS = [
 
 export type GateId = (typeof GATE_DEFS)[number]["id"];
 
+export type CardsTab = "characters" | "props" | "look" | "stills";
+
+export const GATE_DESTINATION: Record<GateId, { step: StepId; cardsTab?: CardsTab }> = {
+  "log-line": { step: "pack" },
+  map: { step: "map" },
+  "edit-list": { step: "edit" },
+  takes: { step: "takes" },
+  characters: { step: "cards", cardsTab: "characters" },
+  props: { step: "cards", cardsTab: "props" },
+  look: { step: "cards", cardsTab: "look" },
+  audio: { step: "pack" },
+  smoke: { step: "smoke" },
+};
+
 export type GateResult = {
   id: GateId;
   n: number;
@@ -46,7 +62,11 @@ export type GateResult = {
 };
 
 function looksLikeShot(text: string): boolean {
-  return /\bshot\s*\d+\b/i.test(text) || /\b(ecu|cu|ms|ws|wide shot|close[- ]up)\b/i.test(text);
+  if (/\bshot\s*\d+\b/i.test(text)) return true;
+  if (/\b(ecu|wide shot|close[- ]up|medium shot|long shot)\b/i.test(text)) return true;
+  // CU / MS / WS as camera sizes — not "18 ms" milliseconds on a clock.
+  const withoutDurationMs = text.replace(/\d+\s*ms\b/gi, " ");
+  return /(^|[\s,/])(cu|ms|ws)([\s,/]|$)/i.test(withoutDurationMs);
 }
 
 function energyOk(energy: string): boolean {
@@ -72,10 +92,7 @@ function propResearch(prop: PropCard): boolean {
     prop.name,
     prop.lockParagraph,
     prop.forbidden,
-    ...PROP_FIELDS.map((field) => {
-      const m = prop.fields[field.key];
-      return `${m.value} ${m.source}`;
-    }),
+    ...PROP_FIELDS.map((field) => prop.fields[field.key].value),
   ].join(" ");
   return mentionsResearch(blob);
 }
@@ -168,6 +185,17 @@ function evaluateEditList(pack: CapturePack): GateResult {
     if (row.join && !holdOkForJoin(row.join, row.hold)) {
       problems.push(holdProblem(row.join, n));
     }
+    const takeName = row.take.trim();
+    const knownTakes = new Set(pack.takes.map((item) => item.take.trim()).filter(Boolean));
+    if (takeName && takeName !== "—" && takeName !== "-" && !knownTakes.has(takeName)) {
+      problems.push(`#${n} take ${takeName} is not on the take cards`);
+    }
+    if (row.join === "continue") {
+      const jumped = continueJumpedLocation(pack, row.locationGrade, takeName);
+      if (jumped) {
+        problems.push(`#${n} continue jumped to take ${jumped}'s location — that is cut or fadeblack`);
+      }
+    }
   });
   if (problems.length) {
     return { ...GATE_DEFS[2], ok: false, detail: problems.slice(0, 3).join("; ") };
@@ -177,6 +205,21 @@ function evaluateEditList(pack: CapturePack): GateResult {
     ok: true,
     detail: `${pack.editList.length} row(s), each one join, clock, take, action, and one verb.`,
   };
+}
+
+function continueJumpedLocation(pack: CapturePack, locationGrade: string, takeName: string): string | null {
+  const loc = locationGrade.toLowerCase();
+  if (!loc) return null;
+  const self = pack.takes.find((item) => item.take.trim() === takeName);
+  const selfLoc = self?.location.trim().toLowerCase() ?? "";
+  if (selfLoc && loc.includes(selfLoc)) return null;
+  for (const take of pack.takes) {
+    if (take.take.trim() === takeName) continue;
+    const other = take.location.trim().toLowerCase();
+    if (other.length < 4) continue;
+    if (loc.includes(other)) return take.take.trim();
+  }
+  return null;
 }
 
 function evaluateTakes(pack: CapturePack): GateResult {
@@ -189,14 +232,13 @@ function evaluateTakes(pack: CapturePack): GateResult {
       !filled(row.location) ||
       !filled(row.grade) ||
       !filled(row.windows) ||
-      !filled(row.prefix) ||
-      !filled(row.hop1Seed),
+      !filled(row.prefix),
   );
   if (incomplete.length) {
     return {
       ...GATE_DEFS[3],
       ok: false,
-      detail: `${incomplete.length} take(s) missing location, grade, windows, prefix, or hop-1 seed.`,
+      detail: `${incomplete.length} take(s) missing location, grade, windows, or prefix.`,
     };
   }
   return {
@@ -297,14 +339,15 @@ function evaluateLook(pack: CapturePack): GateResult {
 }
 
 function evaluateAudio(pack: CapturePack): GateResult {
-  if (!pack.audioPath) {
+  const audioOk = (AUDIO_PATHS as readonly string[]).includes(pack.audioPath);
+  if (!audioOk) {
     return {
       ...GATE_DEFS[7],
       ok: false,
       detail: "Pick exactly one: N/A + mute, prompt score, or silence.",
     };
   }
-  if (!pack.speech) {
+  if (!(SPEECH_MODES as readonly string[]).includes(pack.speech)) {
     return {
       ...GATE_DEFS[7],
       ok: false,
@@ -369,39 +412,9 @@ function evaluateSmoke(pack: CapturePack): GateResult {
     problems.push(...stillCardProblems(card, lookLine));
   }
 
-  pack.editList.forEach((row, index) => {
-    if (!identityPlateNeeded(pack, index)) return;
-    const n = index + 1;
-    if (row.join === "continue" && isHop1EditRow(pack, index)) {
-      const take = pack.takes.find((item) => item.take.trim() === row.take.trim());
-      const plate = take ? plateFileForTake(pack, take) : "";
-      if (!stillOk(plate)) {
-        problems.push(`#${n} continue hop-1 needs a plate (or none + why)`);
-      }
-      return;
-    }
-    if (row.join === "fadeblack") {
-      const take = pack.takes.find((item) => item.take.trim() === row.take.trim());
-      const plate = take ? plateFileForTake(pack, take) : "";
-      if (!stillOk(plate)) {
-        problems.push(`#${n} fadeblack hop-1 needs a plate in the new location/grade (or none + why)`);
-      }
-      return;
-    }
-    if (row.join === "cut") {
-      const take = pack.takes.find((item) => item.take.trim() === row.take.trim());
-      const takePlate = take ? plateFileForTake(pack, take) : "";
-      const cutStill = pack.stills.find(
-        (card) =>
-          card.role === "cut plate" &&
-          (new RegExp(`\\bcut\\s*(?:row|#)?\\s*${n}\\b`, "i").test(card.conditions) ||
-            (take ? new RegExp(`\\btake\\s*${take.take}\\b`, "i").test(card.conditions) : false)),
-      );
-      const plate = cutStill?.file || (isHop1EditRow(pack, index) ? takePlate : "");
-      if (!stillOk(plate)) {
-        problems.push(`#${n} cut needs a plate → I2VA (or none + why)`);
-      }
-    }
+  pack.editList.forEach((_, index) => {
+    const missing = missingIdentityPlate(pack, index);
+    if (missing) problems.push(missing);
   });
 
   if (problems.length) {
@@ -434,6 +447,47 @@ export function evaluateGates(pack: CapturePack): GateResult[] {
 
 export function allGatesGreen(pack: CapturePack): boolean {
   return evaluateGates(pack).every((gate) => gate.ok);
+}
+
+export function gateChecklistMarkdown(pack: CapturePack): string {
+  const gates = evaluateGates(pack);
+  const lines = gates.map(
+    (gate) => `- [${gate.ok ? "x" : " "}] ${gate.n}. ${gate.label} — ${gate.detail}`,
+  );
+  const ready = gates.every((gate) => gate.ok);
+  return `# Capture pack gate
+
+${lines.join("\n")}
+
+Ready to queue Comfy? ${ready ? "Yes." : "No. Do not queue."}
+`;
+}
+
+export function packSummaryMarkdown(pack: CapturePack): string {
+  const title = filled(pack.title) ? pack.title.trim() : "(untitled)";
+  const hops = pack.takes
+    .map((row) => {
+      const mode = row.hop1Mode === "i2va" ? "I2VA" : row.hop1Mode === "t2v" ? "T2V" : "no hop-1 mode";
+      return `- Take ${row.take || "—"} · ${mode} · ${row.hop1Plate || "no plate"}`;
+    })
+    .join("\n");
+  const stills = inUseStills(pack)
+    .map((card) => `- ${card.entity || "unnamed"} · ${card.role || "no role"} · ${card.file || "no file"}`)
+    .join("\n");
+  return `# Pack summary — ${title}
+
+Log line: ${filled(pack.logLine) ? pack.logLine.trim() : "(empty)"}
+
+${gateChecklistMarkdown(pack)}
+## Hop-1
+${hops || "(no takes)"}
+
+## Still cards
+${stills || "(none)"}
+
+## Polaroid / hop-1 grab
+${filled(pack.polaroidPath) ? pack.polaroidPath : "(empty)"}
+`;
 }
 
 export function propGenerateFlags(prop: PropCard): {
