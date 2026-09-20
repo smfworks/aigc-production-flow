@@ -1,13 +1,18 @@
 import { formatCameraCell } from "./camera.ts";
 import { fileSlug, filled } from "./pack.ts";
 import { allGatesGreen, propGenerateFlags } from "./gate.ts";
+import { cutRowFromConditions, hop1ModeLabel, takeFromConditions } from "./stills.ts";
 import {
   CHARACTER_LOCK_FIELDS,
+  DEFAULT_STILL_CANVAS,
   PROP_FIELDS,
   STACK_LINE,
+  STILL_ROLES,
+  STILL_SOURCES,
   type CapturePack,
   type CharacterCard,
   type PropCard,
+  type StillCard,
 } from "../types.ts";
 
 function cell(value: string): string {
@@ -59,11 +64,13 @@ export function renderReadme(pack: CapturePack): string {
     ]),
   );
   const smokeTakes = table(
-    ["Take", "Prefix", "T2V planned", "Watched"],
+    ["Take", "Prefix", "Hop-1", "Plate", "Planned", "Watched"],
     pack.takes.map((row) => [
       row.take,
       row.prefix,
-      row.t2vPlanned ? "yes" : "no",
+      hop1ModeLabel(row.hop1Mode),
+      row.hop1Plate,
+      row.hop1Planned ? "yes" : "no",
       row.watched ? "yes" : "no",
     ]),
   );
@@ -71,11 +78,11 @@ export function renderReadme(pack: CapturePack): string {
     ["Entity", "Role", "File", "Source", "Canvas", "Conditions hop"],
     pack.stills.map((row) => [
       row.entity,
-      row.role ?? "",
+      row.role,
       row.file,
-      row.source ?? "",
-      row.canvas ?? "",
-      row.conditionsHop,
+      row.source,
+      row.canvas,
+      row.conditions,
     ]),
   );
   const lookLock = filled(pack.look.styleLine) ? pack.look.styleLine : "";
@@ -112,6 +119,7 @@ See \`edit-list.md\` in this pack. Every row: join ∈ {continue, cut, fadeblack
 
 - Characters: \`character-*.md\`
 - Props: \`prop-*.md\`
+- Stills: \`still-*.md\`
 - Look: \`look.md\`
 
 Look lock:
@@ -128,7 +136,7 @@ A sheet is the bible. A plate is the first frame. Wikipedia is not a still. Do n
 
 ## Smoke
 
-${pack.smokeNotes.trim() || "One hop-1 per take (I2VA if a plate exists, else T2V) + planned fades. Watch identity at cuts. Do not hop until this join is watchable."}
+${pack.smokeNotes.trim() || "One hop-1 per take — I2VA if a plate exists, else T2V — watched before hopping."}
 
 ${smokeTakes}
 
@@ -225,8 +233,8 @@ export function renderCharacter(card: CharacterCard): string {
 Still file (or \`none\`):
 ${card.stillFile.trim()}
 Still role: sheet (bible) — plates live on \`still-card.md\`
-Still source: photo / qwen-t2i / qwen-edit / none
-Still canvas (must match H3; default 1344×768):
+Still source: ${filled(card.stillSource) ? card.stillSource : "photo / qwen-t2i / qwen-edit / none"}
+Still canvas (must match H3; default 1344×768): ${filled(card.stillCanvas) ? card.stillCanvas.trim() : DEFAULT_STILL_CANVAS}
 Speaker ID (if any): ${filled(card.speakerId) ? card.speakerId.trim() : "none"}
 
 ${table(["Field", "Lock (same words every hop)"], lockRows)}
@@ -254,8 +262,8 @@ export function renderProp(card: PropCard): string {
 Still file (or \`none\`):
 ${card.stillFile.trim()}
 Still role: sheet (bible) — plates live on \`still-card.md\`
-Still source: photo / qwen-t2i / qwen-edit / none
-Still canvas (must match H3; default 1344×768):
+Still source: ${filled(card.stillSource) ? card.stillSource : "photo / qwen-t2i / qwen-edit / none"}
+Still canvas (must match H3; default 1344×768): ${filled(card.stillCanvas) ? card.stillCanvas.trim() : DEFAULT_STILL_CANVAS}
 
 ${table(["Field", "Value", "Unit", "Source (lyric / photo / measured)"], rows)}
 
@@ -269,6 +277,55 @@ Before generate these must be empty:
 
 - ${box(flags.overallHaftUnresolved)} overall vs haft length unresolved
 - ${box(flags.noStillAndNoReason)} no still and no reason
+`;
+}
+
+function enumBoxes(options: readonly string[], selected: string): string {
+  return options.map((option) => `${box(option === selected)} ${option}`).join("   ");
+}
+
+export function stillBasename(card: StillCard): string {
+  const entity = fileSlug(card.entity, "unnamed");
+  if (card.role === "sheet") return `still-${entity}-sheet.md`;
+  if (card.role === "hop-1 plate") {
+    const take = takeFromConditions(card.conditions) || entity;
+    return `still-hop1-${fileSlug(take, "x")}.md`;
+  }
+  if (card.role === "cut plate") {
+    const n = cutRowFromConditions(card.conditions);
+    return n ? `still-cut-${n}.md` : `still-${entity}-cut.md`;
+  }
+  if (card.role === "last-frame") return `still-${entity}-last-frame.md`;
+  return `still-${entity}.md`;
+}
+
+export function renderStill(card: StillCard): string {
+  const entity = filled(card.entity) ? card.entity.trim() : "{ENTITY}";
+  const canvas = filled(card.canvas) ? card.canvas.trim() : DEFAULT_STILL_CANVAS;
+  return `# Still card — ${entity}
+
+Role: ${enumBoxes(STILL_ROLES, card.role)}
+Source: ${enumBoxes(STILL_SOURCES, card.source)}
+Canvas (must match H3 hop-1; default 1344×768):
+${canvas}
+File (relative, or \`none\` + why):
+${card.file.trim()}
+Conditions (hop-1 of take _ / cut row _ / none):
+${card.conditions.trim()}
+
+Look lock (must match \`look.md\`, verbatim):
+${quote(card.lookLock)}
+
+Lock copied **from this still** (do not invent after):
+${quote(card.lockFromStill)}
+
+Forbidden (what this still must not grow):
+${quote(card.forbidden)}
+
+Notes:
+${quote(card.notes)}
+
+A sheet is the bible. A plate is the first frame of a window. Wikipedia is not a still. Do not stretch 1024² to 1344×768.
 `;
 }
 
@@ -306,6 +363,10 @@ export function packToFiles(pack: CapturePack): PackFiles {
   for (const card of pack.props) {
     const name = uniqueFilename(used, `prop-${fileSlug(card.name, "unnamed")}.md`);
     files[name] = renderProp(card);
+  }
+  for (const card of pack.stills) {
+    const name = uniqueFilename(used, stillBasename(card));
+    files[name] = renderStill(card);
   }
   return files;
 }

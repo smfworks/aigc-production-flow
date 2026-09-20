@@ -23,8 +23,11 @@ export function EditListStep({ pack, onChange }: Props) {
         <h2>Edit list</h2>
         <p>
           Every row: join ∈ {"{continue, cut, fadeblack}"}. Exactly one camera
-          verb (type + amplitude + speed). Pan and zoom and circle is three rows
-          or it is refused.
+          verb (type + amplitude + speed). <code>continue</code> = plate on hop-1
+          only; hop 2+ is Motion-Context latent (no new Qwen still).{" "}
+          <code>cut</code> / <code>fadeblack</code> = new plate → I2VA hop-1.
+          Chorus independent takes = independent plates. Pan and zoom and circle
+          is three rows or it is refused.
         </p>
       </div>
       {pack.editList.map((row, index) => {

@@ -126,6 +126,11 @@ a:hover {
   font-size: 15px;
 }
 
+.lede-sub {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
 .sample-row {
   display: flex;
   flex-wrap: wrap;

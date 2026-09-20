@@ -1,4 +1,5 @@
 import type { AudioPath, CapturePack, SpeechMode } from "../types";
+import { STACK_LINE } from "../types";
 import { TextArea, TextField } from "./Field";
 
 type Props = {
@@ -24,7 +25,9 @@ export function PackStep({ pack, onChange }: Props) {
         <h2>New pack</h2>
         <p>
           Title, log line, duration, and exactly one audio path. Speech and
-          chorus hits finish by 8.0 s in a 10.125 s window.
+          chorus hits finish by 8.0 s in a 10.125 s window. Stills are a second
+          Spark (Qwen-Image-2.1 at 1344×768); clips are MiniMax H3 +
+          Motion-Context.
         </p>
       </div>
       <div className="stack">
@@ -97,6 +100,9 @@ export function PackStep({ pack, onChange }: Props) {
           value={pack.forbiddenGlobal}
           onChange={(forbiddenGlobal) => onChange({ ...pack, forbiddenGlobal })}
         />
+        <p className="field-hint">
+          Stack (exported, not a serving pin): {STACK_LINE}
+        </p>
       </div>
     </section>
   );

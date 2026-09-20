@@ -12,7 +12,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --test src/lib/camera.test.ts src/lib/gate.test.ts src/lib/markdown.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/*.test.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

@@ -120,15 +120,20 @@ export default function App() {
           H3 Capture Pack · SMF Works ·{" "}
           <a href="https://github.com/smfworks/h3-longform-capture">GitHub</a>
           {" · "}
+          <a href="https://github.com/smfworks/h3-longform-capture/blob/main/docs/IMAGE-STILLS.md">
+            Still factory → clip factory
+          </a>
+          {" · "}
           <a href="https://www.smfclearinghouse.com/blog/2026-09-17-h3-longform-capture-bible">
             Lock the bible before the GPU
           </a>
         </p>
         <p className="fineprint">
           MIT templates remain the source of truth under <code>templates/</code>{" "}
-          and <code>docs/</code>. This app is a client-side form over that gate.
-          No MiniMax weights, no generated media, no uploads. Intelligence is
-          abundant. Judgment is the product.
+          and <code>docs/</code> (especially <code>docs/IMAGE-STILLS.md</code> and{" "}
+          <code>templates/still-card.md</code>). This app is a client-side form
+          over that gate. No MiniMax weights, no Qwen graphs, no generated media,
+          no uploads. Intelligence is abundant. Judgment is the product.
         </p>
       </footer>
       <Toast message={toast} />

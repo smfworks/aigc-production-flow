@@ -1,10 +1,24 @@
 import { formatCameraCell, holdOkForJoin, isSingleOfficialCamera } from "./camera.ts";
 import { filled, isNumericPin, mentionsResearch, stillOk } from "./pack.ts";
 import {
+  canvasLooksStretched,
+  canvasMatchesHop1,
+  hop1ModeForPlate,
+  identityPlateNeeded,
+  inUseStills,
+  isHop1EditRow,
+  isRealStillFile,
+  plateFileForTake,
+  stillCardProblems,
+  stillSourceAgrees,
+} from "./stills.ts";
+import {
+  DEFAULT_STILL_CANVAS,
   ENERGY_VALUES,
   JOIN_TYPES,
   PROP_FIELDS,
   type CapturePack,
+  type CharacterCard,
   type JoinType,
   type PropCard,
 } from "../types.ts";
@@ -18,7 +32,7 @@ export const GATE_DEFS = [
   { id: "props", n: 6, label: "Prop cards (units + still or none)" },
   { id: "look", n: 7, label: "Look card (one style line)" },
   { id: "audio", n: 8, label: "Audio path (exactly one)" },
-  { id: "smoke", n: 9, label: "Hop-1 smoke plan (one hop-1 per take)" },
+  { id: "smoke", n: 9, label: "Hop-1 smoke plan (I2VA if a plate exists, else T2V)" },
 ] as const;
 
 export type GateId = (typeof GATE_DEFS)[number]["id"];
@@ -192,28 +206,44 @@ function evaluateTakes(pack: CapturePack): GateResult {
   };
 }
 
+function sheetStillProblems(card: CharacterCard | PropCard, kind: "character" | "prop"): string[] {
+  const label = filled(card.name) ? card.name : `unnamed ${kind}`;
+  const problems: string[] = [];
+  if (!stillOk(card.stillFile)) {
+    problems.push(`${label}: sheet path or none + why`);
+  }
+  if (!stillSourceAgrees(card.stillFile, card.stillSource)) {
+    problems.push(`${label}: sheet source (photo / qwen-t2i / qwen-edit / none) must match the file`);
+  }
+  if (!canvasMatchesHop1(card.stillCanvas) || canvasLooksStretched(card.stillCanvas)) {
+    problems.push(`${label}: sheet canvas must be ${DEFAULT_STILL_CANVAS} (do not stretch 1024²)`);
+  }
+  return problems;
+}
+
 function evaluateCharacters(pack: CapturePack): GateResult {
   if (pack.characters.length === 0) {
     return { ...GATE_DEFS[4], ok: false, detail: "Need at least one character card." };
   }
-  const incomplete = pack.characters.filter(
-    (card) =>
-      !filled(card.name) ||
-      !filled(card.lockParagraph) ||
-      !filled(card.forbidden) ||
-      !stillOk(card.stillFile),
-  );
-  if (incomplete.length) {
+  const problems: string[] = [];
+  for (const card of pack.characters) {
+    if (!filled(card.name) || !filled(card.lockParagraph) || !filled(card.forbidden)) {
+      const label = filled(card.name) ? card.name : "unnamed character";
+      problems.push(`${label}: name, lock paragraph, forbidden`);
+    }
+    problems.push(...sheetStillProblems(card, "character"));
+  }
+  if (problems.length) {
     return {
       ...GATE_DEFS[4],
       ok: false,
-      detail: `${incomplete.length} character(s) need name, lock paragraph, forbidden, and still or none + why.`,
+      detail: `${problems.slice(0, 3).join("; ")}. Plates live on still cards.`,
     };
   }
   return {
     ...GATE_DEFS[4],
     ok: true,
-    detail: `${pack.characters.length} character card(s) locked.`,
+    detail: `${pack.characters.length} character card(s) locked. Sheets only — plates live on still cards.`,
   };
 }
 
@@ -233,6 +263,8 @@ function evaluateProps(pack: CapturePack): GateResult {
     }
     if (flags.still) {
       problems.push(`${label}: no still and no reason`);
+    } else {
+      problems.push(...sheetStillProblems(prop, "prop").filter((item) => !item.includes("sheet path")));
     }
     const missing = PROP_FIELDS.filter((field) => {
       const m = prop.fields[field.key];
@@ -298,27 +330,89 @@ function evaluateSmoke(pack: CapturePack): GateResult {
   if (!filled(pack.smokeNotes)) {
     return { ...GATE_DEFS[8], ok: false, detail: "Smoke plan notes are empty." };
   }
-  const unplanned = pack.takes.filter((row) => !row.t2vPlanned || !row.watched);
+  const problems: string[] = [];
+  const unplanned = pack.takes.filter((row) => !row.hop1Planned || !row.watched);
   if (unplanned.length) {
-    return {
-      ...GATE_DEFS[8],
-      ok: false,
-      detail: `${unplanned.length} take(s) missing hop-1 planned + watched.`,
-    };
+    problems.push(`${unplanned.length} take(s) missing hop-1 planned + watched`);
   }
   const prefixes = pack.takes.map((row) => row.prefix.trim().toLowerCase()).filter(Boolean);
   const unique = new Set(prefixes);
   if (prefixes.length !== pack.takes.length || unique.size !== prefixes.length) {
-    return {
-      ...GATE_DEFS[8],
-      ok: false,
-      detail: "Each take needs a unique hop-1 prefix.",
-    };
+    problems.push("Each take needs a unique hop-1 prefix");
   }
+
+  for (const take of pack.takes) {
+    const label = filled(take.take) ? `take ${take.take}` : "unnamed take";
+    const plate = plateFileForTake(pack, take);
+    const derived = hop1ModeForPlate(plate);
+    if (!take.hop1Mode) {
+      problems.push(`${label}: hop-1 mode I2VA or T2V`);
+      continue;
+    }
+    if (!stillOk(plate)) {
+      problems.push(`${label}: plate file or none + why`);
+      continue;
+    }
+    if (take.hop1Mode === "i2va" && !isRealStillFile(plate)) {
+      problems.push(`${label}: I2VA needs a plate file for MiniMaxH3ImageToVideo.first_frame`);
+    }
+    if (take.hop1Mode === "t2v" && isRealStillFile(plate)) {
+      problems.push(`${label}: a plate exists — hop-1 must be I2VA, not T2V`);
+    }
+    if (derived && take.hop1Mode !== derived) {
+      problems.push(`${label}: hop-1 is ${take.hop1Mode.toUpperCase()} but the plate implies ${derived.toUpperCase()}`);
+    }
+  }
+
+  const lookLine = pack.look.styleLine;
+  for (const card of inUseStills(pack)) {
+    problems.push(...stillCardProblems(card, lookLine));
+  }
+
+  pack.editList.forEach((row, index) => {
+    if (!identityPlateNeeded(pack, index)) return;
+    const n = index + 1;
+    if (row.join === "continue" && isHop1EditRow(pack, index)) {
+      const take = pack.takes.find((item) => item.take.trim() === row.take.trim());
+      const plate = take ? plateFileForTake(pack, take) : "";
+      if (!stillOk(plate)) {
+        problems.push(`#${n} continue hop-1 needs a plate (or none + why)`);
+      }
+      return;
+    }
+    if (row.join === "fadeblack") {
+      const take = pack.takes.find((item) => item.take.trim() === row.take.trim());
+      const plate = take ? plateFileForTake(pack, take) : "";
+      if (!stillOk(plate)) {
+        problems.push(`#${n} fadeblack hop-1 needs a plate in the new location/grade (or none + why)`);
+      }
+      return;
+    }
+    if (row.join === "cut") {
+      const take = pack.takes.find((item) => item.take.trim() === row.take.trim());
+      const takePlate = take ? plateFileForTake(pack, take) : "";
+      const cutStill = pack.stills.find(
+        (card) =>
+          card.role === "cut plate" &&
+          (new RegExp(`\\bcut\\s*(?:row|#)?\\s*${n}\\b`, "i").test(card.conditions) ||
+            (take ? new RegExp(`\\btake\\s*${take.take}\\b`, "i").test(card.conditions) : false)),
+      );
+      const plate = cutStill?.file || (isHop1EditRow(pack, index) ? takePlate : "");
+      if (!stillOk(plate)) {
+        problems.push(`#${n} cut needs a plate → I2VA (or none + why)`);
+      }
+    }
+  });
+
+  if (problems.length) {
+    return { ...GATE_DEFS[8], ok: false, detail: problems.slice(0, 3).join("; ") };
+  }
+  const i2va = pack.takes.filter((row) => row.hop1Mode === "i2va").length;
+  const t2v = pack.takes.filter((row) => row.hop1Mode === "t2v").length;
   return {
     ...GATE_DEFS[8],
     ok: true,
-    detail: `${pack.takes.length} hop-1(s) planned and watched before hopping.`,
+    detail: `${pack.takes.length} hop-1(s) planned and watched (${i2va} I2VA, ${t2v} T2V). continue hop 2+ is the latent.`,
   };
 }
 

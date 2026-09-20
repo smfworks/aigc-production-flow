@@ -22,8 +22,8 @@ export function GatePanel({
         <p className="eyebrow">Do not queue Comfy</p>
         <h2>Gate</h2>
         <p className="gate-lede">
-          Refuse generate until all nine exist. Export is the pack zip, not a
-          render.
+          Refuse generate until all nine exist. Hop-1 is I2VA if a plate
+          exists, else T2V. Export is the pack zip, not a render.
         </p>
       </div>
       <p className="gate-score">

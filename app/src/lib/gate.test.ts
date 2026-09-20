@@ -178,6 +178,16 @@ describe("gate 6 prop cards", () => {
   });
 });
 
+describe("gate 5 character sheets", () => {
+  it("fails until sheet source matches the file", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.characters[0].stillSource = "";
+    assert.equal(gate(pack, "characters").ok, false);
+    pack.characters[0].stillSource = "qwen-t2i";
+    assert.equal(gate(pack, "characters").ok, false);
+  });
+});
+
 describe("gate 8 audio path is exclusive", () => {
   it("fails when unset", () => {
     const pack = clonePack(sigilsSample());
@@ -205,5 +215,59 @@ describe("gate 9 smoke", () => {
     const pack = clonePack(sigilsSample());
     pack.takes[1].prefix = pack.takes[0].prefix;
     assert.equal(gate(pack, "smoke").ok, false);
+  });
+
+  it("fails I2VA without a plate file", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.takes[0].hop1Mode = "i2va";
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /I2VA/i);
+  });
+
+  it("fails T2V when a plate file exists", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.takes[0].hop1Plate = "stills/a-hop1-plate.png";
+    pack.takes[0].hop1Mode = "t2v";
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /must be I2VA/i);
+  });
+
+  it("fails a cut that is not hop-1 without a plate or none + why", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.editList.push({
+      ...pack.editList[2],
+      id: "extra-cut",
+      songT: "0:51",
+    });
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /cut needs a plate/i);
+  });
+
+  it("accepts continue hop 2+ with no new plate", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    assert.equal(pack.editList[1].join, "continue");
+    assert.equal(gate(pack, "smoke").ok, true);
+  });
+
+  it("accepts I2VA when the plate file is real and the still card agrees", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.takes[0].hop1Mode = "i2va";
+    pack.takes[0].hop1Plate = "stills/a-hop1-plate.png";
+    const plate = pack.stills.find(
+      (card) => card.role === "hop-1 plate" && /take A/i.test(card.conditions),
+    );
+    assert.ok(plate);
+    plate.file = "stills/a-hop1-plate.png";
+    plate.source = "qwen-edit";
+    plate.lookLock = pack.look.styleLine;
+    plate.lockFromStill = "Forge interior, dusk gold ember, same smith as the sheet.";
+    assert.equal(gate(pack, "smoke").ok, true);
+  });
+
+  it("fails a stretched 1024 canvas on an in-use still card", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.stills[0].canvas = "1024×1024";
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /1024/);
   });
 });

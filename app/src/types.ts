@@ -24,8 +24,20 @@ export type SpeechMode = (typeof SPEECH_MODES)[number];
 export const ENERGY_VALUES = ["title", "verse", "chorus", "bridge", "outro"] as const;
 export type EnergyValue = (typeof ENERGY_VALUES)[number];
 
+/** Two Sparks, two jobs. Canvas 1344×768 is H3 native — not a serving pin. */
 export const STACK_LINE =
-  "Comfy native H3 · 1344×768 · 6-step turbo · Motion-Context 22";
+  "Still factory: Qwen-Image-2.1 · 1344×768 (do not stretch 1024²) · Clip factory: MiniMax H3 + Motion-Context";
+
+export const DEFAULT_STILL_CANVAS = "1344×768";
+
+export const STILL_ROLES = ["sheet", "hop-1 plate", "cut plate", "last-frame"] as const;
+export type StillRole = (typeof STILL_ROLES)[number];
+
+export const STILL_SOURCES = ["photo", "qwen-t2i", "qwen-edit", "none"] as const;
+export type StillSource = (typeof STILL_SOURCES)[number];
+
+export const HOP1_MODES = ["i2va", "t2v"] as const;
+export type Hop1Mode = (typeof HOP1_MODES)[number];
 
 export const PROP_FIELDS = [
   { key: "overallLength", label: "Overall length", unit: "cm" },
@@ -65,7 +77,9 @@ export type TakeCard = {
   windows: string;
   prefix: string;
   hop1Seed: string;
-  t2vPlanned: boolean;
+  hop1Mode: Hop1Mode | "";
+  hop1Plate: string;
+  hop1Planned: boolean;
   watched: boolean;
 };
 
@@ -88,6 +102,8 @@ export type CharacterCard = {
   id: string;
   name: string;
   stillFile: string;
+  stillSource: StillSource | "";
+  stillCanvas: string;
   speakerId: string;
   ageSex: string;
   faceHairBeard: string;
@@ -105,6 +121,8 @@ export type PropCard = {
   id: string;
   name: string;
   stillFile: string;
+  stillSource: StillSource | "";
+  stillCanvas: string;
   fields: Record<PropFieldKey, PropMeasurement>;
   lockParagraph: string;
   forbidden: string;
@@ -118,15 +136,23 @@ export type LookCard = {
   extrasForbidden: string;
 };
 
-export type StillRow = {
+/** First-class still card — `templates/still-card.md`. */
+export type StillCard = {
   id: string;
   entity: string;
-  file: string;
-  role: string;
-  source: string;
+  role: StillRole | "";
+  source: StillSource | "";
   canvas: string;
-  conditionsHop: string;
+  file: string;
+  conditions: string;
+  lookLock: string;
+  lockFromStill: string;
+  forbidden: string;
+  notes: string;
 };
+
+/** @deprecated Use StillCard. Kept as an alias for migrated v1 rows. */
+export type StillRow = StillCard;
 
 export type ContinuityRow = {
   id: string;
@@ -155,7 +181,7 @@ export type CapturePack = {
   characters: CharacterCard[];
   props: PropCard[];
   look: LookCard;
-  stills: StillRow[];
+  stills: StillCard[];
   smokeNotes: string;
   continuityRows: ContinuityRow[];
   polaroidPath: string;
@@ -189,7 +215,7 @@ export const DEFAULT_LOOK_STYLE =
   "Live-action, photoreal cinematic, crushed blacks, hot ember highlights, 24fps.";
 
 export const DEFAULT_SMOKE_NOTES =
-  "One hop-1 per take (I2VA if a plate exists, else T2V) + planned fades. Watch identity at cuts. Do not hop until this join is watchable.";
+  "One hop-1 per take — I2VA if a plate exists, else T2V — watched before hopping. continue = plate on hop-1 only; hop 2+ is Motion-Context latent (no new Qwen still). cut / fadeblack = new plate → I2VA hop-1. Chorus independent takes = independent plates → I2VA.";
 
 export const STEPS = [
   { id: "pack", n: 1, label: "New pack" },

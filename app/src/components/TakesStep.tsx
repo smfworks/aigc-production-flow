@@ -1,5 +1,7 @@
 import type { CapturePack } from "../types";
 import { emptyTake, nextTakeLetter } from "../lib/pack";
+import { applyStillsToTakes } from "../lib/stills";
+import { Hop1Fields } from "./Hop1Fields";
 import { TextField } from "./Field";
 
 type Props = {
@@ -14,8 +16,10 @@ export function TakesStep({ pack, onChange }: Props) {
         <h2>Takes</h2>
         <p>
           One location and one grade per take. Unique prefix for{" "}
-          <code>MiniMaxH3MotionContextSaveLatent</code>. Gold / dusk / amber are
-          three takes, not one prompt.
+          <code>MiniMaxH3MotionContextSaveLatent</code>. Hop-1 is{" "}
+          <strong>I2VA</strong> if a plate exists, else <strong>T2V</strong>.{" "}
+          <code>continue</code> plates hop-1 only — hop 2+ is the latent. Gold /
+          dusk / amber are three takes, not one prompt.
         </p>
       </div>
       {pack.takes.map((row) => (
@@ -117,6 +121,7 @@ export function TakesStep({ pack, onChange }: Props) {
               }
             />
           </div>
+          <Hop1Fields pack={pack} take={row} onChange={onChange} />
         </article>
       ))}
       <button
@@ -130,6 +135,13 @@ export function TakesStep({ pack, onChange }: Props) {
         }
       >
         Add take
+      </button>
+      <button
+        type="button"
+        className="btn btn-inline"
+        onClick={() => onChange(applyStillsToTakes(pack))}
+      >
+        Fill hop-1 from still cards
       </button>
     </section>
   );

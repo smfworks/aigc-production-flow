@@ -11,6 +11,7 @@ import {
   renderLook,
   renderProp,
   renderReadme,
+  renderStill,
 } from "./markdown.ts";
 import { emptyPack } from "./pack.ts";
 import { sigilsGenerateReady, sigilsSample } from "./sample.ts";
@@ -44,8 +45,11 @@ describe("export matches template shapes", () => {
     assert.match(out, /## Map \(clock → beat, not shots\)/);
     assert.match(out, /Wikipedia is not a still/);
     assert.match(out, /^> DRAFT — gates red/m);
-    headerLine(out, "Take \\| Prefix \\| T2V planned \\| Watched");
-    assert.match(out, /\| sigils-a \| yes \| yes \|/);
+    headerLine(out, "Take \\| Prefix \\| Hop-1 \\| Plate \\| Planned \\| Watched");
+    assert.match(out, /\| sigils-a \| T2V \|/);
+    assert.match(out, /\| yes \| yes \|/);
+    assert.match(out, /Qwen-Image-2\.1/);
+    assert.match(out, /still-\*\.md/);
   });
 
   it("edit-list keeps join legend and columns", () => {
@@ -91,6 +95,9 @@ describe("export matches template shapes", () => {
       assert.match(out, new RegExp(`\\| ${field} \\|`));
     }
     assert.match(out, /^# Character card — smith/m);
+    assert.match(out, /Still role: sheet \(bible\)/);
+    assert.match(out, /Still source: none/);
+    assert.match(out, /Still canvas \(must match H3; default 1344×768\): 1344×768/);
   });
 
   it("prop card keeps measurement columns and the two empty-before-generate flags", () => {
@@ -149,6 +156,12 @@ describe("export matches template shapes", () => {
       "edit-list.md",
       "look.md",
       "prop-francisca.md",
+      "still-cut-3.md",
+      "still-francisca-sheet.md",
+      "still-hop1-a.md",
+      "still-hop1-b.md",
+      "still-smith-sheet.md",
+      "still-thrower-sheet.md",
     ]);
   });
 
@@ -161,11 +174,33 @@ describe("export matches template shapes", () => {
     assert.ok(files["continuity-log.md"]);
     assert.ok(Object.keys(files).some((name) => name.startsWith("character-")));
     assert.ok(Object.keys(files).some((name) => name.startsWith("prop-")));
+    assert.ok(Object.keys(files).some((name) => name.startsWith("still-")));
   });
 
   it("generate-ready zip README is not a DRAFT", () => {
     const out = renderReadme(sigilsGenerateReady());
     assert.equal(out.startsWith("> DRAFT"), false);
     assert.match(out, /^# Capture pack — Sigils in the Steel/m);
+  });
+
+  it("still cards match templates/still-card.md", () => {
+    const tpl = template("still-card.md");
+    const sheet = sigilsSample().stills.find((card) => card.role === "sheet");
+    assert.ok(sheet);
+    const out = renderStill(sheet);
+    assert.match(tpl, /^# Still card — \{ENTITY\}/m);
+    assert.match(out, /^# Still card — smith/m);
+    assert.match(tpl, /Role: \[ \] sheet/);
+    assert.match(out, /Role: \[x\] sheet   \[ \] hop-1 plate   \[ \] cut plate   \[ \] last-frame/);
+    assert.match(out, /Source: \[ \] photo   \[ \] qwen-t2i   \[ \] qwen-edit   \[x\] none/);
+    assert.match(out, /Canvas \(must match H3 hop-1; default 1344×768\):/);
+    assert.match(out, /File \(relative, or `none` \+ why\):/);
+    assert.match(out, /Conditions \(hop-1 of take _ \/ cut row _ \/ none\):/);
+    assert.match(out, /Lock copied \*\*from this still\*\*/);
+    assert.match(out, /A sheet is the bible\. A plate is the first frame of a window/);
+    const files = packToFiles(sigilsSample());
+    assert.match(files["still-hop1-a.md"], /Role: \[ \] sheet   \[x\] hop-1 plate/);
+    assert.match(files["still-cut-3.md"], /\[x\] cut plate/);
+    assert.match(files["prop-francisca.md"], /Still source: none/);
   });
 });

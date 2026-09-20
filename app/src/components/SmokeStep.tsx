@@ -1,5 +1,7 @@
 import type { CapturePack } from "../types";
 import { emptyContinuity } from "../lib/pack";
+import { applyStillsToTakes } from "../lib/stills";
+import { Hop1Fields } from "./Hop1Fields";
 import { TextArea, TextField } from "./Field";
 
 type Props = {
@@ -13,9 +15,10 @@ export function SmokeStep({ pack, onChange }: Props) {
       <div className="editor-head">
         <h2>Smoke + continuity</h2>
         <p>
-          One T2V per take with SaveLatent and a unique prefix. Join the planned
-          fades. Watch. Only then hop. The continuity log is a stub until
-          generate — intent is the edit list; this file is what landed.
+          One hop-1 per take — <strong>I2VA if a plate exists, else T2V</strong> —
+          with SaveLatent and a unique prefix. Watch identity at cuts. Only then
+          hop. Gate 9 refuses a missing plate (or missing <code>none</code> +
+          why). The continuity log is a stub until generate.
         </p>
       </div>
       <TextArea
@@ -23,47 +26,22 @@ export function SmokeStep({ pack, onChange }: Props) {
         value={pack.smokeNotes}
         onChange={(smokeNotes) => onChange({ ...pack, smokeNotes })}
       />
+      <button
+        type="button"
+        className="btn btn-inline"
+        onClick={() => onChange(applyStillsToTakes(pack))}
+      >
+        Fill hop-1 from still cards
+      </button>
       {pack.takes.map((row) => (
         <article key={row.id} className="row-card">
           <div className="row-top">
             <span className="row-kicker">
-              Take {row.take} · {row.prefix || "no prefix"}
+              Take {row.take} · {row.prefix || "no prefix"} ·{" "}
+              {row.hop1Mode === "i2va" ? "I2VA" : row.hop1Mode === "t2v" ? "T2V" : "no hop-1 mode"}
             </span>
           </div>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={row.t2vPlanned}
-              onChange={(event) =>
-                onChange({
-                  ...pack,
-                  takes: pack.takes.map((item) =>
-                    item.id === row.id
-                      ? { ...item, t2vPlanned: event.target.checked }
-                      : item,
-                  ),
-                })
-              }
-            />
-            Hop-1 T2V planned
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={row.watched}
-              onChange={(event) =>
-                onChange({
-                  ...pack,
-                  takes: pack.takes.map((item) =>
-                    item.id === row.id
-                      ? { ...item, watched: event.target.checked }
-                      : item,
-                  ),
-                })
-              }
-            />
-            Watched (identity at cuts, join watchable)
-          </label>
+          <Hop1Fields pack={pack} take={row} onChange={onChange} showAttestation />
         </article>
       ))}
 

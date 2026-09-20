@@ -4,6 +4,7 @@ import {
   DEFAULT_LOOK_FORBIDDEN,
   DEFAULT_PROP_FORBIDDEN,
   DEFAULT_SMOKE_NOTES,
+  DEFAULT_STILL_CANVAS,
   PROP_FIELDS,
   type CapturePack,
   type CharacterCard,
@@ -13,7 +14,7 @@ import {
   type PropCard,
   type PropFieldKey,
   type PropMeasurement,
-  type StillRow,
+  type StillCard,
   type TakeCard,
 } from "../types.ts";
 
@@ -79,7 +80,9 @@ export function emptyTake(letter = "A"): TakeCard {
     windows: "",
     prefix: "",
     hop1Seed: "",
-    t2vPlanned: false,
+    hop1Mode: "",
+    hop1Plate: "",
+    hop1Planned: false,
     watched: false,
   };
 }
@@ -106,6 +109,8 @@ export function emptyCharacter(): CharacterCard {
     id: uid(),
     name: "",
     stillFile: "",
+    stillSource: "",
+    stillCanvas: DEFAULT_STILL_CANVAS,
     speakerId: "none",
     ageSex: "",
     faceHairBeard: "",
@@ -125,21 +130,27 @@ export function emptyProp(): PropCard {
     id: uid(),
     name: "",
     stillFile: "",
+    stillSource: "",
+    stillCanvas: DEFAULT_STILL_CANVAS,
     fields: emptyPropFields(),
     lockParagraph: "",
     forbidden: DEFAULT_PROP_FORBIDDEN,
   };
 }
 
-export function emptyStill(): StillRow {
+export function emptyStill(): StillCard {
   return {
     id: uid(),
     entity: "",
-    file: "",
     role: "",
     source: "",
-    canvas: "1344×768",
-    conditionsHop: "",
+    canvas: DEFAULT_STILL_CANVAS,
+    file: "",
+    conditions: "",
+    lookLock: "",
+    lockFromStill: "",
+    forbidden: "",
+    notes: "",
   };
 }
 
