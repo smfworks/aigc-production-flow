@@ -1,23 +1,34 @@
 import type { CapturePack } from "../types";
 import { emptyTake, nextTakeLetter } from "../lib/pack";
+import { applyStillsToTakes } from "../lib/stills";
+import type { GateResult } from "../lib/gate";
+import { Hop1Fields } from "./Hop1Fields";
 import { TextField } from "./Field";
+import { EmptyHint, StepIssues } from "./StepIssues";
 
 type Props = {
   pack: CapturePack;
   onChange: (pack: CapturePack) => void;
+  gates: GateResult[];
 };
 
-export function TakesStep({ pack, onChange }: Props) {
+export function TakesStep({ pack, onChange, gates }: Props) {
   return (
     <section>
       <div className="editor-head">
         <h2>Takes</h2>
         <p>
           One location and one grade per take. Unique prefix for{" "}
-          <code>MiniMaxH3MotionContextSaveLatent</code>. Gold / dusk / amber are
-          three takes, not one prompt.
+          <code>MiniMaxH3MotionContextSaveLatent</code>. Hop-1 is{" "}
+          <strong>I2VA</strong> if a plate exists, else <strong>T2V</strong>.{" "}
+          <code>continue</code> plates hop-1 only — hop 2+ is the latent. Gold /
+          dusk / amber are three takes, not one prompt.
         </p>
       </div>
+      <StepIssues gates={gates} ids={["takes"]} />
+      {pack.takes.length === 0 ? (
+        <EmptyHint>No takes. One location and one grade each. Unique hop-1 prefix.</EmptyHint>
+      ) : null}
       {pack.takes.map((row) => (
         <article key={row.id} className="row-card">
           <div className="row-top">
@@ -28,10 +39,7 @@ export function TakesStep({ pack, onChange }: Props) {
               onClick={() =>
                 onChange({
                   ...pack,
-                  takes:
-                    pack.takes.length === 1
-                      ? pack.takes
-                      : pack.takes.filter((item) => item.id !== row.id),
+                  takes: pack.takes.filter((item) => item.id !== row.id),
                 })
               }
             >
@@ -117,6 +125,7 @@ export function TakesStep({ pack, onChange }: Props) {
               }
             />
           </div>
+          <Hop1Fields pack={pack} take={row} onChange={onChange} />
         </article>
       ))}
       <button
@@ -130,6 +139,13 @@ export function TakesStep({ pack, onChange }: Props) {
         }
       >
         Add take
+      </button>
+      <button
+        type="button"
+        className="btn btn-inline"
+        onClick={() => onChange(applyStillsToTakes(pack))}
+      >
+        Fill hop-1 from still cards
       </button>
     </section>
   );

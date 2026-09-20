@@ -23,6 +23,7 @@ type TextProps = {
   hint?: string;
   placeholder?: string;
   mono?: boolean;
+  title?: string;
 };
 
 export function TextField({
@@ -32,6 +33,7 @@ export function TextField({
   hint,
   placeholder,
   mono,
+  title,
 }: TextProps) {
   return (
     <Field label={label} hint={hint}>
@@ -39,6 +41,7 @@ export function TextField({
         className={mono ? "mono" : undefined}
         value={value}
         placeholder={placeholder}
+        title={title || value}
         onChange={(event) => onChange(event.target.value)}
       />
     </Field>

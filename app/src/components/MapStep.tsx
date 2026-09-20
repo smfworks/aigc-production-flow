@@ -1,12 +1,15 @@
 import { ENERGY_VALUES, type CapturePack } from "../types";
 import { emptyMapRow } from "../lib/pack";
+import type { GateResult } from "../lib/gate";
+import { StepIssues, EmptyHint } from "./StepIssues";
 
 type Props = {
   pack: CapturePack;
   onChange: (pack: CapturePack) => void;
+  gates: GateResult[];
 };
 
-export function MapStep({ pack, onChange }: Props) {
+export function MapStep({ pack, onChange, gates }: Props) {
   return (
     <section>
       <div className="editor-head">
@@ -17,6 +20,10 @@ export function MapStep({ pack, onChange }: Props) {
           list.
         </p>
       </div>
+      <StepIssues gates={gates} ids={["map"]} />
+      {pack.map.length === 0 ? (
+        <EmptyHint>No beats. Map clocks to verse/chorus/bridge — not shots.</EmptyHint>
+      ) : null}
       <div className="table-wrap">
         <table className="data">
           <thead>
@@ -35,6 +42,7 @@ export function MapStep({ pack, onChange }: Props) {
                     className="mono"
                     value={row.clock}
                     placeholder="0:18"
+                    aria-label="Clock"
                     onChange={(event) =>
                       onChange({
                         ...pack,
@@ -51,6 +59,7 @@ export function MapStep({ pack, onChange }: Props) {
                   <input
                     value={row.beat}
                     placeholder="verse"
+                    aria-label="Beat"
                     onChange={(event) =>
                       onChange({
                         ...pack,
@@ -66,6 +75,7 @@ export function MapStep({ pack, onChange }: Props) {
                 <td>
                   <select
                     value={row.energy}
+                    aria-label="Energy"
                     onChange={(event) =>
                       onChange({
                         ...pack,
@@ -92,10 +102,7 @@ export function MapStep({ pack, onChange }: Props) {
                     onClick={() =>
                       onChange({
                         ...pack,
-                        map:
-                          pack.map.length === 1
-                            ? pack.map
-                            : pack.map.filter((item) => item.id !== row.id),
+                        map: pack.map.filter((item) => item.id !== row.id),
                       })
                     }
                   >

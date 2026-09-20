@@ -1,9 +1,13 @@
 import type { AudioPath, CapturePack, SpeechMode } from "../types";
+import { STACK_LINE } from "../types";
+import type { GateResult } from "../lib/gate";
 import { TextArea, TextField } from "./Field";
+import { StepIssues } from "./StepIssues";
 
 type Props = {
   pack: CapturePack;
   onChange: (pack: CapturePack) => void;
+  gates: GateResult[];
 };
 
 const AUDIO: { value: AudioPath; label: string }[] = [
@@ -17,16 +21,19 @@ const SPEECH: { value: SpeechMode; label: string }[] = [
   { value: "finish-by-8s", label: "lines finish by 8.0 s" },
 ];
 
-export function PackStep({ pack, onChange }: Props) {
+export function PackStep({ pack, onChange, gates }: Props) {
   return (
     <section>
       <div className="editor-head">
-        <h2>New pack</h2>
+        <h2>Pack</h2>
         <p>
           Title, log line, duration, and exactly one audio path. Speech and
-          chorus hits finish by 8.0 s in a 10.125 s window.
+          chorus hits finish by 8.0 s in a 10.125 s window. Stills are a second
+          Spark (Qwen-Image-2.1 at 1344×768); clips are MiniMax H3 +
+          Motion-Context.
         </p>
       </div>
+      <StepIssues gates={gates} ids={["log-line", "audio"]} />
       <div className="stack">
         <TextField
           label="Title"
@@ -59,12 +66,16 @@ export function PackStep({ pack, onChange }: Props) {
           />
         </div>
         <div>
-          <p className="editor-label">Audio path (exactly one)</p>
-          <div className="seg-row">
+          <p className="editor-label" id="audio-path-label">
+            Audio path (exactly one)
+          </p>
+          <div className="seg-row" role="radiogroup" aria-labelledby="audio-path-label">
             {AUDIO.map((option) => (
               <button
                 key={option.value}
                 type="button"
+                role="radio"
+                aria-checked={pack.audioPath === option.value}
                 className={pack.audioPath === option.value ? "seg is-on" : "seg"}
                 onClick={() => onChange({ ...pack, audioPath: option.value })}
               >
@@ -78,12 +89,16 @@ export function PackStep({ pack, onChange }: Props) {
           </p>
         </div>
         <div>
-          <p className="editor-label">Speech</p>
-          <div className="seg-row">
+          <p className="editor-label" id="speech-label">
+            Speech
+          </p>
+          <div className="seg-row" role="radiogroup" aria-labelledby="speech-label">
             {SPEECH.map((option) => (
               <button
                 key={option.value}
                 type="button"
+                role="radio"
+                aria-checked={pack.speech === option.value}
                 className={pack.speech === option.value ? "seg is-on" : "seg"}
                 onClick={() => onChange({ ...pack, speech: option.value })}
               >
@@ -97,6 +112,9 @@ export function PackStep({ pack, onChange }: Props) {
           value={pack.forbiddenGlobal}
           onChange={(forbiddenGlobal) => onChange({ ...pack, forbiddenGlobal })}
         />
+        <p className="field-hint">
+          Stack (exported, not a serving pin): {STACK_LINE}
+        </p>
       </div>
     </section>
   );

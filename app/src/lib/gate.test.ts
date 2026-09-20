@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allGatesGreen, evaluateGates, GATE_DEFS, propGenerateFlags } from "./gate.ts";
+import {
+  allGatesGreen,
+  evaluateGates,
+  GATE_DEFS,
+  gateChecklistMarkdown,
+  packSummaryMarkdown,
+  propGenerateFlags,
+} from "./gate.ts";
 import { clonePack, emptyPack, stillOk } from "./pack.ts";
 import { sigilsGenerateReady, sigilsSample } from "./sample.ts";
 import type { CapturePack } from "../types.ts";
@@ -47,6 +54,19 @@ describe("nine README gates", () => {
     assert.deepEqual(red, []);
     assert.equal(allGatesGreen(pack), true);
   });
+
+  it("does not require hop-1 seed for gate 4 (generate-time, not a bible pin)", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    for (const take of pack.takes) take.hop1Seed = "";
+    assert.equal(gate(pack, "takes").ok, true);
+  });
+
+  it("writes an honest Ready to queue Comfy line", () => {
+    assert.match(gateChecklistMarkdown(sigilsSample()), /Ready to queue Comfy\? No/);
+    assert.match(gateChecklistMarkdown(sigilsGenerateReady()), /Ready to queue Comfy\? Yes/);
+    assert.match(packSummaryMarkdown(sigilsSample()), /Take A · T2V/);
+    assert.match(packSummaryMarkdown(sigilsSample()), /francisca · sheet/);
+  });
 });
 
 describe("gate 2 map is clocks not shots", () => {
@@ -55,6 +75,15 @@ describe("gate 2 map is clocks not shots", () => {
     pack.map[0] = { ...pack.map[0], clock: "shot 1", beat: "CU of axe" };
     assert.equal(gate(pack, "map").ok, false);
     assert.match(gate(pack, "map").detail, /not shots/i);
+  });
+
+  it("rejects CU / MS / WS as camera sizes, not milliseconds on a clock", () => {
+    const pack = clonePack(sigilsSample());
+    pack.map[0] = { ...pack.map[0], beat: "CU" };
+    assert.equal(gate(pack, "map").ok, false);
+    const msClock = clonePack(sigilsSample());
+    msClock.map[0] = { ...msClock.map[0], clock: "0:18 (18 ms hold)", beat: "verse" };
+    assert.equal(gate(msClock, "map").ok, true);
   });
 });
 
@@ -123,6 +152,20 @@ describe("gate 3 edit list", () => {
     assert.equal(gate(pack, "edit-list").ok, false);
     assert.match(gate(pack, "edit-list").detail, /amplitude \+ speed/i);
   });
+
+  it("refuses a take letter that is not on the take cards", () => {
+    const pack = clonePack(sigilsSample());
+    pack.editList[2] = { ...pack.editList[2], take: "Z" };
+    assert.equal(gate(pack, "edit-list").ok, false);
+    assert.match(gate(pack, "edit-list").detail, /not on the take cards/i);
+  });
+
+  it("refuses continue that jumps to another take's location", () => {
+    const pack = clonePack(sigilsSample());
+    pack.editList[1] = { ...pack.editList[1], locationGrade: "yard / night" };
+    assert.equal(gate(pack, "edit-list").ok, false);
+    assert.match(gate(pack, "edit-list").detail, /jumped to take B/i);
+  });
 });
 
 describe("gate 6 prop cards", () => {
@@ -176,12 +219,37 @@ describe("gate 6 prop cards", () => {
     assert.equal(gate(pack, "props").ok, false);
     assert.match(gate(pack, "props").detail, /research/i);
   });
+
+  it("does not treat a source cell that mentions research as generate-time homework", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.props[0].fields.headShape.source = "not from research notes — pin from the sheet";
+    assert.equal(gate(pack, "props").ok, true);
+  });
+});
+
+describe("gate 5 character sheets", () => {
+  it("fails until sheet source matches the file", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.characters[0].stillSource = "";
+    assert.equal(gate(pack, "characters").ok, false);
+    pack.characters[0].stillSource = "qwen-t2i";
+    assert.equal(gate(pack, "characters").ok, false);
+  });
 });
 
 describe("gate 8 audio path is exclusive", () => {
   it("fails when unset", () => {
     const pack = clonePack(sigilsSample());
     pack.audioPath = "";
+    assert.equal(gate(pack, "audio").ok, false);
+  });
+
+  it("fails a garbage path (false green)", () => {
+    const pack = clonePack(sigilsSample());
+    (pack as { audioPath: string }).audioPath = "mastered-track-and-prompt-score";
+    assert.equal(gate(pack, "audio").ok, false);
+    (pack as { speech: string }).speech = "whisper";
+    pack.audioPath = "na-mute";
     assert.equal(gate(pack, "audio").ok, false);
   });
 
@@ -205,5 +273,59 @@ describe("gate 9 smoke", () => {
     const pack = clonePack(sigilsSample());
     pack.takes[1].prefix = pack.takes[0].prefix;
     assert.equal(gate(pack, "smoke").ok, false);
+  });
+
+  it("fails I2VA without a plate file", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.takes[0].hop1Mode = "i2va";
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /I2VA/i);
+  });
+
+  it("fails T2V when a plate file exists", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.takes[0].hop1Plate = "stills/a-hop1-plate.png";
+    pack.takes[0].hop1Mode = "t2v";
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /must be I2VA/i);
+  });
+
+  it("fails a cut that is not hop-1 without a plate or none + why", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.editList.push({
+      ...pack.editList[2],
+      id: "extra-cut",
+      songT: "0:51",
+    });
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /cut needs a plate/i);
+  });
+
+  it("accepts continue hop 2+ with no new plate", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    assert.equal(pack.editList[1].join, "continue");
+    assert.equal(gate(pack, "smoke").ok, true);
+  });
+
+  it("accepts I2VA when the plate file is real and the still card agrees", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.takes[0].hop1Mode = "i2va";
+    pack.takes[0].hop1Plate = "stills/a-hop1-plate.png";
+    const plate = pack.stills.find(
+      (card) => card.role === "hop-1 plate" && /take A/i.test(card.conditions),
+    );
+    assert.ok(plate);
+    plate.file = "stills/a-hop1-plate.png";
+    plate.source = "qwen-edit";
+    plate.lookLock = pack.look.styleLine;
+    plate.lockFromStill = "Forge interior, dusk gold ember, same smith as the sheet.";
+    assert.equal(gate(pack, "smoke").ok, true);
+  });
+
+  it("fails a stretched 1024 canvas on an in-use still card", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.stills[0].canvas = "1024×1024";
+    assert.equal(gate(pack, "smoke").ok, false);
+    assert.match(gate(pack, "smoke").detail, /1024/);
   });
 });

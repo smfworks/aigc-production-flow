@@ -4,14 +4,32 @@ import {
   DEFAULT_LOOK_FORBIDDEN,
   DEFAULT_LOOK_STYLE,
   DEFAULT_PROP_FORBIDDEN,
+  DEFAULT_SMOKE_NOTES,
+  DEFAULT_STILL_CANVAS,
   type CapturePack,
   type PropCard,
   type PropFieldKey,
   type PropMeasurement,
+  type StillCard,
 } from "../types.ts";
 import { emptyContinuity, emptyPropFields, uid } from "./pack.ts";
 
 const NONE = "none — not in public example";
+const NONE_STILL = "none — no public likeness still in this example";
+const NONE_PLATE = "none — no public plate; hop-1 stays T2V until a 1344×768 still conditions first_frame";
+
+function still(partial: Partial<StillCard> & Pick<StillCard, "entity" | "role" | "file" | "conditions">): StillCard {
+  return {
+    id: uid(),
+    source: "none",
+    canvas: DEFAULT_STILL_CANVAS,
+    lookLock: "",
+    lockFromStill: "",
+    forbidden: "",
+    notes: "Public example — not a generate still. Do not publish likeness stills to this tree.",
+    ...partial,
+  };
+}
 
 function m(value: string, unit: string, source: string): PropMeasurement {
   return { value, unit, source };
@@ -39,6 +57,8 @@ function francisca(): PropCard {
     id: uid(),
     name: "francisca",
     stillFile: "none — no public still; lyric numbers pinned before any browser call",
+    stillSource: "none",
+    stillCanvas: DEFAULT_STILL_CANVAS,
     fields: franciscaFields(),
     lockParagraph:
       "Francisca: overall 45 cm, head 600 g, 10 cm bite, square poll, teardrop eye. Do not invent a bearded blade, double bit, horns, or chrome.",
@@ -77,7 +97,9 @@ export function sigilsSample(): CapturePack {
         windows: "hop-1 + continue hops",
         prefix: "sigils-a",
         hop1Seed: "56",
-        t2vPlanned: true,
+        hop1Mode: "t2v",
+        hop1Plate: NONE_PLATE,
+        hop1Planned: true,
         watched: true,
       },
       {
@@ -88,7 +110,9 @@ export function sigilsSample(): CapturePack {
         windows: "chorus cuts",
         prefix: "sigils-b",
         hop1Seed: "57",
-        t2vPlanned: true,
+        hop1Mode: "t2v",
+        hop1Plate: NONE_PLATE,
+        hop1Planned: true,
         watched: true,
       },
     ],
@@ -131,7 +155,7 @@ export function sigilsSample(): CapturePack {
         cameraVerb: "pan",
         cameraAmplitude: "small",
         cameraSpeed: "slow",
-        action: "chorus — new angle, new T2V",
+        action: "chorus — new angle, independent plate → I2VA (T2V until a plate exists)",
         hold: "no",
         notes: "chorus",
       },
@@ -140,7 +164,9 @@ export function sigilsSample(): CapturePack {
       {
         id: uid(),
         name: "smith",
-        stillFile: "none — no public likeness still in this example",
+        stillFile: NONE_STILL,
+        stillSource: "none",
+        stillCanvas: DEFAULT_STILL_CANVAS,
         speakerId: "none",
         ageSex: NONE,
         faceHairBeard: NONE,
@@ -150,14 +176,16 @@ export function sigilsSample(): CapturePack {
         distinguishingMarks: NONE,
         eraForbiddenModern: "no modern clothing",
         lockParagraph:
-          "Same face, hair, and wardrobe every hop. Identity holds inside continue. Expect drift at cut and fadeblack until hop-1 is still-conditioned.",
+          "Same face, hair, and wardrobe every hop. Identity holds inside continue. Expect drift at cut and fadeblack until a plate conditions hop-1.",
         forbidden: DEFAULT_CHARACTER_FORBIDDEN,
         motionNotes: NONE,
       },
       {
         id: uid(),
         name: "thrower",
-        stillFile: "none — no public likeness still in this example",
+        stillFile: NONE_STILL,
+        stillSource: "none",
+        stillCanvas: DEFAULT_STILL_CANVAS,
         speakerId: "none",
         ageSex: NONE,
         faceHairBeard: NONE,
@@ -167,7 +195,7 @@ export function sigilsSample(): CapturePack {
         distinguishingMarks: NONE,
         eraForbiddenModern: "no modern clothing",
         lockParagraph:
-          "Same face, hair, and wardrobe every hop. Identity holds inside continue. Expect drift at cut and fadeblack until hop-1 is still-conditioned.",
+          "Same face, hair, and wardrobe every hop. Identity holds inside continue. Expect drift at cut and fadeblack until a plate conditions hop-1.",
         forbidden: DEFAULT_CHARACTER_FORBIDDEN,
         motionNotes: NONE,
       },
@@ -181,36 +209,53 @@ export function sigilsSample(): CapturePack {
       extrasForbidden: DEFAULT_LOOK_FORBIDDEN,
     },
     stills: [
-      {
-        id: uid(),
+      still({
         entity: "smith",
-        file: "none — no public likeness still in this example",
         role: "sheet",
-        source: "none",
-        canvas: "1344×768",
-        conditionsHop: "hop-1 of take A",
-      },
-      {
-        id: uid(),
+        file: NONE_STILL,
+        conditions: "none",
+        forbidden: DEFAULT_CHARACTER_FORBIDDEN,
+        notes: "Sheet is the bible. Plates for hop-1 live on still-hop1-*.md. No public likeness.",
+      }),
+      still({
         entity: "thrower",
-        file: "none — no public likeness still in this example",
         role: "sheet",
-        source: "none",
-        canvas: "1344×768",
-        conditionsHop: "hop-1 of take B",
-      },
-      {
-        id: uid(),
+        file: NONE_STILL,
+        conditions: "none",
+        forbidden: DEFAULT_CHARACTER_FORBIDDEN,
+        notes: "Sheet is the bible. Plates for hop-1 live on still-hop1-*.md. No public likeness.",
+      }),
+      still({
         entity: "francisca",
-        file: "none — no public still; lyric numbers pinned before any browser call",
         role: "sheet",
-        source: "none",
-        canvas: "1344×768",
-        conditionsHop: "hop-1 of take A",
-      },
+        file: "none — no public still; lyric numbers pinned before any browser call",
+        conditions: "none",
+        forbidden: DEFAULT_PROP_FORBIDDEN,
+        notes: "Sheet is the bible. Do not use Wikipedia as a still.",
+      }),
+      still({
+        entity: "take A hop-1",
+        role: "hop-1 plate",
+        file: NONE_PLATE,
+        conditions: "hop-1 of take A",
+        notes: "continue plate on hop-1 only. Hop 2+ is Motion-Context latent.",
+      }),
+      still({
+        entity: "take B hop-1",
+        role: "hop-1 plate",
+        file: NONE_PLATE,
+        conditions: "hop-1 of take B",
+        notes: "fadeblack / new location — new plate, not take A's last frame.",
+      }),
+      still({
+        entity: "chorus cut",
+        role: "cut plate",
+        file: NONE_PLATE,
+        conditions: "cut row 3",
+        notes: "Independent chorus take = independent plate → I2VA once a PNG exists.",
+      }),
     ],
-    smokeNotes:
-      "One hop-1 per take (I2VA if a plate exists, else T2V) + planned fades. Watch identity at cuts. Chorus rows are cut with no hold. Do not hop until this join is watchable.",
+    smokeNotes: DEFAULT_SMOKE_NOTES,
     continuityRows: [emptyContinuity()],
     polaroidPath: "none — fill during generate",
   };
