@@ -405,7 +405,10 @@ function LookEditor({ pack, onChange }: Props) {
 function StillsEditor({ pack, onChange }: Props) {
   return (
     <>
-      <p className="field-hint">Wikipedia is not a still.</p>
+      <p className="field-hint">
+        A sheet is the bible. A plate is the first frame. Wikipedia is not a still.
+        Native canvas 1344×768. Do not stretch 1024².
+      </p>
       {pack.stills.map((row) => (
         <article key={row.id} className="row-card">
           <div className="grid-3">
@@ -443,6 +446,47 @@ function StillsEditor({ pack, onChange }: Props) {
                   ...pack,
                   stills: pack.stills.map((item) =>
                     item.id === row.id ? { ...item, conditionsHop } : item,
+                  ),
+                })
+              }
+            />
+          </div>
+          <div className="grid-3">
+            <TextField
+              label="Role"
+              value={row.role ?? ""}
+              placeholder="sheet / hop-1 plate / cut plate"
+              onChange={(role) =>
+                onChange({
+                  ...pack,
+                  stills: pack.stills.map((item) =>
+                    item.id === row.id ? { ...item, role } : item,
+                  ),
+                })
+              }
+            />
+            <TextField
+              label="Source"
+              value={row.source ?? ""}
+              placeholder="photo / qwen-t2i / qwen-edit / none"
+              onChange={(source) =>
+                onChange({
+                  ...pack,
+                  stills: pack.stills.map((item) =>
+                    item.id === row.id ? { ...item, source } : item,
+                  ),
+                })
+              }
+            />
+            <TextField
+              label="Canvas"
+              value={row.canvas ?? "1344×768"}
+              placeholder="1344×768"
+              onChange={(canvas) =>
+                onChange({
+                  ...pack,
+                  stills: pack.stills.map((item) =>
+                    item.id === row.id ? { ...item, canvas } : item,
                   ),
                 })
               }

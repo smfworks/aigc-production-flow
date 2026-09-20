@@ -29,12 +29,14 @@ Receipts: https://www.smfclearinghouse.com/blog/2026-09-16-h3-sigils-four-minute
 
 **SMF measurement overrides blogs.** Motion-Context 22 holds a take. Fadeblack is a scene cut. Abort ≥85–86°C. One verb. Lyric numbers must be pinned before generate.
 
+**Still factory.** A sheet is the character/prop bible. A plate is the first frame of a window. Generate both on the image Spark (Qwen-Image-2.1) at native 1344×768, then condition hop-1 with `MiniMaxH3ImageToVideo.first_frame`. Hop 2+ is Motion-Context, not a new still. Procedure: [IMAGE-STILLS.md](IMAGE-STILLS.md).[10][11][12]
+
 ## The three joins
 
 | Join | Picture | When |
 |---|---|---|
 | `continue` | Motion-Context hop, trim 22, concat `-c copy` | Same room, same grade, action continues |
-| `cut` | New T2V, hard cut, **no last-second hold** | Chorus, snare, new angle |
+| `cut` | New I2VA/T2V (new plate), hard cut, **no last-second hold** | Chorus, snare, new angle |
 | `fadeblack` | New take + 8-frame dip | New location / time of day |
 
 Hop-1 is 243 frames / **10.125 s** @ 24 fps. Hop 2+ after trim is **221 f / 9.209 s**. Fadeblack offset = duration − 0.333 s. Speech and chorus hits finish by **8.0 s**.
@@ -70,7 +72,7 @@ Do not do (1) and (2).
 
 ## Smoke
 
-Three independent hop-1s + planned fades before a 28-window night. Watch identity at the cuts. A T2V with no SaveLatent cannot be hopped.
+Three independent hop-1s + planned fades before a 28-window night. I2VA if a plate exists. Watch identity at the cuts. A hop-1 with no SaveLatent cannot be hopped.
 
 ## Sources
 

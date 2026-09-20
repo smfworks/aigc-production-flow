@@ -18,7 +18,7 @@ export const GATE_DEFS = [
   { id: "props", n: 6, label: "Prop cards (units + still or none)" },
   { id: "look", n: 7, label: "Look card (one style line)" },
   { id: "audio", n: 8, label: "Audio path (exactly one)" },
-  { id: "smoke", n: 9, label: "Hop-1 smoke plan (one T2V per take)" },
+  { id: "smoke", n: 9, label: "Hop-1 smoke plan (one hop-1 per take)" },
 ] as const;
 
 export type GateId = (typeof GATE_DEFS)[number]["id"];
@@ -303,7 +303,7 @@ function evaluateSmoke(pack: CapturePack): GateResult {
     return {
       ...GATE_DEFS[8],
       ok: false,
-      detail: `${unplanned.length} take(s) missing hop-1 T2V planned + watched.`,
+      detail: `${unplanned.length} take(s) missing hop-1 planned + watched.`,
     };
   }
   const prefixes = pack.takes.map((row) => row.prefix.trim().toLowerCase()).filter(Boolean);
@@ -318,7 +318,7 @@ function evaluateSmoke(pack: CapturePack): GateResult {
   return {
     ...GATE_DEFS[8],
     ok: true,
-    detail: `${pack.takes.length} hop-1 T2V(s) planned and watched before hopping.`,
+    detail: `${pack.takes.length} hop-1(s) planned and watched before hopping.`,
   };
 }
 

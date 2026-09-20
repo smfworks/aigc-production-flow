@@ -132,7 +132,15 @@ export function emptyProp(): PropCard {
 }
 
 export function emptyStill(): StillRow {
-  return { id: uid(), entity: "", file: "", conditionsHop: "" };
+  return {
+    id: uid(),
+    entity: "",
+    file: "",
+    role: "",
+    source: "",
+    canvas: "1344×768",
+    conditionsHop: "",
+  };
 }
 
 export function emptyContinuity(): ContinuityRow {

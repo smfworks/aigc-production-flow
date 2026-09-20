@@ -31,9 +31,10 @@ cp templates/continuity-log.md  "$JOB/continuity-log.md"
 cp templates/character-card.md  "$JOB/character-smith.md"
 cp templates/character-card.md  "$JOB/character-thrower.md"
 cp templates/prop-card.md       "$JOB/prop-francisca.md"
+cp templates/still-card.md      "$JOB/still-hop1-a.md"
 ```
 
-Stills (if you have them) go in `$JOB/stills/` and are referenced by relative path on the cards. Git LFS is not required for a handful of PNGs; skip binaries that are not yours to publish.
+Stills go in `$JOB/stills/` and are referenced by relative path. Name sheets `{entity}-sheet.png` and plates `{take}-hop1-plate.png`. Git LFS is not required for a handful of PNGs. Do not commit likeness stills to the public tree.
 
 ## Fill order (do not skip)
 
@@ -43,8 +44,9 @@ Stills (if you have them) go in `$JOB/stills/` and are referenced by relative pa
 4. Character + prop cards (units, forbidden, still or `none`)
 5. Look card (one style line)
 6. Edit list (every row: join + one camera verb)
-7. Smoke plan
-8. Only then: hop-1 on the Spark
+7. Still factory: sheets, then plates at 1344×768 (see [IMAGE-STILLS.md](IMAGE-STILLS.md))
+8. Smoke plan (I2VA hop-1 if a plate exists)
+9. Only then: hop-1 on the clip Spark
 
 Ambiguous prop fields (overall vs haft length) must be resolved or the pack is incomplete.
 
@@ -67,7 +69,8 @@ Public PRs: templates and redacted examples only.
 - [ ] Every row has exactly one camera verb
 - [ ] Every character/prop has lock paragraph + forbidden + still or `none`
 - [ ] Audio path is one of three
-- [ ] Hop-1 smoke planned per take
+- [ ] Hop-1 smoke planned per take (I2VA if a plate exists)
+- [ ] Sheet vs plate named; canvas 1344×768 or `none` + why
 - [ ] No “research X at generate time”
 
 ## After generate

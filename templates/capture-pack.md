@@ -39,15 +39,15 @@ Forbidden (global):
 
 ## Stills
 
-| Entity | File | Conditions hop |
-|---|---|---|
-| | stills/… or `none` | hop-1 of take _ |
+| Entity | Role | File | Source | Canvas | Conditions hop |
+|---|---|---|---|---|---|
+| | sheet / hop-1 plate / cut plate | stills/… or `none` | photo / qwen-t2i / qwen-edit / none | 1344×768 | hop-1 of take _ |
 
-Wikipedia is not a still.
+A sheet is the bible. A plate is the first frame. Wikipedia is not a still. Do not stretch 1024². Procedure: `docs/IMAGE-STILLS.md`.
 
 ## Smoke
 
-One T2V per take + planned fades. Watch identity at cuts. Do not hop until this join is watchable.
+One hop-1 per take (I2VA if a plate exists, else T2V) + planned fades. Watch identity at cuts. Do not hop until this join is watchable.
 
 ## Continuity log
 
