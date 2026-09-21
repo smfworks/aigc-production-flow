@@ -1,6 +1,6 @@
-# Studio shell (Phase 1)
+# Studio shell (Phase 3)
 
-Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 2 adds shot readiness, candidate confirm, costume media, and a storyboard canvas.
+Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 3 adds a Task Center, hop-1 preview desk, and stub job enqueue/cancel/retry.
 
 ```bash
 # from repo root

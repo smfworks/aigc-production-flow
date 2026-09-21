@@ -21,6 +21,13 @@ class Settings(BaseSettings):
         "http://localhost:5173,http://localhost:5174,"
         "http://127.0.0.1:5173,http://127.0.0.1:5174"
     )
+    job_worker: str = "thread"
+    job_poll_seconds: float = 0.25
+    still_adapter: str = "stub"
+    clip_adapter: str = "stub"
+    adapter_webhook_url: str = ""
+    adapter_cli: str = ""
+    adapter_timeout_seconds: float = 60.0
 
     @property
     def cors_origin_list(self) -> list[str]:

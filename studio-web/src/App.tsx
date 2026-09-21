@@ -3,8 +3,10 @@ import { api, downloadMedia, downloadPack, getToken, setToken } from "./api.ts";
 import type {
   Comment,
   Episode,
+  Job,
   MediaAsset,
   Meta,
+  PreviewDesk,
   Project,
   Review,
   ReviewStateName,
@@ -12,11 +14,10 @@ import type {
 } from "./types.ts";
 import { REVIEW_COPY, REVIEW_STATES } from "./types.ts";
 import { ShotBoard } from "./ShotBoard.tsx";
-
-type View =
-  | { page: "projects" }
-  | { page: "project"; projectId: string }
-  | { page: "episode"; projectId: string; episodeId: string };
+import { TaskCenter } from "./TaskCenter.tsx";
+import { PreviewDesk as PreviewDeskPanel } from "./PreviewDesk.tsx";
+import { JobTable } from "./JobTable.tsx";
+import { navigate, parseHash, type View } from "./nav.ts";
 
 function formatWhen(iso: string): string {
   const date = new Date(iso);
@@ -25,7 +26,7 @@ function formatWhen(iso: string): string {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>({ page: "projects" });
+  const [view, setView] = useState<View>(() => parseHash());
   const [token, setTokenState] = useState(getToken);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -43,6 +44,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const onHash = () => setView(parseHash());
+    window.addEventListener("hashchange", onHash);
+    if (!window.location.hash) navigate({ page: "projects" });
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
     if (!notice) return;
     const id = window.setTimeout(() => setNotice(null), 3200);
     return () => window.clearTimeout(id);
@@ -55,16 +63,31 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 2</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 3</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects and episodes around the pack zip. The builder in{" "}
-          <code>app/</code> still fills gates. This shell adds shot readiness,
-          candidate confirm, and a storyboard canvas. It does not run a generate
-          queue.
+          Projects, hop-1 preview desk, and a task center around the pack zip. Jobs run in-process
+          with adapter=<code>stub</code> unless a live hook is set. This shell does not claim H3 or
+          Qwen ran. Pack zip remains the contract.
         </p>
+        <nav className="mast-nav" aria-label="Studio">
+          <button
+            type="button"
+            className={view.page === "projects" || view.page === "project" || view.page === "episode" ? "btn btn-go" : "btn"}
+            onClick={() => navigate({ page: "projects" })}
+          >
+            Projects
+          </button>
+          <button
+            type="button"
+            className={view.page === "tasks" ? "btn btn-go" : "btn"}
+            onClick={() => navigate({ page: "tasks" })}
+          >
+            Task Center
+          </button>
+        </nav>
         <div className="auth-row">
           <label>
             Local-dev token
@@ -78,6 +101,11 @@ export default function App() {
             />
           </label>
           <span className="hint">SSO later. This is not multi-tenant SaaS security.</span>
+          {meta?.still_adapter ? (
+            <span className="hint">
+              still={meta.still_adapter} · clip={meta.clip_adapter} · worker={meta.job_worker}
+            </span>
+          ) : null}
         </div>
       </header>
 
@@ -97,7 +125,7 @@ export default function App() {
 
       {view.page === "projects" ? (
         <ProjectList
-          onOpen={(projectId) => setView({ page: "project", projectId })}
+          onOpen={(projectId) => navigate({ page: "project", projectId })}
           onError={showError}
           onNotice={setNotice}
         />
@@ -105,9 +133,9 @@ export default function App() {
       {view.page === "project" ? (
         <ProjectView
           projectId={view.projectId}
-          onBack={() => setView({ page: "projects" })}
+          onBack={() => navigate({ page: "projects" })}
           onOpenEpisode={(episodeId) =>
-            setView({ page: "episode", projectId: view.projectId, episodeId })
+            navigate({ page: "episode", projectId: view.projectId, episodeId })
           }
           onError={showError}
           onNotice={setNotice}
@@ -117,11 +145,15 @@ export default function App() {
         <EpisodeView
           projectId={view.projectId}
           episodeId={view.episodeId}
+          shotId={view.shotId}
           packBuilderUrl={packBuilderUrl}
-          onBack={() => setView({ page: "project", projectId: view.projectId })}
+          onBack={() => navigate({ page: "project", projectId: view.projectId })}
           onError={showError}
           onNotice={setNotice}
         />
+      ) : null}
+      {view.page === "tasks" ? (
+        <TaskCenter jobId={view.jobId} onError={showError} onNotice={setNotice} />
       ) : null}
     </div>
   );
@@ -327,6 +359,7 @@ function ProjectView({
 function EpisodeView({
   projectId,
   episodeId,
+  shotId,
   packBuilderUrl,
   onBack,
   onError,
@@ -334,6 +367,7 @@ function EpisodeView({
 }: {
   projectId: string;
   episodeId: string;
+  shotId?: string;
   packBuilderUrl: string;
   onBack: () => void;
   onError: (err: unknown) => void;
@@ -344,6 +378,9 @@ function EpisodeView({
   const [comments, setComments] = useState<Comment[]>([]);
   const [media, setMedia] = useState<MediaAsset[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [desk, setDesk] = useState<PreviewDesk | null>(null);
+  const [selectedShotId, setSelectedShotId] = useState<string | null>(shotId ?? null);
   const [commentBody, setCommentBody] = useState("");
   const [note, setNote] = useState("");
   const [kind, setKind] = useState("plate");
@@ -356,22 +393,32 @@ function EpisodeView({
 
   const load = useCallback(async () => {
     try {
-      const [nextEpisode, nextReview, nextComments, nextMedia, nextShots] = await Promise.all([
-        api.episode(episodeId),
-        api.review(episodeId),
-        api.comments(episodeId),
-        api.media(episodeId),
-        api.shots(episodeId).catch(() => [] as Shot[]),
-      ]);
+      const [nextEpisode, nextReview, nextComments, nextMedia, nextShots, nextJobs, nextDesk] =
+        await Promise.all([
+          api.episode(episodeId),
+          api.review(episodeId),
+          api.comments(episodeId),
+          api.media(episodeId),
+          api.shots(episodeId).catch(() => [] as Shot[]),
+          api.episodeJobs(episodeId).catch(() => [] as Job[]),
+          api.previewDesk(episodeId).catch(() => null),
+        ]);
       setEpisode(nextEpisode);
       setReview(nextReview);
       setComments(nextComments);
       setMedia(nextMedia);
       setShots(nextShots);
+      setJobs(nextJobs);
+      setDesk(nextDesk);
+      setSelectedShotId((current) => {
+        if (shotId) return shotId;
+        if (current && nextShots.some((shot) => shot.id === current)) return current;
+        return nextShots.find((shot) => shot.hop1_required)?.id ?? nextShots[0]?.id ?? null;
+      });
     } catch (err) {
       onError(err);
     }
-  }, [episodeId, onError]);
+  }, [episodeId, onError, shotId]);
 
   useEffect(() => {
     void load();
@@ -379,7 +426,38 @@ function EpisodeView({
 
   const gates = review?.latest_gates?.gates ?? [];
   const allGreen = review?.latest_gates?.all_green === true;
-  const generateBlocked = useMemo(() => !allGreen, [allGreen]);
+  const generateBlocked = useMemo(
+    () => !allGreen || desk?.generate_ok_ready !== true,
+    [allGreen, desk],
+  );
+
+  useEffect(() => {
+    const dirty = jobs.some((job) => job.status === "queued" || job.status === "running");
+    if (!dirty) return;
+    const id = window.setInterval(() => {
+      void api.episodeJobs(episodeId).then(setJobs).catch(() => undefined);
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [jobs, episodeId]);
+
+  function selectShot(nextId: string) {
+    setSelectedShotId(nextId);
+    navigate({ page: "episode", projectId, episodeId, shotId: nextId });
+  }
+
+  async function enqueue(jobType: string, withShot = false) {
+    try {
+      const job = await api.enqueueJob({
+        episode_id: episodeId,
+        shot_id: withShot ? selectedShotId || undefined : undefined,
+        job_type: jobType,
+      });
+      onNotice(`${job.job_type} → ${job.status} (adapter=${job.adapter})`);
+      await load();
+    } catch (err) {
+      onError(err);
+    }
+  }
 
   async function changeState(state: ReviewStateName) {
     try {
@@ -519,6 +597,8 @@ function EpisodeView({
         shots={shots}
         media={media}
         packBuilderUrl={packBuilderUrl}
+        selectedShotId={selectedShotId}
+        onSelectShot={selectShot}
         onExtract={() => {
           void api
             .extractCandidates(episodeId)
@@ -555,11 +635,74 @@ function EpisodeView({
         }}
       />
 
+      <PreviewDeskPanel
+        episodeId={episodeId}
+        desk={desk}
+        shots={shots}
+        media={media}
+        selectedShotId={selectedShotId}
+        onSelectShot={selectShot}
+        onError={onError}
+        onNotice={onNotice}
+        onChanged={() => void load()}
+      />
+
+      <section className="panel">
+        <h3>Jobs</h3>
+        <p className="hint">
+          Path: green pack → batch-precheck → stub hop-1 → attach preview+receipt → preview-watched.
+          Adapter label is honest. This is not Celery.
+        </p>
+        <div className="toolbar">
+          <button type="button" className="btn" onClick={() => void enqueue("batch-precheck")}>
+            Enqueue batch-precheck
+          </button>
+          <button type="button" className="btn" onClick={() => void enqueue("still-sheet")}>
+            Stub still-sheet
+          </button>
+          <button type="button" className="btn" onClick={() => void enqueue("still-plate")}>
+            Stub still-plate
+          </button>
+          <button type="button" className="btn" onClick={() => void enqueue("clip-hop1", true)}>
+            Stub hop-1
+          </button>
+          <button type="button" className="btn" onClick={() => void enqueue("clip-extend", true)}>
+            Stub clip-extend
+          </button>
+          <button type="button" className="btn" onClick={() => navigate({ page: "tasks" })}>
+            Open Task Center
+          </button>
+        </div>
+        <JobTable
+          jobs={jobs}
+          onCancel={(job) => {
+            void api
+              .cancelJob(job.id)
+              .then(() => {
+                onNotice(`Cancelled ${job.job_type}`);
+                return load();
+              })
+              .catch(onError);
+          }}
+          onRetry={(job) => {
+            void api
+              .retryJob(job.id)
+              .then((next) => {
+                onNotice(`Retried → ${next.status}`);
+                return load();
+              })
+              .catch(onError);
+          }}
+        />
+      </section>
+
       <section className="panel">
         <h3>Review state</h3>
         <p className="hint">
           Current: <strong>{review?.current ?? "draft"}</strong>
-          {generateBlocked ? " — generate-ok refused while any gate is red." : ""}
+          {generateBlocked
+            ? " — generate-ok refused while any gate is red or a required hop-1 lacks preview-watched + receipt."
+            : ""}
         </p>
         <div className="states">
           {REVIEW_STATES.map((state) => (
@@ -617,12 +760,13 @@ function EpisodeView({
         </div>
         <div className="panel">
           <h3>Media library</h3>
-          <p className="hint">Sheets, plates, and costumes. No engine MP4s. Files land in gitignored data/media/.</p>
+          <p className="hint">Sheets, plates, costumes, and hop-1 preview receipts. Engine MP4s stay gitignored in data/media/. Never commit them.</p>
           <div className="create-row">
             <select value={kind} onChange={(event) => setKind(event.target.value)}>
               <option value="sheet">sheet</option>
               <option value="plate">plate</option>
               <option value="costume">costume</option>
+              <option value="preview">preview</option>
               <option value="other">other</option>
             </select>
             <select value={entityType} onChange={(event) => setEntityType(event.target.value)}>
@@ -648,7 +792,7 @@ function EpisodeView({
             <input
               ref={mediaRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.md,.txt"
+              accept="image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.md,.txt,.json,.mp4,.webm"
               hidden
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -681,7 +825,10 @@ function EpisodeView({
           )}
         </div>
       </section>
-      <p className="hint">Project {projectId}. Builder remains the four-stage walk. generate-ok still needs every gate green.</p>
+      <p className="hint">
+        Project {projectId}. Builder remains the four-stage walk. generate-ok needs every gate green
+        and hop-1 receipts watched.
+      </p>
     </div>
   );
 }

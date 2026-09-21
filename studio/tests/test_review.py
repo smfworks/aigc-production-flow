@@ -1,4 +1,5 @@
 from tests.fixtures import green_pack, pack_zip_bytes, red_haft_pack
+from tests.helpers import attach_watched_receipt, ready_all_shots
 
 
 def _episode(client, auth):
@@ -53,9 +54,19 @@ def test_review_states_and_generate_ok_honesty(client, auth):
         headers=auth,
         files={"file": ("green.zip", pack_zip_bytes(green_pack()), "application/zip")},
     )
+    still_preview = client.put(
+        f"/api/episodes/{episode['id']}/review",
+        json={"state": "generate-ok", "note": "nine green, no hop-1 receipt"},
+        headers=auth,
+    )
+    assert still_preview.status_code == 409
+    assert still_preview.json()["detail"]["code"] == "preview_incomplete"
+
+    shots = ready_all_shots(client, auth, episode["id"])
+    attach_watched_receipt(client, auth, episode["id"], shots[0]["id"])
     ok = client.put(
         f"/api/episodes/{episode['id']}/review",
-        json={"state": "generate-ok", "note": "nine green, watched"},
+        json={"state": "generate-ok", "note": "gates green, hop-1 watched"},
         headers=auth,
     )
     assert ok.status_code == 200
