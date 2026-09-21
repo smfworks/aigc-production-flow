@@ -198,7 +198,15 @@ export const api = {
   episodes: (projectId: string) => request<Episode[]>(`/api/projects/${projectId}/episodes`),
   createEpisode: (
     projectId: string,
-    body: { title: string; synopsis?: string; log_line?: string; season?: number },
+    body: {
+      title: string;
+      synopsis?: string;
+      log_line?: string;
+      season?: number;
+      pack?: "none" | "blank";
+      template_id?: string;
+      brain_dump?: string;
+    },
   ) =>
     request<Episode>(`/api/projects/${projectId}/episodes`, {
       method: "POST",
@@ -374,6 +382,57 @@ export const api = {
       `/api/templates/${templateId}/projects`,
       { method: "POST", body: JSON.stringify(body) },
     ),
+  startStudio: (body: {
+    name?: string;
+    description?: string;
+    mode: "blank" | "template" | "brain";
+    template_id?: string;
+    brain_dump?: string;
+    episode_title?: string;
+  }) =>
+    request<{
+      project_id: string;
+      episode_id: string;
+      revision_id: string;
+      gates_green: boolean;
+      generate_ready: boolean;
+      model_ran: boolean;
+      model: string;
+      model_note: string;
+      source: string;
+    }>("/api/studio/start", { method: "POST", body: JSON.stringify(body) }),
+  revision: (episodeId: string, revisionId: string) =>
+    request<{ id: string; filename: string; all_gates_green: boolean; pack: Record<string, unknown> }>(
+      `/api/episodes/${episodeId}/revisions/${revisionId}`,
+    ),
+  savePack: (episodeId: string, pack: unknown) =>
+    request<{
+      revision_id: string;
+      filename: string;
+      gates_green: boolean;
+      generate_ready: boolean;
+    }>(`/api/episodes/${episodeId}/pack/json`, {
+      method: "POST",
+      body: JSON.stringify({ pack }),
+    }),
+  resetBlank: (episodeId: string) =>
+    request<{ revision_id: string; filename: string; gates_green: boolean }>(
+      `/api/episodes/${episodeId}/pack/blank`,
+      { method: "POST", body: JSON.stringify({ confirm: "reset" }) },
+    ),
+  brainDump: (episodeId: string, text: string, title = "") =>
+    request<{
+      project_id: string;
+      episode_id: string;
+      revision_id: string;
+      gates_green: boolean;
+      model_ran: boolean;
+      model_note: string;
+      generate_ready: boolean;
+    }>(`/api/episodes/${episodeId}/brain-dump`, {
+      method: "POST",
+      body: JSON.stringify({ text, title }),
+    }),
   budget: (query: { project_id?: string; episode_id?: string } = {}) => {
     if (query.episode_id) return request<BudgetDashboard>(`/api/episodes/${query.episode_id}/budget`);
     if (query.project_id) return request<BudgetDashboard>(`/api/projects/${query.project_id}/budget`);
@@ -437,6 +496,14 @@ export async function downloadExport(episodeId: string, kind: "edl" | "playlist"
   });
   if (!response.ok) throw new Error(await parseError(response));
   await saveDownload(response, fallback);
+}
+
+export async function downloadAgentExport(episodeId: string): Promise<void> {
+  const response = await fetch(`/api/episodes/${episodeId}/export/agent`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  await saveDownload(response, "agent-episode.zip");
 }
 
 export async function downloadBackup(): Promise<void> {

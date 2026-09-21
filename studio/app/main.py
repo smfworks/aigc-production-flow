@@ -28,6 +28,7 @@ from .routers import (
     budget,
     comments,
     continuity,
+    create,
     demo,
     episodes,
     export,
@@ -75,10 +76,15 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.9.0",
+        version="0.10.0",
         description=(
-            "Phase 9 studio spine for the AIGC production flow. "
+            "Phase 10 studio: one app to create the pack. "
+            "New project, blank pack, vertical template, or brain dump — no zip required. "
+            "Four stages edit inside the episode. Export for agent hands a zip to "
+            "Hermes / OpenClaw / Grok for Comfy MCP (stills then clips). "
             "Pack zip remains the collaboration contract. "
+            "Brain dump uses a deterministic template unless STUDIO_LLM_BASE_URL is set. "
+            "Export does not call Comfy. "
             "App-level roles add writer and art beside the Phase 5 producer / editor / "
             "reviewer / viewer bundle. Episode season/sequence order, a soft playlist "
             "scrubber, and identity unapprove/keyword edit. "
@@ -109,6 +115,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    application.include_router(create.router)
     application.include_router(projects.router)
     application.include_router(episodes.router)
     application.include_router(packs.router)
@@ -140,7 +147,7 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 9,
+            "phase": 10,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",
@@ -231,6 +238,16 @@ def create_app() -> FastAPI:
             notify_webhook_configured=webhook_configured(cfg),
             multi_org=True,
             role_matrix=role_matrix(),
+            llm_configured=bool((cfg.llm_base_url or "").strip()),
+            llm_note=(
+                "Brain dump can call a local/OpenAI-compatible endpoint at STUDIO_LLM_BASE_URL."
+                if (cfg.llm_base_url or "").strip()
+                else (
+                    "No model configured. Brain dump uses a deterministic template expansion. "
+                    "Set STUDIO_LLM_BASE_URL for an optional local/OpenAI-compatible endpoint."
+                )
+            ),
+            primary_create="studio",
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])

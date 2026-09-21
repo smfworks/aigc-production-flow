@@ -1,6 +1,8 @@
-# Studio shell (Phase 9)
+# Studio shell (Phase 10)
 
-Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 9 adds the **writer/art role matrix**, **episode reorder**, a **soft playlist scrubber**, and **identity unapprove / keyword edit** on top of the identity store, pack revision diff, and builder auto-import.
+Vite + React UI for one AIGC Studio. **Start here** creates a project and pack (blank, template, or brain dump). The episode embeds the pack builder’s four stages (Script → Assets → Storyboard → Preview) and autosaves revisions. **Export for agent** downloads the handoff zip. Zip import and the optional builder window stay secondary.
+
+The pack builder source stays in `../app/` and is reused by the episode stages. Hermes `smf-h3-capture` is unchanged.
 
 `npm run e2e` is the Playwright smoke. It prints `E2E_SKIP: playwright browsers unavailable` and exits 0 when Chromium cannot launch.
 

@@ -446,3 +446,34 @@ ScriptUser = Annotated[UserOut, Depends(require_perm(PERM_SCRIPT))]
 IdentityUser = Annotated[UserOut, Depends(require_perm(PERM_IDENTITY))]
 EditUser = Annotated[UserOut, Depends(require_perm(PERM_EDIT))]
 MediaOrIdentityUser = Annotated[UserOut, Depends(require_any(PERM_MEDIA, PERM_IDENTITY))]
+
+
+def require_craft():
+    """Writer, art, or the legacy editor/producer bundle may save the in-studio pack."""
+    needed = frozenset({PERM_SCRIPT, PERM_PACK, PERM_IDENTITY, PERM_EDIT})
+
+    def _dep(
+        user: Annotated[UserOut, Depends(get_current_user)],
+        db: Annotated[Session, Depends(get_db)],
+        x_org_id: Annotated[str | None, Header()] = None,
+    ) -> UserOut:
+        actor = attach_role(user, db, required=True, org_id=x_org_id)
+        if any(perm in permissions_for(actor.role) for perm in needed):
+            return actor
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "forbidden_role",
+                "message": (
+                    f"Role {actor.role} cannot edit the in-studio pack. "
+                    "Writer, art, and the legacy editor/producer can. Viewers stay read-only."
+                ),
+                "role": actor.role,
+                "required_any": sorted(needed),
+            },
+        )
+
+    return _dep
+
+
+CraftUser = Annotated[UserOut, Depends(require_craft())]

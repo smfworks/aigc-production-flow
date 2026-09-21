@@ -59,7 +59,7 @@ def extract_candidates(episode_id: str, user: EditUser, db: DbDep) -> list[ShotO
     if not revision:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Import a pack zip before extracting candidates.",
+            detail="Start a pack in Studio, or import a zip, before extracting candidates.",
         )
     pack = revision.pack_json if isinstance(revision.pack_json, dict) else {}
     if not episode.shots:

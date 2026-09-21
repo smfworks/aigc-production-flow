@@ -98,7 +98,7 @@ export function PreviewDesk({
         </p>
       ) : null}
       {required.length === 0 ? (
-        <p className="empty">Import a pack with hop-1 planned takes to open the desk.</p>
+        <p className="empty">No hop-1 rows yet. Plan them in Preview, or import a zip.</p>
       ) : (
         <ul className="shot-list">
           {required.map((row) => {

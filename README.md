@@ -113,13 +113,17 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
-## Studio spine (Phase 9) vs pack builder
+## Studio spine (Phase 10) vs pack builder
+
+One app. Open Studio → **New project** → brain dump, blank pack, or template → edit the four stages on the episode → **Export for agent**. The brief lists still jobs, then hop-1 clip jobs. Zip import is optional.
+
+Hermes `smf-h3-capture` can stay. Studio is the primary create surface. The pack builder remains the zip round-trip, not a second ritual you must finish before Studio starts.
 
 Two pieces, one contract:
 
 | | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
 |---|---|---|
-| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. **Open in Studio** stages the zip when the studio API is reachable. | Projects, ordered episodes, pack revisions, **pack diff**, **identity store** (unapprove + keyword edit), review **sign-off**, comments, media, shots, job center, stub adapters, hop-1 desk, **playlist scrubber**, budget, audit, EDL, templates, **writer/art/editor/producer** roles, presence, adapter health, **multi-org lite**, **notifications**, **continuity panel**, **demo seed**, **backup**. Optional Celery / OIDC. |
+| Job | Four-stage walk and zip round-trip. Export markdown zip + `pack.json`. **Open in Studio** is optional. | Create the pack here: blank, template, or brain dump. Edit the four stages on the episode. **Export for agent** (stills then clips). Plus pack diff, identity, sign-off, jobs, playlist scrubber, budget, audit, roles, multi-org lite. Optional Celery / OIDC / local LLM endpoint. |
 | Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. Compose pack: `docker-compose.studio.yml`. |
 | Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles (`writer` / `art` plus the Phase 5 four). Optional OIDC JWKS (**off by default**). Roles stay app-level unless the OIDC claim map is on. Multi-org lite is membership isolation, not SaaS. [docs/AUTH.md](docs/AUTH.md). |
 | Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green, hop-1 receipts are preview-watched, **and** a reviewer/producer has signed off. Default adapter=`stub`. Budget units are operator credits, not a cloud bill. Media is local disk unless S3 is configured. |
@@ -149,14 +153,14 @@ docker compose -f docker-compose.studio.yml up --build
 ```
 app/                     client-side pack builder (Vite + React) — do not rewrite
 studio/                  FastAPI spine (SQLite default, Postgres-ready URL)
-studio-web/              thin studio shell (lists, review, identity, playlist scrubber, pack diff, jobs, budget, audit, EDL, members)
+studio-web/              studio shell (create pack, four stages, agent export, review, jobs, budget, audit)
 docker-compose.studio.yml  API + studio-web (optional worker / postgres / minio / celery profiles)
 scripts/dev-studio.sh    local API + studio + builder
 data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 templates/verticals/     education / brand promo / short-drama empty packs
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 9 studio operator path (role matrix, episode order, scrubber, identity edit)
+docs/STUDIO.md           Phase 10 studio operator path (create in-app, brain dump, agent export)
 docs/AUTH.md             local / forward-header / optional OIDC — multi-org lite, not SaaS or a production IdP
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)

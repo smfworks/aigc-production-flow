@@ -36,6 +36,9 @@ import { ContinuityPanel } from "./ContinuityPanel.tsx";
 import { IdentityStore } from "./IdentityStore.tsx";
 import { PlaylistScrubber } from "./PlaylistScrubber.tsx";
 import { PackDiffPanel } from "./PackDiffPanel.tsx";
+import { PackStage } from "./PackStage.tsx";
+import { StartHere } from "./StartHere.tsx";
+import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
 import {
   clearHandoffSearch,
@@ -138,20 +141,30 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 9</p>
+            <p className="eyebrow">SMF Works · Studio · Phase 10</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects, identity store, pack revision diff, playlist scrubber, hop-1 preview desk,
-          members (writer / art / editor / producer), presence, continuity, and adapter health
-          around the pack zip. Multi-org lite is membership
-          isolation — not SaaS billing. Jobs default to an in-process thread worker; Celery is
-          opt-in. Budget units are operator credits — not a cloud bill. Media is local disk unless
-          S3 is configured. OIDC is opt-in and off by default. Pack zip remains the contract.
-          Unset comfy-* hooks are not live.
+          One app for the pack. Start a project here — blank, template, or brain dump — then edit
+          Script → Assets → Storyboard → Preview on the episode. Export for an agent feeds Comfy
+          MCP (stills, then clips). Pack zip stays the collaboration contract. Import is optional.
+          Hermes <code>smf-h3-capture</code> can stay; Studio is the create surface. Jobs default
+          to stub. Unset comfy hooks are not live. No model is claimed unless one is configured.
         </p>
         <nav className="mast-nav" aria-label="Studio">
+          <button
+            type="button"
+            className="btn btn-go"
+            onClick={() => {
+              navigate({ page: "projects" });
+              window.setTimeout(() => {
+                document.getElementById("start-here")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 50);
+            }}
+          >
+            New project
+          </button>
           <button
             type="button"
             className={view.page === "projects" || view.page === "project" || view.page === "episode" ? "btn btn-go" : "btn"}
@@ -276,8 +289,8 @@ export default function App() {
       ) : null}
       {importHint() ? (
         <p className="banner banner-ok" role="status" data-testid="import-hint">
-          Pack builder handoff: export a zip there, open a project/episode, then{" "}
-          <strong>Import pack zip</strong>. Deep links:{" "}
+          Optional zip handoff: pick a project/episode, then{" "}
+          <strong>Import pack zip</strong>. You can also start a pack here. Deep links:{" "}
           <code>#/projects/&lt;id&gt;/episodes/&lt;id&gt;</code>
           <button
             type="button"
@@ -302,6 +315,9 @@ export default function App() {
           me={me}
           orgId={me?.org_id}
           onOpen={(projectId) => navigate({ page: "project", projectId })}
+          onStarted={(projectId, episodeId) =>
+            navigate({ page: "episode", projectId, episodeId })
+          }
           onError={showError}
           onNotice={setNotice}
         />
@@ -349,31 +365,27 @@ function ProjectList({
   me,
   orgId,
   onOpen,
+  onStarted,
   onError,
   onNotice,
 }: {
   me: StudioUser | null;
   orgId?: string | null;
   onOpen: (id: string) => void;
+  onStarted: (projectId: string, episodeId: string) => void;
   onError: (err: unknown) => void;
   onNotice: (msg: string) => void;
 }) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [templates, setTemplates] = useState<VerticalTemplate[]>([]);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [templateId, setTemplateId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreSummary, setRestoreSummary] = useState("");
   const restoreRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
-      const [nextProjects, nextTemplates] = await Promise.all([
-        api.projects(),
-        api.templates().catch(() => [] as VerticalTemplate[]),
-      ]);
+      const nextProjects = await api.projects();
       setProjects(nextProjects);
-      setTemplates(nextTemplates);
     } catch (err) {
       onError(err);
     }
@@ -383,74 +395,23 @@ function ProjectList({
     void load();
   }, [load]);
 
-  async function create(event: FormEvent) {
-    event.preventDefault();
-    if (!name.trim() && !templateId) return;
-    setBusy(true);
-    try {
-      if (templateId) {
-        const created = await api.createFromTemplate(templateId, {
-          name: name.trim() || undefined,
-          description: description.trim() || undefined,
-        });
-        setName("");
-        setDescription("");
-        setTemplateId("");
-        onNotice(
-          `Created ${created.project.name} from ${templateId} — gates ${
-            created.gates_green ? "green" : "red (fill the pack; no fake generate)"
-          }`,
-        );
-        await load();
-        onOpen(created.project.id);
-      } else {
-        const project = await api.createProject({ name: name.trim(), description: description.trim() });
-        setName("");
-        setDescription("");
-        onNotice(`Created ${project.name}`);
-        await load();
-        onOpen(project.id);
-      }
-    } catch (err) {
-      onError(err);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <section className="panel">
+      <StartHere
+        me={me}
+        onError={onError}
+        onStarted={(projectId, episodeId, note) => {
+          onNotice(note);
+          void load().then(() => onStarted(projectId, episodeId));
+        }}
+      />
       <div className="panel-head">
         <h2>Projects</h2>
-        <p>One title. Episodes are chapters. Pack zip is the collaboration object. New from template seeds an empty pack — gates stay red.</p>
+        <p>One title. Episodes hold the pack. Zip import stays available on the episode as a secondary path.</p>
       </div>
-      <form className="create-row" onSubmit={create}>
-        <input
-          placeholder="Project name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          required={!templateId}
-        />
-        <input
-          placeholder="Log line / description (optional)"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-        <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
-          <option value="">Blank project</option>
-          {templates.map((row) => (
-            <option key={row.id} value={row.id}>
-              New from template: {row.name}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className="btn btn-go" disabled={busy || !can(me, "mutate")}>
-          {templateId ? "New from template" : "New project"}
-        </button>
-      </form>
       {projects.length === 0 ? (
         <div className="empty-tip">
-          <p className="empty">No projects yet in this org. Create one, import a pack zip, or seed a stub demo episode.</p>
+          <p className="empty">Start here — new project, blank pack, template, or a brain dump. A zip is optional.</p>
           <p className="hint">
             First-run: <strong>Seed demo episode</strong> uses the short-drama-ep template plus JSON fixture
             metadata — no likeness still, no engine MP4, gates stay red.
@@ -525,23 +486,38 @@ function ProjectList({
                 }
                 const summary = `Dry-run: create ${dry.would_create_projects?.length ?? 0} projects, add ${
                   dry.would_add_revisions?.length ?? 0
-                } missing pack revisions, keep ${dry.would_keep_revisions?.length ?? 0} existing. Pack revisions are never deleted. Apply?`;
+                } missing pack revisions, keep ${dry.would_keep_revisions?.length ?? 0} existing. Pack revisions are never deleted.`;
                 onNotice(summary);
-                if (!window.confirm(summary)) return null;
-                return api.restoreBackup(file, false);
-              })
-              .then((applied) => {
-                if (applied?.applied) {
-                  onNotice(
-                    `Restore applied. Pack revisions preserved. Added ${applied.added_revisions ?? 0} missing revisions.`,
-                  );
-                  return load();
-                }
+                setRestoreFile(file);
+                setRestoreSummary(summary);
               })
               .catch(onError);
           }}
         />
       </div>
+      <ConfirmDialog
+        open={Boolean(restoreFile)}
+        title="Apply backup restore?"
+        message={restoreSummary}
+        confirmLabel="Apply restore"
+        onCancel={() => setRestoreFile(null)}
+        onConfirm={() => {
+          const file = restoreFile;
+          setRestoreFile(null);
+          if (!file) return;
+          void api
+            .restoreBackup(file, false)
+            .then((applied) => {
+              if (applied?.applied) {
+                onNotice(
+                  `Restore applied. Pack revisions preserved. Added ${applied.added_revisions ?? 0} missing revisions.`,
+                );
+                return load();
+              }
+            })
+            .catch(onError);
+        }}
+      />
       <MembersPanel me={me} onError={onError} onNotice={onNotice} />
     </section>
   );
@@ -567,6 +543,10 @@ function ProjectView({
   const [adapters, setAdapters] = useState<AdapterCatalog | null>(null);
   const [title, setTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
+  const [episodeMode, setEpisodeMode] = useState<"blank" | "template" | "brain">("blank");
+  const [episodeTemplate, setEpisodeTemplate] = useState("");
+  const [episodeBrain, setEpisodeBrain] = useState("");
+  const [templates, setTemplates] = useState<VerticalTemplate[]>([]);
   const [stillAdapter, setStillAdapter] = useState("stub");
   const [clipAdapter, setClipAdapter] = useState("stub");
   const [cap, setCap] = useState("");
@@ -577,12 +557,14 @@ function ProjectView({
 
   const load = useCallback(async () => {
     try {
-      const [nextProject, nextEpisodes, nextAdapters, nextRetention] = await Promise.all([
+      const [nextProject, nextEpisodes, nextAdapters, nextRetention, nextTemplates] = await Promise.all([
         api.project(projectId),
         api.episodes(projectId),
         api.adapters().catch(() => null),
         api.retentionPreview({ project_id: projectId }).catch(() => null),
+        api.templates().catch(() => [] as VerticalTemplate[]),
       ]);
+      setTemplates(nextTemplates);
       setProject(nextProject);
       setEpisodes(nextEpisodes);
       setAdapters(nextAdapters);
@@ -604,15 +586,25 @@ function ProjectView({
   async function create(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) return;
+    if (episodeMode === "template" && !episodeTemplate) return;
+    if (episodeMode === "brain" && !episodeBrain.trim()) return;
     setBusy(true);
     try {
       const episode = await api.createEpisode(projectId, {
         title: title.trim(),
-        synopsis: synopsis.trim(),
+        synopsis: episodeMode === "brain" ? episodeBrain.trim() : synopsis.trim(),
+        pack: episodeMode === "blank" ? "blank" : "none",
+        template_id: episodeMode === "template" ? episodeTemplate : undefined,
+        brain_dump: episodeMode === "brain" ? episodeBrain.trim() : "",
       });
       setTitle("");
       setSynopsis("");
-      onNotice(`Created ${episode.title}`);
+      setEpisodeBrain("");
+      onNotice(
+        episodeMode === "brain"
+          ? `Draft pack on ${episode.title}. Gates stay red until filled.`
+          : `Created ${episode.title} with a ${episodeMode === "template" ? "template" : "blank"} pack.`,
+      );
       await load();
       onOpenEpisode(episode.id);
     } catch (err) {
@@ -711,7 +703,7 @@ function ProjectView({
       </button>
       <div className="panel-head">
         <h2>{project?.name ?? "Project"}</h2>
-        <p>{project?.description || "Episodes are chapters. Review state lives on each episode."}</p>
+        <p>{project?.description || "Episodes are chapters. Start a blank pack, a template, or a brain dump here."}</p>
       </div>
       <form className="create-row" onSubmit={saveSettings}>
         <select value={stillAdapter} onChange={(event) => setStillAdapter(event.target.value)}>
@@ -794,23 +786,62 @@ function ProjectView({
         </button>
       </div>
       <form className="create-row" onSubmit={create}>
+        <select
+          value={episodeMode}
+          onChange={(event) => setEpisodeMode(event.target.value as "blank" | "template" | "brain")}
+          aria-label="Episode pack"
+        >
+          <option value="blank">New blank pack</option>
+          <option value="template">New from template</option>
+          <option value="brain">Brain dump</option>
+        </select>
         <input
           placeholder="Episode / chapter title"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           required
+          aria-label="Episode title"
         />
-        <input
-          placeholder="Synopsis (optional)"
-          value={synopsis}
-          onChange={(event) => setSynopsis(event.target.value)}
-        />
+        {episodeMode === "template" ? (
+          <select
+            value={episodeTemplate}
+            onChange={(event) => setEpisodeTemplate(event.target.value)}
+            required
+            aria-label="Episode template"
+          >
+            <option value="">Choose a vertical</option>
+            {templates.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.name}
+              </option>
+            ))}
+          </select>
+        ) : episodeMode === "brain" ? null : (
+          <input
+            placeholder="Synopsis (optional)"
+            value={synopsis}
+            onChange={(event) => setSynopsis(event.target.value)}
+            aria-label="Episode synopsis"
+          />
+        )}
         <button type="submit" className="btn btn-go" disabled={busy || !can(me, "script")}>
-          New episode
+          {episodeMode === "blank" ? "New blank pack" : episodeMode === "template" ? "New from template" : "New from brain dump"}
         </button>
       </form>
+      {episodeMode === "brain" ? (
+        <label className="field">
+          <span className="editor-label">Brain dump</span>
+          <textarea
+            value={episodeBrain}
+            onChange={(event) => setEpisodeBrain(event.target.value)}
+            rows={4}
+            placeholder="Freeform brief for this episode. Draft skeleton only."
+            aria-label="New episode brain dump"
+          />
+        </label>
+      ) : null}
       {episodes.length === 0 ? (
-        <p className="empty">No episodes. Add a chapter, then import a pack zip.</p>
+        <p className="empty">Start here. Add a blank pack, a template, or a brain dump. You do not need a zip.</p>
       ) : (
         <ul className="card-list" data-testid="episode-list">
           {episodes.map((episode, index) => (
@@ -1099,7 +1130,8 @@ function EpisodeView({
         <p>
           S{episode?.season ?? 1} · seq {episode?.sequence ?? episode?.chapter ?? "—"} · chapter{" "}
           {episode?.chapter ?? "—"}.{" "}
-          {episode?.synopsis || "Import a pack zip from the builder. generate-ok stays locked until every gate is green."}
+          {episode?.synopsis ||
+            "Edit the four stages below. generate-ok stays locked until every gate is green. Zip import is optional."}
         </p>
       </div>
       <form
@@ -1148,7 +1180,19 @@ function EpisodeView({
       </form>
       <PresenceBar episodeId={episodeId} shotId={selectedShotId} onError={onError} />
 
+      <PackStage
+        episodeId={episodeId}
+        canEdit={can(me, "script") || can(me, "pack") || can(me, "identity") || can(me, "edit")}
+        onError={onError}
+        onNotice={onNotice}
+        onSaved={() => void load()}
+      />
+
       <section className="panel">
+        <div className="panel-head">
+          <h3>Optional zip</h3>
+          <p>Import a pack zip or use Open in Studio when a file already exists. Creating the pack does not require it.</p>
+        </div>
         <div className="toolbar">
           <button
             type="button"
@@ -1164,7 +1208,7 @@ function EpisodeView({
             }}
             disabled={!can(me, "pack") || diffBusy}
           >
-            {getPendingHandoff() || getPendingFile() ? "Import handed-off zip" : "Import pack zip"}
+            {getPendingHandoff() || getPendingFile() ? "Import handed-off zip" : "Import zip"}
           </button>
           <button type="button" className="btn" onClick={() => void exportPack()}>
             Export pack zip
@@ -1210,7 +1254,7 @@ function EpisodeView({
             Audit
           </button>
           <a className="btn" href={packBuilderUrl} target="_blank" rel="noreferrer">
-            Open pack builder
+            Pack builder (optional)
           </a>
           <button
             type="button"
@@ -1224,7 +1268,7 @@ function EpisodeView({
             Copy episode link
           </button>
           <button type="button" className="btn" onClick={() => setShowBuilder((value) => !value)}>
-            {showBuilder ? "Hide builder iframe" : "Show builder iframe"}
+            {showBuilder ? "Hide builder window" : "Optional builder window"}
           </button>
           <input
             ref={packRef}
@@ -1247,9 +1291,9 @@ function EpisodeView({
           </p>
         ) : (
           <p className="hint">
-            No revision yet. Export from the builder at {packBuilderUrl}, then Open in Studio
-            (auto-import after you pick this episode when the handoff carried the zip)
-            {importHint() || getPendingHandoff() ? "." : "."}
+            No stored revision yet. Use the stages above (blank, template, or brain dump). A zip from{" "}
+            {packBuilderUrl} is optional
+            {importHint() || getPendingHandoff() ? " — a handoff is waiting." : "."}
           </p>
         )}
         {packDiff ? (
@@ -1279,7 +1323,7 @@ function EpisodeView({
       <section className="panel">
         <h3>Gates</h3>
         {gates.length === 0 ? (
-          <p className="empty">Import a pack to snapshot the gates.</p>
+          <p className="empty">No stored snapshot yet. Fill the stages above. Gates stay red until the pack is filled.</p>
         ) : (
           <ol className="gates">
             {gates.map((gate) => (

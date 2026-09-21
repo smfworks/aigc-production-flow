@@ -227,6 +227,9 @@ export type Meta = {
   notify_webhook_configured?: boolean;
   multi_org?: boolean;
   multi_org_note?: string;
+  llm_configured?: boolean;
+  llm_note?: string;
+  primary_create?: string;
 };
 
 export const REVIEW_COPY: Record<ReviewStateName, string> = {

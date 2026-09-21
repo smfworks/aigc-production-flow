@@ -1,6 +1,8 @@
-# AIGC studio API (Phase 9)
+# AIGC studio API (Phase 10)
 
-FastAPI spine for projects, ordered episodes, pack zip revisions, pack revision diff, review states, reviewer/producer sign-off, comments, visual identity store (approve / unapprove / keyword edit), media, shots, jobs, adapters, hop-1 preview desk, playlist scrubber, budget, audit, retention, EDL export, vertical templates, org members (`writer` / `art` plus the Phase 5 roles), presence, media store adapters, multi-org lite, notifications, continuity, demo seed, backup, and builder pack handoff. Optional Celery worker. Optional OIDC JWKS.
+FastAPI spine. Create a pack without a zip (`POST /api/studio/start`: blank, template, or brain dump). Edit it with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) that lists still jobs before hop-1 clips and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
+
+Also: ordered episodes, pack revision diff, review sign-off, identity store, media, shots, jobs, adapters, hop-1 preview desk, playlist scrubber, budget, audit, retention, EDL, vertical templates, org members, presence, multi-org lite, notifications, continuity, demo seed, backup, and optional builder handoff. Optional Celery. Optional OIDC.
 
 Operator docs: [../docs/STUDIO.md](../docs/STUDIO.md). Auth: [../docs/AUTH.md](../docs/AUTH.md).
 

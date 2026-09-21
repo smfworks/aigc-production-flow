@@ -63,7 +63,7 @@ export function PlaylistScrubber({
       </div>
       {shots.length === 0 ? (
         <p className="empty" data-testid="playlist-empty">
-          No shots on this playlist yet. Import a pack to see the edit-list order. This is not a
+          No shots on this playlist yet. Fill the storyboard stage to see the edit-list order. This is not a
           timeline editor, and no preview file is invented.
         </p>
       ) : (

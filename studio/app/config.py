@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     s3_secret_key: str = ""
     presence_ttl_seconds: int = 60
     notify_webhook_url: str = ""
+    # Optional local/OpenAI-compatible chat endpoint for brain-dump drafts.
+    # Unset means deterministic template expansion. Never claim a model ran.
+    llm_base_url: str = ""
+    llm_model: str = ""
+    llm_api_key: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

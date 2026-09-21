@@ -14,7 +14,19 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    // app/ sources are compiled from this project. Node resolution would look
+    // for react and jszip under app/node_modules, which CI does not install.
+    "baseUrl": ".",
+    "paths": {
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
+      "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"],
+      "react-dom": ["./node_modules/@types/react-dom/index.d.ts"],
+      "react-dom/client": ["./node_modules/@types/react-dom/client.d.ts"],
+      "jszip": ["./node_modules/jszip/index.d.ts"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../app/src"],
+  "exclude": ["../app/src/**/*.test.ts"]
 }

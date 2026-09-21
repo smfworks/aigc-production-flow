@@ -32,6 +32,9 @@ ORG_CREATE = "org.create"
 BACKUP_EXPORT = "backup.export"
 BACKUP_RESTORE = "backup.restore"
 DEMO_SEED = "demo.seed"
+PACK_SAVE = "pack.save"
+BRAIN_DUMP = "brain.dump"
+AGENT_EXPORT = "agent.export"
 
 ACTIONS = (
     REVIEW_SET,
@@ -58,6 +61,9 @@ ACTIONS = (
     BACKUP_EXPORT,
     BACKUP_RESTORE,
     DEMO_SEED,
+    PACK_SAVE,
+    BRAIN_DUMP,
+    AGENT_EXPORT,
 )
 
 
