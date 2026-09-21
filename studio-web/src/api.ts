@@ -1,5 +1,6 @@
 import type {
   AdapterCatalog,
+  AdapterHealth,
   AuditEvent,
   Board,
   BudgetDashboard,
@@ -9,6 +10,8 @@ import type {
   Job,
   MediaAsset,
   Meta,
+  OrgMember,
+  PresenceUser,
   PreviewDesk,
   Project,
   RetentionPreview,
@@ -16,10 +19,12 @@ import type {
   ReviewStateName,
   Shot,
   ShotReadiness,
+  StudioUser,
   VerticalTemplate,
 } from "./types.ts";
 
 const TOKEN_KEY = "smf.aigc-studio.token";
+const USER_KEY = "smf.aigc-studio.user";
 
 export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || import.meta.env.VITE_API_TOKEN || "local-dev-token";
@@ -27,6 +32,14 @@ export function getToken(): string {
 
 export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function getUserName(): string {
+  return localStorage.getItem(USER_KEY) || "";
+}
+
+export function setUserName(name: string): void {
+  localStorage.setItem(USER_KEY, name);
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -48,6 +61,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${getToken()}`);
   }
+  const userName = getUserName().trim();
+  if (userName && !headers.has("X-User-Name")) {
+    headers.set("X-User-Name", userName);
+  }
   if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -61,6 +78,24 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   meta: () => request<Meta>("/api/meta"),
+  me: () => request<StudioUser>("/api/me"),
+  members: (orgId: string) => request<OrgMember[]>(`/api/orgs/${orgId}/members`),
+  addMember: (orgId: string, body: { user_name: string; role: string }) =>
+    request<OrgMember>(`/api/orgs/${orgId}/members`, { method: "POST", body: JSON.stringify(body) }),
+  changeMemberRole: (orgId: string, memberId: string, role: string) =>
+    request<OrgMember>(`/api/orgs/${orgId}/members/${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  presence: (episodeId: string) => request<PresenceUser[]>(`/api/episodes/${episodeId}/presence`),
+  heartbeat: (episodeId: string, shotId?: string | null) =>
+    request<PresenceUser[]>(`/api/episodes/${episodeId}/presence`, {
+      method: "POST",
+      body: JSON.stringify({ shot_id: shotId || null }),
+    }),
+  adapterHealth: () => request<AdapterHealth[]>("/api/adapters/health"),
+  adapterDryRun: (adapterId: string) =>
+    request<AdapterHealth>(`/api/adapters/${adapterId}/dry-run`, { method: "POST" }),
   projects: () => request<Project[]>("/api/projects"),
   createProject: (body: {
     name: string;
@@ -97,12 +132,20 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ state, note }),
     }),
-  comments: (episodeId: string) => request<Comment[]>(`/api/episodes/${episodeId}/comments`),
-  addComment: (episodeId: string, body: string) =>
+  comments: (episodeId: string, query: { shot_id?: string; include_resolved?: boolean } = {}) => {
+    const params = new URLSearchParams();
+    if (query.shot_id) params.set("shot_id", query.shot_id);
+    if (query.include_resolved === false) params.set("include_resolved", "false");
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request<Comment[]>(`/api/episodes/${episodeId}/comments${suffix}`);
+  },
+  addComment: (episodeId: string, body: string, extra: { shot_id?: string; board_node_id?: string } = {}) =>
     request<Comment>(`/api/episodes/${episodeId}/comments`, {
       method: "POST",
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({ body, ...extra }),
     }),
+  resolveComment: (commentId: string) =>
+    request<Comment>(`/api/comments/${commentId}/resolve`, { method: "POST" }),
   media: (episodeId: string) => request<MediaAsset[]>(`/api/episodes/${episodeId}/media`),
   uploadMedia: (
     episodeId: string,
@@ -271,9 +314,16 @@ async function saveDownload(response: Response, fallback: string): Promise<void>
   URL.revokeObjectURL(url);
 }
 
+function authHeaders(): HeadersInit {
+  const headers: Record<string, string> = { Authorization: `Bearer ${getToken()}` };
+  const userName = getUserName().trim();
+  if (userName) headers["X-User-Name"] = userName;
+  return headers;
+}
+
 export async function downloadPack(episodeId: string): Promise<void> {
   const response = await fetch(api.exportPackUrl(episodeId), {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
   await saveDownload(response, "pack.zip");
@@ -282,7 +332,7 @@ export async function downloadPack(episodeId: string): Promise<void> {
 export async function downloadExport(episodeId: string, kind: "edl" | "playlist" | "fcpxml"): Promise<void> {
   const fallback = kind === "edl" ? "episode.edl" : kind === "fcpxml" ? "episode.xml" : "playlist.json";
   const response = await fetch(`/api/episodes/${episodeId}/export/${kind}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
   await saveDownload(response, fallback);
@@ -290,7 +340,7 @@ export async function downloadExport(episodeId: string, kind: "edl" | "playlist"
 
 export async function downloadMedia(assetId: string, filename: string): Promise<void> {
   const response = await fetch(api.mediaUrl(assetId), {
-    headers: { Authorization: `Bearer ${getToken()}` },
+    headers: authHeaders(),
   });
   if (!response.ok) throw new Error(await parseError(response));
   await saveDownload(response, filename);

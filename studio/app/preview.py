@@ -10,11 +10,11 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from .config import get_settings
 from .deps import latest_revision
 from .gates import as_list, as_record, filled, is_none_still, is_real_still_file, still_ok
 from .models import ContinuityReceipt, Episode, MediaAsset, Shot, utcnow
 from .schemas import ContinuityReceiptOut
+from .store import get_store
 
 DURATION_KEYS = ("duration_s", "duration", "seconds")
 FRAME_KEYS = ("frames", "nb_frames", "nframes")
@@ -326,8 +326,17 @@ def apply_receipt(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found on this episode.")
         receipt.media_id = media_id
         if parse_media:
-            path = get_settings().media_path / asset.path
-            parsed = parse_preview_file(path, asset.content_type)
+            store = get_store()
+            local = store.local_path(asset.path)
+            if local is not None and local.is_file():
+                parsed = parse_preview_file(local, asset.content_type)
+            else:
+                try:
+                    data = store.get_bytes(asset.path)
+                except HTTPException:
+                    data = b""
+                suffix = Path(asset.original_name or asset.path or "").suffix
+                parsed = parse_preview_bytes(data, suffix=suffix, content_type=asset.content_type or "")
             if parsed.get("duration_s") is not None and duration_s is None:
                 duration_s = float(parsed["duration_s"])
                 source = source or "parsed"

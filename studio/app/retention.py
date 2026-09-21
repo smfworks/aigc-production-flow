@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from .config import Settings, get_settings
 from .models import ContinuityReceipt, Episode, Job, MediaAsset, PackRevision, Project, utcnow
+from .store import get_store
 
 KEEP_NOTE = "Pack revisions are not deleted by default."
 
@@ -143,20 +143,19 @@ def apply(
         now=now,
     )
     deleted: list[str] = []
-    media_root = (settings or get_settings()).media_path
+    store = get_store(settings or get_settings())
     for row in preview["candidates"]:
         asset = db.get(MediaAsset, row["id"])
         if not asset:
             continue
-        path = media_root / asset.path
+        rel = asset.path
         for job in db.query(Job).filter(Job.media_id == asset.id).all():
             job.media_id = None
         for receipt in db.query(ContinuityReceipt).filter(ContinuityReceipt.media_id == asset.id).all():
             receipt.media_id = None
         db.delete(asset)
         deleted.append(asset.id)
-        if path.is_file():
-            path.unlink()
+        store.delete(rel)
     db.commit()
     preview["deleted_ids"] = deleted
     preview["deleted_count"] = len(deleted)

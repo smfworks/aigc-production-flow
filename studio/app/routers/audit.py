@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Query
 
 from ..audit import ACTIONS, event_out, list_events
-from ..deps import DbDep, UserDep
+from ..deps import DbDep
+from ..rbac import ReadUser
 from ..schemas import AuditEventOut
 
 router = APIRouter(tags=["audit"])
@@ -9,7 +10,7 @@ router = APIRouter(tags=["audit"])
 
 @router.get("/api/audit", response_model=list[AuditEventOut])
 def get_audit(
-    _user: UserDep,
+    _user: ReadUser,
     db: DbDep,
     project_id: str | None = None,
     episode_id: str | None = None,

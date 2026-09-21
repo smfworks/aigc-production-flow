@@ -8,12 +8,12 @@ from sqlalchemy.orm import Session
 
 from ..adapters import get_clip_factory, get_still_factory
 from ..adapters.base import AdapterResult, JobContext
-from ..config import get_settings
 from ..database import SessionLocal
 from ..deps import latest_revision, touch
 from ..models import Episode, Job, MediaAsset, utcnow
-from ..packzip import slugify, write_bytes
+from ..packzip import slugify
 from ..precheck import run_batch_precheck
+from ..store import get_store
 
 
 def _session(db: Session | None) -> tuple[Session, bool]:
@@ -200,7 +200,7 @@ def _store_media(session: Session, job: Job, episode: Episode, result: AdapterRe
     session.flush()
     stored = f"{asset.id}_{slugify(Path(original).stem, 'job')}{suffix}"
     rel = Path(episode.id) / "jobs" / stored
-    write_bytes(get_settings().media_path / rel, result.media_bytes or b"")
+    get_store().put(str(rel), result.media_bytes or b"")
     asset.stored_name = stored
     asset.path = str(rel)
     return asset

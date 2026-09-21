@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from ..deps import DbDep, UserDep, get_episode
+from ..deps import DbDep, get_episode
+from ..rbac import ReadUser
 from ..timeline import playlist_json, render_edl, render_fcpxml, render_playlist
 
 router = APIRouter(tags=["export"])
@@ -16,7 +17,7 @@ def _require_shots(episode) -> None:
 
 
 @router.get("/api/episodes/{episode_id}/export/edl")
-def export_edl(episode_id: str, _user: UserDep, db: DbDep) -> PlainTextResponse:
+def export_edl(episode_id: str, _user: ReadUser, db: DbDep) -> PlainTextResponse:
     episode = get_episode(db, episode_id)
     _require_shots(episode)
     body = render_edl(episode)
@@ -29,7 +30,7 @@ def export_edl(episode_id: str, _user: UserDep, db: DbDep) -> PlainTextResponse:
 
 
 @router.get("/api/episodes/{episode_id}/export/fcpxml")
-def export_fcpxml(episode_id: str, _user: UserDep, db: DbDep) -> Response:
+def export_fcpxml(episode_id: str, _user: ReadUser, db: DbDep) -> Response:
     episode = get_episode(db, episode_id)
     _require_shots(episode)
     body = render_fcpxml(episode)
@@ -42,7 +43,7 @@ def export_fcpxml(episode_id: str, _user: UserDep, db: DbDep) -> Response:
 
 
 @router.get("/api/episodes/{episode_id}/export/playlist")
-def export_playlist(episode_id: str, _user: UserDep, db: DbDep) -> JSONResponse:
+def export_playlist(episode_id: str, _user: ReadUser, db: DbDep) -> JSONResponse:
     episode = get_episode(db, episode_id)
     _require_shots(episode)
     filename = f"{episode.title or 'episode'}-playlist.json"
@@ -53,7 +54,7 @@ def export_playlist(episode_id: str, _user: UserDep, db: DbDep) -> JSONResponse:
 
 
 @router.get("/api/episodes/{episode_id}/export/playlist.txt")
-def export_playlist_download(episode_id: str, _user: UserDep, db: DbDep) -> PlainTextResponse:
+def export_playlist_download(episode_id: str, _user: ReadUser, db: DbDep) -> PlainTextResponse:
     episode = get_episode(db, episode_id)
     _require_shots(episode)
     filename = f"{episode.title or 'episode'}-playlist.json"

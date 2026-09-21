@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     budget_hard_stop: bool = False
     retention_days: int = 30
     templates_root: str = ""
+    media_backend: str = "local"
+    s3_bucket: str = ""
+    s3_endpoint: str = ""
+    s3_prefix: str = ""
+    s3_region: str = "us-east-1"
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    presence_ttl_seconds: int = 60
 
     @property
     def cors_origin_list(self) -> list[str]:

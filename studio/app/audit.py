@@ -16,6 +16,10 @@ PACK_EXPORT = "pack.export"
 MEDIA_UPLOAD = "media.upload"
 PROJECT_CREATE = "project.create"
 RETENTION_APPLY = "retention.apply"
+COMMENT_CREATE = "comment.create"
+COMMENT_RESOLVE = "comment.resolve"
+MEMBER_ADD = "member.add"
+MEMBER_ROLE = "member.role"
 
 ACTIONS = (
     REVIEW_SET,
@@ -26,6 +30,10 @@ ACTIONS = (
     MEDIA_UPLOAD,
     PROJECT_CREATE,
     RETENTION_APPLY,
+    COMMENT_CREATE,
+    COMMENT_RESOLVE,
+    MEMBER_ADD,
+    MEMBER_ROLE,
 )
 
 

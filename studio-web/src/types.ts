@@ -79,9 +79,52 @@ export type Review = {
 export type Comment = {
   id: string;
   episode_id: string;
+  shot_id: string | null;
+  board_node_id: string;
   author: string;
   body: string;
+  resolved: boolean;
+  resolved_by: string;
+  resolved_at: string | null;
   created_at: string;
+};
+
+export type OrgRole = "producer" | "editor" | "reviewer" | "viewer";
+
+export type StudioUser = {
+  name: string;
+  auth_mode: "local" | "forward-header";
+  sso: string;
+  role: OrgRole | null;
+  org_id: string | null;
+  permissions: string[];
+};
+
+export type OrgMember = {
+  id: string;
+  organization_id: string;
+  user_name: string;
+  role: OrgRole;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PresenceUser = {
+  user_name: string;
+  role: string;
+  shot_id: string;
+  last_seen: string;
+  ttl_seconds: number;
+};
+
+export type AdapterHealth = {
+  id: string;
+  ok: boolean;
+  live: boolean;
+  config_present: boolean;
+  reachable: boolean | null;
+  transport: string;
+  detail: string;
 };
 
 export type MediaAsset = {
@@ -113,6 +156,11 @@ export type Meta = {
   cost_currency?: string;
   retention_days?: number;
   budget_hard_stop?: boolean;
+  media_backend?: "local" | "s3";
+  media_s3_configured?: boolean;
+  media_note?: string;
+  presence_ttl_seconds?: number;
+  roles?: string[];
 };
 
 export const REVIEW_COPY: Record<ReviewStateName, string> = {
@@ -260,12 +308,14 @@ export type AdapterSlot = {
   live: boolean;
   transport: string;
   note: string;
+  health?: AdapterHealth | null;
 };
 
 export type AdapterCatalog = {
   adapters: AdapterSlot[];
   still_default: string;
   clip_default: string;
+  health?: AdapterHealth[];
   note: string;
 };
 

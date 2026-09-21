@@ -658,3 +658,92 @@ a.btn {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
+
+.role-chip,
+.presence-chip,
+.adapter-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-style: normal;
+}
+
+.role-chip.is-producer,
+.presence-chip.is-producer {
+  color: var(--ember);
+  border-color: rgba(234, 88, 12, 0.5);
+}
+
+.role-chip.is-editor,
+.presence-chip.is-editor {
+  color: var(--cyan);
+  border-color: rgba(0, 212, 255, 0.45);
+}
+
+.role-chip.is-reviewer,
+.presence-chip.is-reviewer {
+  color: var(--go);
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.member-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.member-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.presence-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 12px;
+}
+
+.adapter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.adapter-chip.is-ok {
+  color: var(--go);
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.adapter-chip.is-bad {
+  color: var(--rose);
+  border-color: rgba(244, 63, 94, 0.5);
+}
+
+.adapter-warn {
+  color: var(--ember);
+}
+
+.comments-drawer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.thread li.is-resolved p {
+  color: var(--muted);
+  text-decoration: line-through;
+}

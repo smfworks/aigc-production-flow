@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..audit import RETENTION_APPLY, record
-from ..deps import DbDep, UserDep
+from ..deps import DbDep
+from ..rbac import PERM_RETENTION, ReadUser, refuse_unless
 from ..retention import apply, candidates
 from ..schemas import RetentionApply
 
@@ -10,7 +11,7 @@ router = APIRouter(tags=["retention"])
 
 @router.get("/api/retention")
 def retention_preview(
-    _user: UserDep,
+    _user: ReadUser,
     db: DbDep,
     project_id: str | None = None,
     episode_id: str | None = None,
@@ -22,12 +23,13 @@ def retention_preview(
 
 
 @router.post("/api/retention")
-def retention_run(body: RetentionApply, user: UserDep, db: DbDep) -> dict:
+def retention_run(body: RetentionApply, user: ReadUser, db: DbDep) -> dict:
     if body.dry_run:
         preview = candidates(db, project_id=body.project_id, episode_id=body.episode_id)
         preview["applied"] = False
         preview["dry_run"] = True
         return preview
+    refuse_unless(user, PERM_RETENTION)
     if body.confirm != "expire":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -54,7 +56,7 @@ def retention_run(body: RetentionApply, user: UserDep, db: DbDep) -> dict:
 
 @router.get("/api/retention/dry-run")
 def retention_dry_run_alias(
-    _user: UserDep,
+    _user: ReadUser,
     db: DbDep,
     project_id: str | None = Query(default=None),
     episode_id: str | None = Query(default=None),

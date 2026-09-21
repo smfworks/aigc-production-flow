@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, downloadExport, downloadMedia, downloadPack, getToken, setToken } from "./api.ts";
+import { api, downloadExport, downloadMedia, downloadPack, getToken, getUserName, setToken, setUserName } from "./api.ts";
 import type {
   AdapterCatalog,
+  AdapterHealth,
   Comment,
   Episode,
   Job,
@@ -13,6 +14,7 @@ import type {
   Review,
   ReviewStateName,
   Shot,
+  StudioUser,
   VerticalTemplate,
 } from "./types.ts";
 import { REVIEW_COPY, REVIEW_STATES } from "./types.ts";
@@ -22,7 +24,14 @@ import { PreviewDesk as PreviewDeskPanel } from "./PreviewDesk.tsx";
 import { JobTable } from "./JobTable.tsx";
 import { BudgetDashboard } from "./BudgetDashboard.tsx";
 import { AuditLog } from "./AuditLog.tsx";
+import { MembersPanel } from "./MembersPanel.tsx";
+import { PresenceBar } from "./PresenceBar.tsx";
+import { AdapterStrip } from "./AdapterStrip.tsx";
 import { navigate, parseHash, type View } from "./nav.ts";
+
+function can(user: StudioUser | null, perm: string): boolean {
+  return Boolean(user?.permissions?.includes(perm));
+}
 
 function formatWhen(iso: string): string {
   const date = new Date(iso);
@@ -33,9 +42,12 @@ function formatWhen(iso: string): string {
 export default function App() {
   const [view, setView] = useState<View>(() => parseHash());
   const [token, setTokenState] = useState(getToken);
+  const [userName, setUserNameState] = useState(getUserName);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
+  const [me, setMe] = useState<StudioUser | null>(null);
+  const [adapterHealth, setAdapterHealth] = useState<AdapterHealth[]>([]);
 
   const packBuilderUrl =
     meta?.pack_builder_url || import.meta.env.VITE_PACK_BUILDER_URL || "http://localhost:5173";
@@ -46,7 +58,9 @@ export default function App() {
 
   useEffect(() => {
     api.meta().then(setMeta).catch(() => setMeta(null));
-  }, []);
+    api.me().then(setMe).catch(() => setMe(null));
+    api.adapterHealth().then(setAdapterHealth).catch(() => setAdapterHealth([]));
+  }, [token, userName]);
 
   useEffect(() => {
     const onHash = () => setView(parseHash());
@@ -68,14 +82,15 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 4</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 5</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects, hop-1 preview desk, task center, budget, audit, and EDL export around the pack
-          zip. Jobs run in-process with adapter=<code>stub</code> unless a live hook is set. Budget
-          units are operator credits — not a cloud bill. Pack zip remains the contract.
+          Projects, hop-1 preview desk, members, presence, and adapter health around the pack zip.
+          Jobs run in-process with adapter=<code>stub</code> unless a live hook is set. Budget
+          units are operator credits — not a cloud bill. Media is local disk unless S3 is
+          configured. Pack zip remains the contract.
         </p>
         <nav className="mast-nav" aria-label="Studio">
           <button
@@ -119,15 +134,35 @@ export default function App() {
               autoComplete="off"
             />
           </label>
+          <label>
+            Local user
+            <input
+              value={userName}
+              placeholder={meta?.default_user || "local-dev"}
+              onChange={(event) => {
+                setUserNameState(event.target.value);
+                setUserName(event.target.value);
+              }}
+              autoComplete="username"
+            />
+          </label>
+          {me?.role ? <em className={`role-chip is-${me.role}`}>{me.role}</em> : <em className="role-chip">not a member</em>}
           <span className="hint">
-            Auth {meta?.auth_mode ?? "local"}. SSO/OIDC is not implemented — docs/AUTH.md.
+            Auth {meta?.auth_mode ?? "local"}. Roles are app-level. SSO/OIDC is not implemented —
+            docs/AUTH.md.
           </span>
           {meta?.still_adapter ? (
             <span className="hint">
-              still={meta.still_adapter} · clip={meta.clip_adapter} · worker={meta.job_worker}
+              still={meta.still_adapter} · clip={meta.clip_adapter} · worker={meta.job_worker} ·
+              media={meta.media_backend || "local"}
             </span>
           ) : null}
         </div>
+        <AdapterStrip
+          stillDefault={meta?.still_adapter}
+          clipDefault={meta?.clip_adapter}
+          onError={showError}
+        />
       </header>
 
       {error ? (
@@ -146,6 +181,7 @@ export default function App() {
 
       {view.page === "projects" ? (
         <ProjectList
+          me={me}
           onOpen={(projectId) => navigate({ page: "project", projectId })}
           onError={showError}
           onNotice={setNotice}
@@ -154,6 +190,7 @@ export default function App() {
       {view.page === "project" ? (
         <ProjectView
           projectId={view.projectId}
+          me={me}
           onBack={() => navigate({ page: "projects" })}
           onOpenEpisode={(episodeId) =>
             navigate({ page: "episode", projectId: view.projectId, episodeId })
@@ -168,6 +205,8 @@ export default function App() {
           episodeId={view.episodeId}
           shotId={view.shotId}
           packBuilderUrl={packBuilderUrl}
+          me={me}
+          adapterHealth={adapterHealth}
           onBack={() => navigate({ page: "project", projectId: view.projectId })}
           onError={showError}
           onNotice={setNotice}
@@ -187,10 +226,12 @@ export default function App() {
 }
 
 function ProjectList({
+  me,
   onOpen,
   onError,
   onNotice,
 }: {
+  me: StudioUser | null;
   onOpen: (id: string) => void;
   onError: (err: unknown) => void;
   onNotice: (msg: string) => void;
@@ -280,7 +321,7 @@ function ProjectList({
             </option>
           ))}
         </select>
-        <button type="submit" className="btn btn-go" disabled={busy}>
+        <button type="submit" className="btn btn-go" disabled={busy || !can(me, "mutate")}>
           {templateId ? "New from template" : "New project"}
         </button>
       </form>
@@ -302,18 +343,21 @@ function ProjectList({
           ))}
         </ul>
       )}
+      <MembersPanel me={me} onError={onError} onNotice={onNotice} />
     </section>
   );
 }
 
 function ProjectView({
   projectId,
+  me,
   onBack,
   onOpenEpisode,
   onError,
   onNotice,
 }: {
   projectId: string;
+  me: StudioUser | null;
   onBack: () => void;
   onOpenEpisode: (id: string) => void;
   onError: (err: unknown) => void;
@@ -453,12 +497,14 @@ function ProjectView({
           value={cap}
           onChange={(event) => setCap(event.target.value)}
           inputMode="decimal"
+          disabled={!can(me, "budget")}
         />
         <label className="check">
           <input
             type="checkbox"
             checked={hardStop}
             onChange={(event) => setHardStop(event.target.checked)}
+            disabled={!can(me, "budget")}
           />
           Hard stop
         </label>
@@ -467,8 +513,9 @@ function ProjectView({
           value={retentionDays}
           onChange={(event) => setRetentionDays(event.target.value)}
           inputMode="numeric"
+          disabled={!can(me, "retention")}
         />
-        <button type="submit" className="btn" disabled={busy}>
+        <button type="submit" className="btn" disabled={busy || !can(me, "mutate")}>
           Save settings
         </button>
         <button type="button" className="btn" onClick={() => navigate({ page: "budget", projectId })}>
@@ -490,7 +537,12 @@ function ProjectView({
         <button type="button" className="btn" onClick={() => void runRetention(false)}>
           Retention dry-run
         </button>
-        <button type="button" className="btn" onClick={() => void runRetention(true)}>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => void runRetention(true)}
+          disabled={!can(me, "retention")}
+        >
           Apply retention
         </button>
       </div>
@@ -506,7 +558,7 @@ function ProjectView({
           value={synopsis}
           onChange={(event) => setSynopsis(event.target.value)}
         />
-        <button type="submit" className="btn btn-go" disabled={busy}>
+        <button type="submit" className="btn btn-go" disabled={busy || !can(me, "mutate")}>
           New episode
         </button>
       </form>
@@ -542,6 +594,8 @@ function EpisodeView({
   episodeId,
   shotId,
   packBuilderUrl,
+  me,
+  adapterHealth,
   onBack,
   onError,
   onNotice,
@@ -550,6 +604,8 @@ function EpisodeView({
   episodeId: string;
   shotId?: string;
   packBuilderUrl: string;
+  me: StudioUser | null;
+  adapterHealth: AdapterHealth[];
   onBack: () => void;
   onError: (err: unknown) => void;
   onNotice: (msg: string) => void;
@@ -711,10 +767,16 @@ function EpisodeView({
           {episode?.synopsis || "Import a pack zip from the builder. generate-ok stays locked until every gate is green."}
         </p>
       </div>
+      <PresenceBar episodeId={episodeId} shotId={selectedShotId} onError={onError} />
 
       <section className="panel">
         <div className="toolbar">
-          <button type="button" className="btn" onClick={() => packRef.current?.click()}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => packRef.current?.click()}
+            disabled={!can(me, "pack")}
+          >
             Import pack zip
           </button>
           <button type="button" className="btn" onClick={() => void exportPack()}>
@@ -820,6 +882,11 @@ function EpisodeView({
         packBuilderUrl={packBuilderUrl}
         selectedShotId={selectedShotId}
         onSelectShot={selectShot}
+        episodeId={episodeId}
+        canComment={can(me, "comment")}
+        canMutate={can(me, "mutate")}
+        onError={onError}
+        onNotice={onNotice}
         onExtract={() => {
           void api
             .extractCandidates(episodeId)
@@ -873,21 +940,25 @@ function EpisodeView({
         <p className="hint">
           Path: green pack → batch-precheck → stub hop-1 → attach preview+receipt → preview-watched.
           Adapter label is honest. This is not Celery.
+          {adapterHealth.some((row) => row.live && !row.ok)
+            ? " Live adapters in the strip that are down will 409 on enqueue — use stub or fix the hook."
+            : ""}
+          {!can(me, "jobs") ? " Viewers cannot enqueue. Promote to editor." : ""}
         </p>
         <div className="toolbar">
-          <button type="button" className="btn" onClick={() => void enqueue("batch-precheck")}>
+          <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("batch-precheck")}>
             Enqueue batch-precheck
           </button>
-          <button type="button" className="btn" onClick={() => void enqueue("still-sheet")}>
+          <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("still-sheet")}>
             Stub still-sheet
           </button>
-          <button type="button" className="btn" onClick={() => void enqueue("still-plate")}>
+          <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("still-plate")}>
             Stub still-plate
           </button>
-          <button type="button" className="btn" onClick={() => void enqueue("clip-hop1", true)}>
+          <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("clip-hop1", true)}>
             Stub hop-1
           </button>
-          <button type="button" className="btn" onClick={() => void enqueue("clip-extend", true)}>
+          <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("clip-extend", true)}>
             Stub clip-extend
           </button>
           <button type="button" className="btn" onClick={() => navigate({ page: "tasks" })}>
@@ -931,7 +1002,7 @@ function EpisodeView({
               key={state}
               type="button"
               className={review?.current === state ? "btn btn-go" : "btn"}
-              disabled={state === "generate-ok" && generateBlocked}
+              disabled={(state === "generate-ok" && generateBlocked) || !can(me, "review")}
               title={REVIEW_COPY[state]}
               onClick={() => void changeState(state)}
             >
@@ -965,12 +1036,14 @@ function EpisodeView({
               placeholder="Writer / art / editor notes. Pack zip is still the contract."
               rows={3}
             />
-            <button type="submit" className="btn btn-go">
+            <button type="submit" className="btn btn-go" disabled={!can(me, "comment")}>
               Add comment
             </button>
           </form>
           <ul className="thread">
-            {comments.map((comment) => (
+            {comments
+              .filter((comment) => !comment.shot_id)
+              .map((comment) => (
               <li key={comment.id}>
                 <strong>{comment.author}</strong>
                 <span>{formatWhen(comment.created_at)}</span>
@@ -981,7 +1054,10 @@ function EpisodeView({
         </div>
         <div className="panel">
           <h3>Media library</h3>
-          <p className="hint">Sheets, plates, costumes, and hop-1 preview receipts. Engine MP4s stay gitignored in data/media/. Never commit them.</p>
+          <p className="hint">
+            Sheets, plates, costumes, and hop-1 preview receipts. Store: {me ? "org media adapter" : "local"}.
+            Engine MP4s stay gitignored. Never commit them. S3/MinIO is not live unless configured.
+          </p>
           <div className="create-row">
             <select value={kind} onChange={(event) => setKind(event.target.value)}>
               <option value="sheet">sheet</option>
@@ -1007,7 +1083,7 @@ function EpisodeView({
               value={mediaNotes}
               onChange={(event) => setMediaNotes(event.target.value)}
             />
-            <button type="button" className="btn" onClick={() => mediaRef.current?.click()}>
+            <button type="button" className="btn" disabled={!can(me, "media")} onClick={() => mediaRef.current?.click()}>
               Upload
             </button>
             <input

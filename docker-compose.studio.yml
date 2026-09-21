@@ -1,0 +1,103 @@
+# Phase 5 studio pack. Not production SSO. No secrets in this file.
+#
+#   docker compose -f docker-compose.studio.yml up --build
+#
+# Ports:
+#   studio-api   8000  FastAPI + in-process thread worker (default)
+#   studio-web   5174  nginx SPA; /api proxies to studio-api
+#
+# Optional profiles (not started by default):
+#   --profile worker    standalone poller. Set STUDIO_JOB_WORKER=off on the API first.
+#   --profile postgres  Postgres instead of the SQLite volume. Point STUDIO_DATABASE_URL at it.
+#   --profile minio     local object store. Set STUDIO_MEDIA_BACKEND=s3 + bucket/endpoint + credentials
+#                       in the *runtime environment* (do not commit them). Unset → local disk, honestly.
+#
+# Celery and OIDC are not in this compose file.
+
+services:
+  studio-api:
+    build:
+      context: ./studio
+    ports:
+      - "8000:8000"
+    environment:
+      STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-sqlite:////data/studio.db}
+      STUDIO_MEDIA_ROOT: /data/media
+      STUDIO_MEDIA_BACKEND: ${STUDIO_MEDIA_BACKEND:-local}
+      STUDIO_S3_BUCKET: ${STUDIO_S3_BUCKET:-}
+      STUDIO_S3_ENDPOINT: ${STUDIO_S3_ENDPOINT:-}
+      STUDIO_S3_PREFIX: ${STUDIO_S3_PREFIX:-}
+      STUDIO_S3_REGION: ${STUDIO_S3_REGION:-us-east-1}
+      STUDIO_API_TOKEN: ${STUDIO_API_TOKEN:-local-dev-token}
+      STUDIO_DEFAULT_USER: ${STUDIO_DEFAULT_USER:-local-dev}
+      STUDIO_PACK_BUILDER_URL: ${STUDIO_PACK_BUILDER_URL:-http://localhost:5173}
+      STUDIO_CORS_ORIGINS: ${STUDIO_CORS_ORIGINS:-http://localhost:5174,http://127.0.0.1:5174,http://localhost:8000}
+      STUDIO_JOB_WORKER: ${STUDIO_JOB_WORKER:-thread}
+      STUDIO_AUTH_MODE: ${STUDIO_AUTH_MODE:-local}
+      STUDIO_STILL_ADAPTER: ${STUDIO_STILL_ADAPTER:-stub}
+      STUDIO_CLIP_ADAPTER: ${STUDIO_CLIP_ADAPTER:-stub}
+    volumes:
+      - studio-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+
+  studio-web:
+    build:
+      context: ./studio-web
+    ports:
+      - "5174:80"
+    depends_on:
+      studio-api:
+        condition: service_healthy
+
+  studio-worker:
+    profiles: ["worker"]
+    build:
+      context: ./studio
+    command: ["python", "-m", "app.jobs"]
+    environment:
+      STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-sqlite:////data/studio.db}
+      STUDIO_MEDIA_ROOT: /data/media
+      STUDIO_MEDIA_BACKEND: ${STUDIO_MEDIA_BACKEND:-local}
+      STUDIO_S3_BUCKET: ${STUDIO_S3_BUCKET:-}
+      STUDIO_S3_ENDPOINT: ${STUDIO_S3_ENDPOINT:-}
+      STUDIO_S3_PREFIX: ${STUDIO_S3_PREFIX:-}
+      STUDIO_JOB_WORKER: thread
+    volumes:
+      - studio-data:/data
+    depends_on:
+      studio-api:
+        condition: service_started
+
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: studio
+      POSTGRES_USER: studio
+      POSTGRES_PASSWORD: ${STUDIO_POSTGRES_PASSWORD:-studio}
+    ports:
+      - "5432:5432"
+    volumes:
+      - studio-pg:/var/lib/postgresql/data
+
+  minio:
+    profiles: ["minio"]
+    image: minio/minio:latest
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+volumes:
+  studio-data:
+  studio-pg:
+  minio-data:

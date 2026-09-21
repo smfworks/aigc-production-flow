@@ -73,10 +73,11 @@ The pack builder already refuses export until gates are green. That is the v1 co
 - **Costume** — linkable media kind / entity type in the studio library.
 - **Storyboard canvas** — list (precision) + board of takes/edit rows with join types; join inspector highlights continue chains vs cut/fadeblack boundaries.
 
-Still deferred (NLE / full SSO):
+Still deferred (NLE / full SSO / Celery):
 
 - Full NLE timeline editor (Phase 4 ships metadata-only EDL / FCP XML lite / shot playlist)
-- OIDC / multi-tenant isolation (Phase 4 ships `docs/AUTH.md` + `STUDIO_AUTH_MODE=forward-header`)
+- OIDC / IdP login (Phase 4 ships `docs/AUTH.md` + `STUDIO_AUTH_MODE=forward-header`; Phase 5 adds **app-level** org roles on that identity — not OIDC groups)
+- Celery / GPU queue (Phase 3 jobs are in-process; one engine adapter at a time per GPU stays an ops pin)
 
 **Phase 3 (this repo, delivered):**
 
@@ -93,16 +94,27 @@ Still deferred (NLE / full SSO):
 - Light **EDL / FCP XML lite / shot playlist** export from the edit list + continue chains
 - **Vertical templates** (education lesson, brand promo, short drama ep) — empty structured packs, no fake generate
 
+**Phase 5 (this repo, collaborate & operate):**
+
+- App-level **RBAC lite** (`producer` / `editor` / `reviewer` / `viewer`) on the default org. Seed local-dev user as producer. Viewers are read-only. Identity is still local token or `X-Forwarded-User` — **not OIDC**
+- **Presence** heartbeats (TTL ~60s) and **shot comment** threads (create / list / resolve) with audit
+- **Media store adapters**: local disk default; optional S3/MinIO when `STUDIO_MEDIA_BACKEND=s3` and a bucket are set. Unset stays local and never claims cloud storage is live
+- Adapter **health / dry-run** (reachable? config present?) plus a studio status strip. Unhealthy live slots 409 on enqueue. Stub remains default
+- Compose pack: `docker compose -f docker-compose.studio.yml up` (API + studio-web; optional worker / Postgres / MinIO profiles)
+
 v2 leftover (platform, do not pretend we have it):
 
 - visual identity store (approved sheet + per-window plates), not a pasted wardrobe paragraph
 - Celery / GPU queue (Phase 3 jobs are in-process; one engine adapter at a time per GPU stays an ops pin)
+- OIDC / multi-tenant SaaS
 
 **Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). Auth is a local-dev API token plus an optional reverse-proxy identity hook — not OIDC. Operator path: [STUDIO.md](STUDIO.md). Auth stub: [AUTH.md](AUTH.md).
 
 **Phase 3 (this repo, jobs + desk):** `generate-ok` is refused unless that snapshot is all green **and** each required hop-1 is preview-watched with a continuity receipt. Stub jobs never stamp generate-ok.
 
 **Phase 4 (this repo, scale & polish):** set adapter defaults + budget cap → run stub jobs → see spend → audit trail → export EDL → create a project from a vertical template.
+
+**Phase 5 (this repo, collaborate & operate):** add a member as viewer → cannot enqueue → promote to editor → comment on a shot → see presence. Adapter health strip. Optional MinIO/S3 when env is set. `docker compose -f docker-compose.studio.yml up`.
 
 ## Multi-user collaboration
 
@@ -113,7 +125,9 @@ v1 (now, honest): the pack **is** the collaboration object.
 - Public GitHub is process only. Private fork (or sibling private repo) holds likeness stills and unreleased music
 - Roles on a pack (convention, not auth): **writer** (script + map), **art** (sheets/plates), **editor** (joins + verbs), **producer** (gates green / GPU spend)
 
-Phase 1 (this repo): a **studio spine** holds projects / episodes, comments, review state, and a gitignored media directory. The zip is still the round-trip. Roles stay convention, not SSO. Do not treat `STUDIO_API_TOKEN` as multi-tenant isolation.
+Phase 1 (this repo): a **studio spine** holds projects / episodes, comments, review state, and a gitignored media directory. The zip is still the round-trip. Do not treat `STUDIO_API_TOKEN` as multi-tenant isolation.
+
+Phase 5 (this repo): org **members** with app-level roles. Pack zip is still the collaboration object. Identity is still not OIDC.
 
 v2 leftover (build, do not pretend we have it):
 
@@ -124,6 +138,8 @@ v2 leftover (build, do not pretend we have it):
 | Editor | takes, edit list, joins | one verb, fade vs cut |
 | Producer | audio path, generate-ok | GPU budget, license |
 | Reviewer | comments only | preview watch, NG reason |
+
+Studio Phase 5 maps a **lite** subset onto org members (`producer` / `editor` / `reviewer` / `viewer`) for mutating HTTP routes. It is not the full writer/art matrix above and not IdP groups.
 
 Do not stand a multi-tenant SaaS until the zip round-trip and the four-stage gate order are boring.
 

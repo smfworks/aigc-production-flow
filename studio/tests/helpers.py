@@ -8,6 +8,32 @@ import time
 from tests.fixtures import green_pack, pack_zip_bytes
 
 
+def as_user(auth: dict[str, str], name: str) -> dict[str, str]:
+    return {**auth, "X-User-Name": name}
+
+
+def org_id(client, auth) -> str:
+    me = client.get("/api/me", headers=auth)
+    assert me.status_code == 200
+    oid = me.json().get("org_id")
+    if oid:
+        return oid
+    orgs = client.get("/api/orgs", headers=auth)
+    assert orgs.status_code == 200
+    return orgs.json()[0]["id"]
+
+
+def add_member(client, auth, user_name: str, role: str = "viewer") -> dict:
+    oid = org_id(client, auth)
+    response = client.post(
+        f"/api/orgs/{oid}/members",
+        headers=auth,
+        json={"user_name": user_name, "role": role},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 def create_episode(client, auth, name: str = "Phase 3"):
     project = client.post("/api/projects", json={"name": name}, headers=auth).json()
     episode = client.post(

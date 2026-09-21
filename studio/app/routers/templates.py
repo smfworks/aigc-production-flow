@@ -2,8 +2,9 @@ from fastapi import APIRouter, status
 
 from ..adapters.catalog import require_slot
 from ..audit import PROJECT_CREATE, record
-from ..deps import DbDep, UserDep, get_default_org
+from ..deps import DbDep, get_default_org
 from ..models import utcnow
+from ..rbac import MutateUser, ReadUser
 from ..schemas import ProjectFromTemplate, VerticalTemplateOut
 from ..serializers import episode_out, project_out
 from ..verticals import create_project_from_template, get_template, list_templates
@@ -25,12 +26,12 @@ def _out(meta: dict) -> VerticalTemplateOut:
 
 
 @router.get("/api/templates", response_model=list[VerticalTemplateOut])
-def templates(_user: UserDep) -> list[VerticalTemplateOut]:
+def templates(_user: ReadUser) -> list[VerticalTemplateOut]:
     return [_out(meta) for meta in list_templates()]
 
 
 @router.get("/api/templates/{template_id}", response_model=VerticalTemplateOut)
-def template_detail(template_id: str, _user: UserDep) -> VerticalTemplateOut:
+def template_detail(template_id: str, _user: ReadUser) -> VerticalTemplateOut:
     return _out(get_template(template_id))
 
 
@@ -42,7 +43,7 @@ def template_detail(template_id: str, _user: UserDep) -> VerticalTemplateOut:
 def new_from_template(
     template_id: str,
     body: ProjectFromTemplate,
-    user: UserDep,
+    user: MutateUser,
     db: DbDep,
 ) -> dict:
     still = require_slot(body.still_adapter, "still") if body.still_adapter else None

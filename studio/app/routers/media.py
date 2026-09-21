@@ -1,14 +1,15 @@
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from ..audit import MEDIA_UPLOAD, record
-from ..config import get_settings
-from ..deps import DbDep, UserDep, get_episode, touch
+from ..deps import DbDep, get_episode, touch
 from ..models import ContinuityReceipt, ENTITY_TYPES, Job, MEDIA_KINDS, MediaAsset, utcnow
-from ..packzip import slugify, write_bytes
+from ..packzip import slugify
+from ..rbac import MediaUser, ReadUser
 from ..schemas import MediaAssetOut
+from ..store import get_store
 
 router = APIRouter(tags=["media"])
 
@@ -17,7 +18,7 @@ PREVIEW_SUFFIXES = IMAGE_SUFFIXES | {".json", ".mp4", ".webm", ".mov"}
 
 
 @router.get("/api/episodes/{episode_id}/media", response_model=list[MediaAssetOut])
-def list_media(episode_id: str, _user: UserDep, db: DbDep) -> list[MediaAssetOut]:
+def list_media(episode_id: str, _user: ReadUser, db: DbDep) -> list[MediaAssetOut]:
     episode = get_episode(db, episode_id)
     return [MediaAssetOut.model_validate(row) for row in episode.media]
 
@@ -29,7 +30,7 @@ def list_media(episode_id: str, _user: UserDep, db: DbDep) -> list[MediaAssetOut
 )
 async def upload_media(
     episode_id: str,
-    user: UserDep,
+    user: MediaUser,
     db: DbDep,
     file: UploadFile = File(...),
     kind: str = Form("other"),
@@ -89,8 +90,7 @@ async def upload_media(
     safe = slugify(Path(original).stem, "asset") + (suffix or "")
     stored = f"{asset.id}_{safe}"
     rel = Path(episode.id) / "assets" / stored
-    settings = get_settings()
-    write_bytes(settings.media_path / rel, data)
+    get_store().put(str(rel), data)
     asset.stored_name = stored
     asset.path = str(rel)
     episode.updated_at = utcnow()
@@ -111,22 +111,30 @@ async def upload_media(
 
 
 @router.get("/api/media/{asset_id}")
-def download_media(asset_id: str, _user: UserDep, db: DbDep) -> FileResponse:
+def download_media(asset_id: str, _user: ReadUser, db: DbDep):
     asset = db.get(MediaAsset, asset_id)
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
-    path = get_settings().media_path / asset.path
-    if not path.is_file():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media file missing from disk.")
-    return FileResponse(path, media_type=asset.content_type, filename=asset.original_name)
+    store = get_store()
+    local = store.local_path(asset.path)
+    if local is not None:
+        if not local.is_file():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media file missing from disk.")
+        return FileResponse(local, media_type=asset.content_type, filename=asset.original_name)
+    data = store.get_bytes(asset.path)
+    return Response(
+        content=data,
+        media_type=asset.content_type,
+        headers={"Content-Disposition": f'attachment; filename="{asset.original_name}"'},
+    )
 
 
 @router.delete("/api/media/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_media(asset_id: str, _user: UserDep, db: DbDep) -> None:
+def delete_media(asset_id: str, _user: MediaUser, db: DbDep) -> None:
     asset = db.get(MediaAsset, asset_id)
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
-    path = get_settings().media_path / asset.path
+    rel = asset.path
     episode = asset.episode
     for job in db.query(Job).filter(Job.media_id == asset.id).all():
         job.media_id = None
@@ -136,5 +144,4 @@ def delete_media(asset_id: str, _user: UserDep, db: DbDep) -> None:
     episode.updated_at = utcnow()
     touch(episode.project)
     db.commit()
-    if path.is_file():
-        path.unlink()
+    get_store().delete(rel)

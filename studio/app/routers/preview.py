@@ -2,10 +2,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
-from ..config import get_settings
-from ..deps import DbDep, UserDep, get_episode, latest_revision, touch
+from ..deps import DbDep, get_episode, latest_revision, touch
 from ..models import Shot, utcnow
-from ..packzip import slugify, write_bytes
+from ..packzip import slugify
 from ..preview import (
     apply_receipt,
     hop1_required_shots,
@@ -17,6 +16,8 @@ from ..preview import (
     receipt_out,
     extend_ok,
 )
+from ..rbac import MutateUser, ReadUser
+from ..store import get_store
 from ..schemas import (
     ContinuityReceiptOut,
     PreviewDeskOut,
@@ -51,7 +52,7 @@ def _get_shot(db, episode_id: str, shot_id: str) -> Shot:
 
 
 @router.get("/api/episodes/{episode_id}/preview-desk", response_model=PreviewDeskOut)
-def get_preview_desk(episode_id: str, _user: UserDep, db: DbDep) -> PreviewDeskOut:
+def get_preview_desk(episode_id: str, _user: ReadUser, db: DbDep) -> PreviewDeskOut:
     episode = get_episode(db, episode_id)
     pack = pack_of(episode)
     required = hop1_required_shots(episode, pack)
@@ -98,7 +99,7 @@ def get_preview_desk(episode_id: str, _user: UserDep, db: DbDep) -> PreviewDeskO
     "/api/episodes/{episode_id}/shots/{shot_id}/receipt",
     response_model=ContinuityReceiptOut | None,
 )
-def get_receipt(episode_id: str, shot_id: str, _user: UserDep, db: DbDep) -> ContinuityReceiptOut | None:
+def get_receipt(episode_id: str, shot_id: str, _user: ReadUser, db: DbDep) -> ContinuityReceiptOut | None:
     shot = _get_shot(db, episode_id, shot_id)
     return receipt_out(shot.receipt)
 
@@ -108,7 +109,7 @@ def get_receipt(episode_id: str, shot_id: str, _user: UserDep, db: DbDep) -> Con
     response_model=ContinuityReceiptOut,
 )
 def set_receipt(
-    episode_id: str, shot_id: str, body: ReceiptSet, user: UserDep, db: DbDep
+    episode_id: str, shot_id: str, body: ReceiptSet, user: MutateUser, db: DbDep
 ) -> ContinuityReceiptOut:
     shot = _get_shot(db, episode_id, shot_id)
     receipt = apply_receipt(
@@ -138,7 +139,7 @@ def set_receipt(
     response_model=ContinuityReceiptOut,
 )
 def set_preview_watched(
-    episode_id: str, shot_id: str, body: PreviewWatchedSet, user: UserDep, db: DbDep
+    episode_id: str, shot_id: str, body: PreviewWatchedSet, user: MutateUser, db: DbDep
 ) -> ContinuityReceiptOut:
     shot = _get_shot(db, episode_id, shot_id)
     if shot.receipt is None:
@@ -167,7 +168,7 @@ def set_preview_watched(
 async def attach_preview(
     episode_id: str,
     shot_id: str,
-    user: UserDep,
+    user: MutateUser,
     db: DbDep,
     file: UploadFile | None = File(default=None),
     media_id: str = Form(""),
@@ -212,7 +213,7 @@ async def attach_preview(
         db.flush()
         stored = f"{asset.id}_{slugify(Path(original).stem, 'preview')}{suffix}"
         rel = Path(episode.id) / "previews" / stored
-        write_bytes(get_settings().media_path / rel, data)
+        get_store().put(str(rel), data)
         asset.stored_name = stored
         asset.path = str(rel)
         attached_id = asset.id
