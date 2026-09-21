@@ -4,10 +4,12 @@ import type { ContinuitySummary } from "./types.ts";
 
 export function ContinuityPanel({
   episodeId,
+  refreshKey,
   onOpenHref,
   onError,
 }: {
   episodeId: string;
+  refreshKey?: string;
   onOpenHref: (href: string) => void;
   onError: (err: unknown) => void;
 }) {
@@ -15,7 +17,7 @@ export function ContinuityPanel({
 
   useEffect(() => {
     void api.continuity(episodeId).then(setSummary).catch(onError);
-  }, [episodeId, onError]);
+  }, [episodeId, refreshKey, onError]);
 
   if (!summary) {
     return (

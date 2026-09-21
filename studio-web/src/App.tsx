@@ -1174,6 +1174,9 @@ function EpisodeView({
 
       <ContinuityPanel
         episodeId={episodeId}
+        refreshKey={(identity?.plates || [])
+          .map((asset) => `${asset.id}:${asset.shot_id || ""}:${asset.approval_status}`)
+          .join("|")}
         onError={onError}
         onOpenHref={(href) => {
           const next = href.startsWith("#") ? href : `#${href}`;
