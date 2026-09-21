@@ -86,8 +86,9 @@ export function PreviewDesk({
         <h3>Hop-1 preview desk</h3>
         <p>
           One hop-1 per planned take. Attach the stub receipt or a local preview file, fill
-          duration/frames + still-vs-lock, then mark preview-watched. generate-ok and clip-extend stay
-          blocked until every required hop-1 has that stamp. An NG reason still blocks spend.
+          duration/frames + still-vs-lock, then mark preview-watched. generate-ok also needs a
+          reviewer/producer sign-off. clip-extend stays blocked until every required hop-1 has
+          that stamp. An NG reason still blocks spend.
         </p>
       </div>
       {desk ? (

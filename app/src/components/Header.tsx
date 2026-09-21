@@ -1,3 +1,5 @@
+import { studioImportUrl } from "../lib/studio";
+
 type Props = {
   onLoadSample: () => void;
   onNewPack: () => void;
@@ -48,6 +50,9 @@ export function Header({ onLoadSample, onNewPack, onImport }: Props) {
         <button type="button" className="btn" onClick={onImport}>
           Import zip
         </button>
+        <a className="btn" href={studioImportUrl()} target="_blank" rel="noreferrer">
+          Open in Studio
+        </a>
       </div>
     </header>
   );

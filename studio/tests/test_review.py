@@ -1,5 +1,5 @@
 from tests.fixtures import green_pack, pack_zip_bytes, red_haft_pack
-from tests.helpers import attach_watched_receipt, ready_all_shots
+from tests.helpers import attach_watched_receipt, ready_all_shots, sign_off
 
 
 def _episode(client, auth):
@@ -64,9 +64,19 @@ def test_review_states_and_generate_ok_honesty(client, auth):
 
     shots = ready_all_shots(client, auth, episode["id"])
     attach_watched_receipt(client, auth, episode["id"], shots[0]["id"])
+    unsigned = client.put(
+        f"/api/episodes/{episode['id']}/review",
+        json={"state": "generate-ok", "note": "gates green, hop-1 watched, no sign-off"},
+        headers=auth,
+    )
+    assert unsigned.status_code == 409
+    assert unsigned.json()["detail"]["code"] == "review_unsigned"
+
+    signed = sign_off(client, auth, episode["id"], "producer sign-off")
+    assert signed["signed_off"] is True
     ok = client.put(
         f"/api/episodes/{episode['id']}/review",
-        json={"state": "generate-ok", "note": "gates green, hop-1 watched"},
+        json={"state": "generate-ok", "note": "gates green, hop-1 watched, signed"},
         headers=auth,
     )
     assert ok.status_code == 200

@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     )
     job_worker: str = "thread"
     job_poll_seconds: float = 0.25
+    celery_broker_url: str = ""
+    oidc_issuer: str = ""
+    oidc_audience: str = ""
+    oidc_client_id: str = ""
+    oidc_jwks_url: str = ""
+    oidc_name_claim: str = "preferred_username"
+    oidc_role_claim: str = ""
+    oidc_role_map: str = ""
+    oidc_apply_role_claim: bool = False
     still_adapter: str = "stub"
     clip_adapter: str = "stub"
     adapter_webhook_url: str = ""

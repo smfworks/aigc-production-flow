@@ -73,16 +73,16 @@ The pack builder already refuses export until gates are green. That is the v1 co
 - **Costume** — linkable media kind / entity type in the studio library.
 - **Storyboard canvas** — list (precision) + board of takes/edit rows with join types; join inspector highlights continue chains vs cut/fadeblack boundaries.
 
-Still deferred (NLE / full SSO / Celery):
+Still deferred (NLE):
 
 - Full NLE timeline editor (Phase 4 ships metadata-only EDL / FCP XML lite / shot playlist)
-- OIDC / IdP login (Phase 4 ships `docs/AUTH.md` + `STUDIO_AUTH_MODE=forward-header`; Phase 5 adds **app-level** org roles on that identity — not OIDC groups)
-- Celery / GPU queue (Phase 3 jobs are in-process; one engine adapter at a time per GPU stays an ops pin)
+
+OIDC and Celery are **optional in Phase 6** and **off by default**. They are not a production IdP or a claimed live broker.
 
 **Phase 3 (this repo, delivered):**
 
 - **Preview receipt** — hop-1 preview desk: attach/upload preview media, duration/frames (manual or parsed JSON / ffprobe), still-vs-lock note, optional NG reason. Required before `generate-ok` and `clip-extend`
-- Async generate jobs with cancel/retry (in-process thread worker; Celery is the documented upgrade path, not this process)
+- Async generate jobs with cancel/retry (in-process thread worker default; Celery is opt-in in Phase 6)
 - Engine adapters: still + clip factory interface; default `adapter=stub` with fixture receipts; optional webhook/CLI live hook (unset → stub only)
 - `batch-precheck` job: gates green + shot ready + plates bound before hop-1 enqueue
 
@@ -96,7 +96,7 @@ Still deferred (NLE / full SSO / Celery):
 
 **Phase 5 (this repo, collaborate & operate):**
 
-- App-level **RBAC lite** (`producer` / `editor` / `reviewer` / `viewer`) on the default org. Seed local-dev user as producer. Viewers are read-only. Identity is still local token or `X-Forwarded-User` — **not OIDC**
+- App-level **RBAC lite** (`producer` / `editor` / `reviewer` / `viewer`) on the default org. Seed local-dev user as producer. Viewers are read-only. Identity is still local token or `X-Forwarded-User` unless OIDC is explicitly enabled
 - **Presence** heartbeats (TTL ~60s) and **shot comment** threads (create / list / resolve) with audit
 - **Media store adapters**: local disk default; optional S3/MinIO when `STUDIO_MEDIA_BACKEND=s3` and a bucket are set. Unset stays local and never claims cloud storage is live
 - Adapter **health / dry-run** (reachable? config present?) plus a studio status strip. Unhealthy live slots 409 on enqueue. Stub remains default
@@ -105,12 +105,22 @@ Still deferred (NLE / full SSO / Celery):
 v2 leftover (platform, do not pretend we have it):
 
 - visual identity store (approved sheet + per-window plates), not a pasted wardrobe paragraph
-- Celery / GPU queue (Phase 3 jobs are in-process; one engine adapter at a time per GPU stays an ops pin)
-- OIDC / multi-tenant SaaS
+- GPU queue / one engine adapter at a time per GPU (ops pin)
+- multi-tenant SaaS
 
-**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). Auth is a local-dev API token plus an optional reverse-proxy identity hook — not OIDC. Operator path: [STUDIO.md](STUDIO.md). Auth stub: [AUTH.md](AUTH.md).
+**Phase 6 (this repo, production readiness):**
+
+- Optional **Celery** (`STUDIO_JOB_WORKER=celery` + Redis broker). Default remains the in-process thread worker. Never run both against the same SQLite file.
+- Optional **OIDC** (`STUDIO_AUTH_MODE=oidc` + issuer JWKS). Off by default. Not a production IdP.
+- **Review sign-off** required before `generate-ok` (reviewer or producer; producer override audited)
+- Pack ↔ studio **deep links** and builder **Open in Studio** import handoff (`?import=`)
+- GitHub Actions CI: studio pytest, pack-builder `npm test`, studio-web typecheck
+
+**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). Auth is a local-dev API token plus optional reverse-proxy / optional OIDC. Operator path: [STUDIO.md](STUDIO.md). Auth: [AUTH.md](AUTH.md).
 
 **Phase 3 (this repo, jobs + desk):** `generate-ok` is refused unless that snapshot is all green **and** each required hop-1 is preview-watched with a continuity receipt. Stub jobs never stamp generate-ok.
+
+**Phase 6 (this repo, production readiness):** `generate-ok` also needs a reviewer/producer sign-off (or an audited producer override). Celery and OIDC remain opt-in.
 
 **Phase 4 (this repo, scale & polish):** set adapter defaults + budget cap → run stub jobs → see spend → audit trail → export EDL → create a project from a vertical template.
 
@@ -174,7 +184,7 @@ The flow is real when:
 3. Export still requires every gate green (nine README gates plus entity-schedule and lock-diff).
 4. A pack zip round-trips without a GPU.
 5. GPU spend still happens somewhere else, after preview.
-6. Studio `generate-ok` is refused unless the stored gate snapshot is all green **and** each required hop-1 has preview-watched + a continuity receipt. Shot `ready` is prepared, not generating. Stub jobs do not stamp generate-ok.
+6. Studio `generate-ok` is refused unless the stored gate snapshot is all green, each required hop-1 has preview-watched + a continuity receipt, **and** a reviewer or producer has signed off (producer override is audited). Shot `ready` is prepared, not generating. Stub jobs do not stamp generate-ok.
 
 ## Sources
 

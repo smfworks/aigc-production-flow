@@ -659,6 +659,21 @@ a.btn {
   letter-spacing: 0.06em;
 }
 
+.signoff-box {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 212, 255, 0.04);
+}
+
+.signoff-box p {
+  margin: 0;
+  color: var(--ink);
+}
+
 .role-chip,
 .presence-chip,
 .adapter-chip {

@@ -2,6 +2,7 @@ from tests.helpers import (
     attach_watched_receipt,
     create_episode,
     green_ready_episode,
+    sign_off,
     wait_job,
 )
 
@@ -85,6 +86,15 @@ def test_path_green_precheck_stub_hop1_receipt_generate_ok(client, auth):
     assert receipt["duration_s"] == 10.125
     assert receipt["frames"] == 243
 
+    unsigned = client.put(
+        f"/api/episodes/{episode['id']}/review",
+        headers=auth,
+        json={"state": "generate-ok", "note": "watched stub hop-1"},
+    )
+    assert unsigned.status_code == 409
+    assert unsigned.json()["detail"]["code"] == "review_unsigned"
+
+    sign_off(client, auth, episode["id"])
     ok = client.put(
         f"/api/episodes/{episode['id']}/review",
         headers=auth,

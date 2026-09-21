@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from .models import AuditEvent, Episode, Project
 
 REVIEW_SET = "review.set"
+REVIEW_SIGNOFF = "review.signoff"
+REVIEW_OVERRIDE = "review.override"
 JOB_ENQUEUE = "job.enqueue"
 JOB_CANCEL = "job.cancel"
 PACK_IMPORT = "pack.import"
@@ -23,6 +25,8 @@ MEMBER_ROLE = "member.role"
 
 ACTIONS = (
     REVIEW_SET,
+    REVIEW_SIGNOFF,
+    REVIEW_OVERRIDE,
     JOB_ENQUEUE,
     JOB_CANCEL,
     PACK_IMPORT,

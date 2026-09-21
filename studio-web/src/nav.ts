@@ -61,6 +61,25 @@ export function navigate(view: View): void {
   }
 }
 
+export function shareUrl(view: View): string {
+  const url = new URL(window.location.href);
+  return `${url.origin}${url.pathname}${viewToHash(view)}`;
+}
+
+export function importHint(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("import")) return null;
+  return params.get("import") || "1";
+}
+
+export function clearImportHint(): void {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("import")) return;
+  url.searchParams.delete("import");
+  const search = url.searchParams.toString();
+  window.history.replaceState(null, "", `${url.pathname}${search ? `?${search}` : ""}${url.hash}`);
+}
+
 export function sameView(a: View, b: View): boolean {
   return viewToHash(a) === viewToHash(b);
 }

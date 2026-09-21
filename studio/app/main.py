@@ -6,13 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import database as database_module
 from .adapters.catalog import CATALOG
 from .adapters.registry import resolve_adapter_name
-from .auth import _mode
+from .auth import _mode, _sso_note
 from .budget import DISCLAIMER
 from .config import get_settings
 from .database import Base, get_db
 from .deps import DbDep, UserDep
+from .jobs.modes import WORKER_CELERY, normalize_worker
 from .jobs.worker import start_worker, stop_worker
 from .models import Organization
+from .oidc import oidc_configured
 from .rbac import attach_role
 from .routers import (
     adapters,
@@ -61,17 +63,20 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.5.0",
+        version="0.6.0",
         description=(
-            "Phase 5 studio spine for the AIGC production flow. "
+            "Phase 6 studio spine for the AIGC production flow. "
             "Pack zip remains the collaboration contract. "
             "App-level org roles (producer / editor / reviewer / viewer) sit on top of "
-            "local-dev Bearer + optional X-Forwarded-User. SSO/OIDC is not implemented. "
+            "local-dev Bearer, optional X-Forwarded-User, or optional OIDC JWKS. "
+            "OIDC and Celery are opt-in and off by default. This is not a production IdP. "
             "This is not multi-tenant SaaS security. "
-            "Jobs run in-process (thread worker). Celery is the documented upgrade path, not this process. "
+            "Default jobs run in-process (thread worker). "
             "Adapter catalog: stub plus documented slots (comfy-h3, comfy-qwen, webhook, cli). "
             "Budget units come from an operator rate table — not a cloud invoice. "
-            "Media defaults to local disk; S3/MinIO is opt-in and never claimed live when unset."
+            "Media defaults to local disk; S3/MinIO is opt-in and never claimed live when unset. "
+            "generate-ok requires gates + hop-1 receipts + a reviewer/producer sign-off "
+            "(producer override is audited)."
         ),
         license_info={"name": "MIT", "identifier": "MIT"},
         lifespan=lifespan,
@@ -104,14 +109,16 @@ def create_app() -> FastAPI:
     @application.get("/", tags=["meta"])
     def root() -> dict:
         cfg = get_settings()
+        worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 5,
+            "phase": 6,
             "docs": "/docs",
             "openapi": "/openapi.json",
-            "auth": "local Bearer token; optional forward-header identity; app-level org roles",
-            "sso": "not implemented — see docs/AUTH.md",
-            "job_worker": "in-process thread (Celery later)",
+            "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",
+            "sso": _sso_note(_mode(cfg.auth_mode)),
+            "job_worker": worker,
+            "celery": worker == WORKER_CELERY,
             "adapters": [slot.id for slot in CATALOG],
             "media_backend": active_backend(cfg),
             "budget": DISCLAIMER,
@@ -124,13 +131,15 @@ def create_app() -> FastAPI:
     @application.get("/api/meta", response_model=MetaOut, tags=["meta"])
     def meta() -> MetaOut:
         cfg = get_settings()
+        worker = normalize_worker(cfg.job_worker)
         return MetaOut(
             pack_builder_url=cfg.pack_builder_url,
             default_user=cfg.default_user,
-            job_worker=cfg.job_worker,
+            job_worker=worker,
             still_adapter=resolve_adapter_name("still-sheet", cfg),
             clip_adapter=resolve_adapter_name("clip-hop1", cfg),
             auth_mode=_mode(cfg.auth_mode),
+            sso=_sso_note(_mode(cfg.auth_mode)),
             cost_currency=cfg.cost_currency or "credits",
             retention_days=int(cfg.retention_days or 0),
             budget_hard_stop=bool(cfg.budget_hard_stop),
@@ -138,6 +147,9 @@ def create_app() -> FastAPI:
             media_s3_configured=requested_backend(cfg) == "s3" and s3_ready(cfg),
             media_note=media_note(cfg),
             presence_ttl_seconds=int(cfg.presence_ttl_seconds or 60),
+            celery_enabled=worker == WORKER_CELERY,
+            oidc_configured=oidc_configured(cfg),
+            oidc_apply_role_claim=bool(cfg.oidc_apply_role_claim),
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])

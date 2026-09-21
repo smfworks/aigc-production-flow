@@ -3,7 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY app ./app
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[celery,oidc]"
 
 ENV STUDIO_DATABASE_URL=sqlite:////data/studio.db
 ENV STUDIO_MEDIA_ROOT=/data/media
