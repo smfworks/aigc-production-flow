@@ -141,7 +141,7 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio · Phase 10</p>
+            <p className="eyebrow">SMF Works · AIGC Studio · Phase 11</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>

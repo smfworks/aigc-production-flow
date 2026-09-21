@@ -11,6 +11,7 @@ import httpx
 
 from ..config import Settings, get_settings
 from .catalog import CATALOG, STUB_NAME, AdapterSlot, slot_for
+from .comfy_client import lanes_for_slot, native_ready, parse_lane_list, probe_lane, validate_lane
 from .live import transport_ready
 
 _HEALTH_TIMEOUT = 2.5
@@ -68,17 +69,49 @@ def validate_slot_config(slot: AdapterSlot, settings: Settings) -> tuple[bool, l
         errors.append("comfy-h3 must declare hop-1 window length")
     if slot.id == "comfy-qwen" and not slot.canvas:
         errors.append("comfy-qwen must declare still canvas")
+    for lane in lanes_for_slot(settings, slot.id):
+        ok, err = validate_lane(lane, settings)
+        if not ok:
+            errors.append(err)
+    if slot.id == "comfy-h3" and (settings.comfy_h3_styles or "").strip():
+        from .comfy_h3 import style_table
+        from .comfy_client import ComfyError
+
+        try:
+            style_table(settings)
+        except ComfyError as exc:
+            errors.append(str(exc))
+    for lane in parse_lane_list(settings.comfy_image_lanes_for_free):
+        if slot.id != "comfy-h3":
+            break
+        ok, err = validate_lane(lane, settings)
+        if not ok:
+            errors.append(err)
     return not errors, errors
 
 
-def _meta(slot: AdapterSlot) -> dict[str, Any]:
+def _meta(slot: AdapterSlot, *, lanes_configured: bool = False) -> dict[str, Any]:
     return {
         "window_s": slot.window_s,
         "frames": slot.frames,
         "fps": slot.fps,
         "canvas": slot.canvas,
         "hop1_watch_required": bool(slot.hop1_watch_required),
+        "lanes_configured": lanes_configured,
     }
+
+
+def _hook_names(slot: AdapterSlot) -> list[str]:
+    needed: list[str] = []
+    if slot.id == "comfy-qwen":
+        needed.append("STUDIO_COMFY_STILL_LANES")
+    if slot.id == "comfy-h3":
+        needed.append("STUDIO_COMFY_CLIP_LANES")
+    if slot.transport in {"webhook", "webhook-or-cli"}:
+        needed.append("STUDIO_ADAPTER_WEBHOOK_URL")
+    if slot.transport in {"cli", "webhook-or-cli"}:
+        needed.append("STUDIO_ADAPTER_CLI")
+    return needed
 
 
 def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str, Any]:
@@ -98,15 +131,13 @@ def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str
             "detail": slot.honesty or "Stub fixture receipts. Always healthy. Never claims H3 or Qwen ran.",
             "schema_ok": True,
             "not_live": True,
-            **_meta(slot),
+            **_meta(slot, lanes_configured=False),
         }
-    present = transport_ready(cfg, slot.transport)
+    lanes = lanes_for_slot(cfg, slot.id)
+    native = native_ready(cfg, slot.id)
+    present = transport_ready(cfg, slot.transport, slot.id)
     if not present:
-        needed = []
-        if slot.transport in {"webhook", "webhook-or-cli"}:
-            needed.append("STUDIO_ADAPTER_WEBHOOK_URL")
-        if slot.transport in {"cli", "webhook-or-cli"}:
-            needed.append("STUDIO_ADAPTER_CLI")
+        needed = _hook_names(slot)
         detail = (
             f"Not live. {slot.id} hook unset ({' or '.join(needed)}). "
             "Enqueue resolves to stub. This is not a Hailuo/Veo/Kling adapter."
@@ -121,7 +152,42 @@ def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str
             "detail": detail,
             "schema_ok": True,
             "not_live": True,
-            **_meta(slot),
+            **_meta(slot, lanes_configured=False),
+        }
+    if native:
+        notes: list[str] = []
+        ok = schema_ok
+        reachable = False
+        if not schema_ok:
+            notes.extend(schema_errors)
+            notes.append("Lane check skipped until the lane URL is a private http(s) host.")
+        else:
+            up = 0
+            for lane in lanes:
+                reachable_one, note = probe_lane(lane, timeout)
+                notes.append(note)
+                if reachable_one:
+                    up += 1
+            reachable = up > 0
+            ok = ok and reachable
+        window_note = ""
+        if slot.window_s:
+            window_note = f" Window {slot.window_s}s / {slot.frames}f @ {slot.fps}fps."
+        elif slot.canvas:
+            window_note = f" Canvas {slot.canvas}."
+        watch = " Hop-1 watch protocol required before generate-ok."
+        lane_note = f" {len(lanes)} ComfyUI lane(s) configured."
+        return {
+            "id": slot.id,
+            "ok": ok,
+            "live": True,
+            "config_present": True,
+            "reachable": reachable,
+            "transport": "comfy",
+            "detail": ("; ".join(notes) or "config present") + lane_note + window_note + watch,
+            "schema_ok": schema_ok,
+            "not_live": False,
+            **_meta(slot, lanes_configured=True),
         }
     notes: list[str] = []
     ok = schema_ok

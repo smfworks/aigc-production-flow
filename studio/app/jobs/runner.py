@@ -95,44 +95,161 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
             session.commit()
             return job
 
-        job.adapter = result.adapter or job.adapter or "stub"
-        job.result = result.receipt if isinstance(result.receipt, dict) else {"result": result.receipt}
-        if result.media_bytes:
-            asset = _store_media(session, job, episode, result)
-            job.media_id = asset.id
-            if result.ok and job.job_type == "clip-hop1" and job.shot:
-                from ..preview import apply_receipt
-
-                apply_receipt(
-                    session,
-                    job.shot,
-                    user_name=job.created_by,
-                    media_id=asset.id,
-                    parse_media=True,
-                )
-        if result.ok:
-            job.status = "succeeded"
-            job.progress = 100
+        if result.pending:
+            job.adapter = result.adapter or job.adapter or "stub"
+            job.result = result.receipt if isinstance(result.receipt, dict) else {}
+            job.progress = max(job.progress or 0, 12)
+            job.status = "running"
             job.error = ""
-            job.actual_cost_units = float(job.estimated_cost_units or 0)
-        else:
-            job.status = "failed"
-            job.error = result.error or "Adapter failed."
-            job.actual_cost_units = 0.0
-        job.finished_at = utcnow()
-        job.updated_at = utcnow()
-        episode.updated_at = utcnow()
-        touch(episode.project)
-        session.commit()
-        if job.status in {"succeeded", "failed"}:
-            from ..notify import notify_job_finished
-
-            notify_job_finished(session, job)
+            job.updated_at = utcnow()
             session.commit()
-        return job
+            return job
+
+        return _finish_adapter_result(session, job, episode, result)
     finally:
         if owned:
             session.close()
+
+
+def _as_float(value: object) -> float | None:
+    if value in {None, ""}:
+        return None
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_int(value: object) -> int | None:
+    number = _as_float(value)
+    if number is None:
+        return None
+    return int(number)
+
+
+def _finish_adapter_result(session: Session, job: Job, episode: Episode, result: AdapterResult) -> Job:
+    job.adapter = result.adapter or job.adapter or "stub"
+    job.result = result.receipt if isinstance(result.receipt, dict) else {"result": result.receipt}
+    if result.media_bytes:
+        asset = _store_media(session, job, episode, result)
+        job.media_id = asset.id
+        receipt = job.result if isinstance(job.result, dict) else {}
+        local = get_store().local_path(asset.path)
+        saved = ""
+        if isinstance(result.receipt, dict):
+            saved = str(result.receipt.get("path") or "")
+        if local is not None:
+            receipt["path"] = str(local)
+            if saved and saved != str(local) and receipt.get("description"):
+                receipt["description"] = str(receipt["description"]).replace(saved, str(local))
+        receipt["media_store_path"] = asset.path
+        job.result = receipt
+        if result.ok and job.job_type == "clip-hop1" and job.shot:
+            from ..preview import apply_receipt
+
+            note = receipt.get("still_vs_lock")
+            apply_receipt(
+                session,
+                job.shot,
+                user_name=job.created_by,
+                media_id=asset.id,
+                duration_s=_as_float(receipt.get("duration_s")),
+                frames=_as_int(receipt.get("frames")),
+                fps=_as_float(receipt.get("fps")),
+                still_vs_lock=str(note).strip() if isinstance(note, str) and note.strip() else None,
+                parse_media=True,
+            )
+    if result.ok:
+        job.status = "succeeded"
+        job.progress = 100
+        job.error = ""
+        job.actual_cost_units = float(job.estimated_cost_units or 0)
+    else:
+        job.status = "failed"
+        job.error = result.error or "Adapter failed."
+        job.actual_cost_units = 0.0
+    job.finished_at = utcnow()
+    job.updated_at = utcnow()
+    episode.updated_at = utcnow()
+    touch(episode.project)
+    session.commit()
+    if job.status in {"succeeded", "failed"}:
+        from ..notify import notify_job_finished
+
+        notify_job_finished(session, job)
+        session.commit()
+    return job
+
+
+def touch_comfy_job(session: Session, job: Job) -> Job:
+    """Advance one due MiniMax H3 poll. Still jobs do not use this path."""
+    body = job.result if isinstance(job.result, dict) else {}
+    if job.status != "running" or not body.get("comfy_pending"):
+        return job
+    from ..adapters.comfy_h3 import poll_due
+
+    if not poll_due(body):
+        return job
+    session.refresh(job)
+    if job.cancel_requested:
+        _cancel(job)
+        session.commit()
+        return job
+    if job.status != "running":
+        return job
+    from ..adapters.comfy_h3 import poll_clip
+    from ..config import get_settings
+
+    try:
+        polled = poll_clip(get_settings(), body)
+    except Exception as exc:  # noqa: BLE001 — a blip must not 500 the job list
+        job.result = {**body, "poll_note": f"ComfyUI poll failed: {exc}", "called_comfy": True}
+        job.updated_at = utcnow()
+        session.commit()
+        return job
+    if polled.pending:
+        job.result = polled.receipt if isinstance(polled.receipt, dict) else body
+        job.progress = max(job.progress or 0, 20)
+        job.updated_at = utcnow()
+        session.commit()
+        return job
+    episode = job.episode
+    return _finish_adapter_result(session, job, episode, polled)
+
+
+def touch_comfy_jobs(session: Session, jobs: list[Job]) -> None:
+    for job in jobs:
+        body = job.result if isinstance(job.result, dict) else {}
+        if job.status == "running" and body.get("comfy_pending"):
+            touch_comfy_job(session, job)
+
+
+def due_comfy_job_id(session: Session) -> str | None:
+    from ..adapters.comfy_h3 import poll_due
+
+    running = (
+        session.query(Job)
+        .filter(Job.status == "running")
+        .order_by(Job.updated_at.asc())
+        .limit(20)
+        .all()
+    )
+    for row in running:
+        body = row.result if isinstance(row.result, dict) else {}
+        if body.get("comfy_pending") and poll_due(body):
+            return row.id
+    return None
+
+
+def resume_due_comfy_job(job_id: str) -> Job | None:
+    session = SessionLocal()
+    try:
+        job = session.get(Job, job_id)
+        if not job:
+            return None
+        return touch_comfy_job(session, job)
+    finally:
+        session.close()
 
 
 def _cancel(job: Job) -> None:

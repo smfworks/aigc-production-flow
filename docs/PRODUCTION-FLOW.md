@@ -118,6 +118,10 @@ OIDC and Celery are **optional in Phase 6** and **off by default**. They are not
 - **Builder → studio auto-import** — Open in Studio stages the zip (`POST /api/handoffs`) when `VITE_STUDIO_URL` is set (CORS/token documented). Pick project/episode → import uses the handed-off zip (no re-choose file). Failure modes: studio down, auth. Never auto-generate
 - **Measured live Comfy hooks** — `comfy-h3` declares hop-1 **10.125 s / 243 f @ 24 fps**; `comfy-qwen` declares canvas **1344×768**. Health/dry-run include config schema validation. Unset env is **not live** and still resolves to stub. Hop-1 watch protocol remains required; live adapters must not skip it. Stub remains default. No Hailuo/Veo/Kling in this phase
 
+**Phase 11 (this repo, native ComfyUI engines):**
+
+- **Qwen-Image stills** and **MiniMax H3 clips** run through Studio's Python Comfy client when `STUDIO_COMFY_STILL_LANES` / `STUDIO_COMFY_CLIP_LANES` are set. Empty lanes stay stub and **not live**. Busy lanes refuse instead of queueing behind a long render. Clip jobs return a job id and ETA, then an mp4 path. Hop-1 watch is still required. Export for agent does not call Comfy. No Hailuo / Veo / Kling. MIT notice for the upstream behavior notes: [NOTICE](../NOTICE)
+
 **Phase 10 (this repo, one AIGC Studio):**
 
 - **Create in Studio** — New project, new blank pack/episode, or new from a vertical template. Org-scoped project + episode + pack revision. No zip required. Empty states say start here. Import zip and Open in Studio stay secondary

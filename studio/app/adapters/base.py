@@ -15,6 +15,7 @@ class AdapterResult:
     media_name: str = ""
     media_kind: str = "other"
     content_type: str = "application/json"
+    pending: bool = False
 
 
 @dataclass

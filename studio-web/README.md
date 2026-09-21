@@ -1,4 +1,4 @@
-# Studio shell (Phase 10)
+# Studio shell (Phase 11)
 
 Vite + React UI for one AIGC Studio. **Start here** creates a project and pack (blank, template, or brain dump). The episode embeds the pack builder’s four stages (Script → Assets → Storyboard → Preview) and autosaves revisions. **Export for agent** downloads the handoff zip. Zip import and the optional builder window stay secondary.
 

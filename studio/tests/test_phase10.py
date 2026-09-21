@@ -61,7 +61,7 @@ def test_start_blank_project_without_zip(client, auth):
     assert pack["studioMeta"]["model_ran"] is False
 
     meta = client.get("/api/meta")
-    assert meta.json()["phase"] == 10
+    assert meta.json()["phase"] == 11
     assert meta.json()["llm_configured"] is False
     assert meta.json()["primary_create"] == "studio"
     assert "No model configured" in meta.json()["llm_note"]

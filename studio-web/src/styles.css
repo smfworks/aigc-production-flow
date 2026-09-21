@@ -973,6 +973,16 @@ a.btn {
   color: var(--muted);
 }
 
+.adapter-badge {
+  margin-left: 6px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 5px;
+  font-size: 9px;
+}
+
 .adapter-chip.is-muted {
   color: var(--muted);
   border-color: var(--line);

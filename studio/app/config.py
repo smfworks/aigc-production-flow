@@ -37,6 +37,30 @@ class Settings(BaseSettings):
     adapter_webhook_url: str = ""
     adapter_cli: str = ""
     adapter_timeout_seconds: float = 60.0
+    # Native ComfyUI lanes. Empty means the comfy-* slot stays not-live (stub),
+    # unless a webhook or CLI hook is set. Defaults are overridable checkpoint names.
+    comfy_still_lanes: str = ""
+    comfy_clip_lanes: str = ""
+    comfy_image_lanes_for_free: str = ""
+    comfy_allow_hosts: str = ""
+    comfy_out_dir: str = ""
+    comfy_request_timeout_seconds: float = 30.0
+    comfy_still_timeout_seconds: float = 300.0
+    comfy_still_poll_seconds: float = 4.0
+    comfy_poll_interval_seconds: float = 15.0
+    comfy_qwen_unet: str = "qwen_image_2.1_int8_convrot.safetensors"
+    comfy_qwen_clip: str = "qwen3vl_8b_int8_convrot.safetensors"
+    comfy_qwen_vae: str = "qwen_image_2.1_vae_bf16.safetensors"
+    comfy_h3_unet_full: str = "minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+    comfy_h3_unet_turbo: str = "minimax_h3_ref2va_pruned_turbo_int8_convrot.safetensors"
+    comfy_h3_clip: str = "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
+    comfy_h3_video_vae: str = "minimax_h3_video_vae_fp16.safetensors"
+    comfy_h3_audio_vae: str = "minimax_h3_audio_vae_fp32.safetensors"
+    comfy_h3_styles: str = ""
+    comfy_h3_max_frames: int = 362
+    comfy_h3_fps: float = 24.0
+    comfy_h3_width: int = 960
+    comfy_h3_height: int = 544
     auth_mode: str = "local"
     cost_rates: str = "stub:0.1,webhook:1,cli:1,comfy-h3:2,comfy-qwen:0.5"
     cost_currency: str = "credits"

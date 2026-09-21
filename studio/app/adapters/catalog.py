@@ -16,25 +16,72 @@ H3_FRAMES = 243
 H3_FPS = 24.0
 QWEN_CANVAS = "1344x768"
 
-COMIFY_ENV_SCHEMA: dict[str, Any] = {
+_COMFY_SHARED_PROPS: dict[str, Any] = {
+    "STUDIO_ADAPTER_WEBHOOK_URL": {
+        "type": "string",
+        "format": "uri",
+        "description": "Optional http(s) webhook. Used only when native ComfyUI lanes are unset.",
+    },
+    "STUDIO_ADAPTER_CLI": {
+        "type": "string",
+        "description": "Optional CLI template. Used only when native ComfyUI lanes are unset.",
+    },
+    "STUDIO_ADAPTER_TIMEOUT_SECONDS": {"type": "number", "exclusiveMinimum": 0},
+    "STUDIO_COMFY_ALLOW_HOSTS": {
+        "type": "string",
+        "description": "Extra trusted hostnames (comma-separated). Loopback and private IPs are already allowed.",
+    },
+    "STUDIO_COMFY_OUT_DIR": {
+        "type": "string",
+        "description": "Where finished files are written. Default is the media root comfy/ directory.",
+    },
+}
+
+COMFY_STILL_ENV_SCHEMA: dict[str, Any] = {
     "type": "object",
     "anyOf": [
+        {"required": ["STUDIO_COMFY_STILL_LANES"]},
         {"required": ["STUDIO_ADAPTER_WEBHOOK_URL"]},
         {"required": ["STUDIO_ADAPTER_CLI"]},
     ],
     "properties": {
-        "STUDIO_ADAPTER_WEBHOOK_URL": {
+        **_COMFY_SHARED_PROPS,
+        "STUDIO_COMFY_STILL_LANES": {
             "type": "string",
-            "format": "uri",
-            "description": "http(s) webhook that accepts the job JSON payload.",
+            "description": "Comma-separated ComfyUI base URLs for Qwen-Image stills. Private network only.",
         },
-        "STUDIO_ADAPTER_CLI": {
-            "type": "string",
-            "description": "Command template: {job_id} {job_type} {episode_id} {shot_id}; JSON on stdin.",
-        },
-        "STUDIO_ADAPTER_TIMEOUT_SECONDS": {"type": "number", "exclusiveMinimum": 0},
+        "STUDIO_COMFY_QWEN_UNET": {"type": "string"},
+        "STUDIO_COMFY_QWEN_CLIP": {"type": "string"},
+        "STUDIO_COMFY_QWEN_VAE": {"type": "string"},
     },
 }
+
+COMFY_CLIP_ENV_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "anyOf": [
+        {"required": ["STUDIO_COMFY_CLIP_LANES"]},
+        {"required": ["STUDIO_ADAPTER_WEBHOOK_URL"]},
+        {"required": ["STUDIO_ADAPTER_CLI"]},
+    ],
+    "properties": {
+        **_COMFY_SHARED_PROPS,
+        "STUDIO_COMFY_CLIP_LANES": {
+            "type": "string",
+            "description": "Comma-separated ComfyUI base URLs for MiniMax H3 clips. Private network only.",
+        },
+        "STUDIO_COMFY_IMAGE_LANES_FOR_FREE": {
+            "type": "string",
+            "description": "Sibling still lanes to POST /free before a clip, when they share VRAM.",
+        },
+        "STUDIO_COMFY_H3_STYLES": {
+            "type": "string",
+            "description": "Optional JSON map of style name to {file, trigger}. Empty means no LoRA.",
+        },
+    },
+}
+
+# Backward-compatible name used by older notes. Still slots use the still schema.
+COMIFY_ENV_SCHEMA = COMFY_STILL_ENV_SCHEMA
 
 WEBHOOK_ENV_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -111,14 +158,16 @@ CATALOG: tuple[AdapterSlot, ...] = (
         live=True,
         transport="webhook-or-cli",
         note=(
-            "Documented still slot for a Qwen-Image Comfy box. Native canvas 1344×768. "
-            "Needs STUDIO_ADAPTER_WEBHOOK_URL or STUDIO_ADAPTER_CLI. Unset → stub only. Not live until set."
+            "Qwen-Image still factory on ComfyUI. Measured canvas 1344×768 (size studio/pack); "
+            "also square 1328, landscape 1664×928, portrait 928×1664. "
+            "Set STUDIO_COMFY_STILL_LANES (private network) or a webhook/CLI hook. Unset → stub only."
         ),
         canvas=QWEN_CANVAS,
         hop1_watch_required=True,
-        config_schema=COMIFY_ENV_SCHEMA,
+        config_schema=COMFY_STILL_ENV_SCHEMA,
         honesty=(
-            "Measured still factory canvas 1344×768. Unset hook is not live (resolves to stub). "
+            "Measured still factory canvas 1344×768. Unset lanes are not live (resolves to stub). "
+            "A live run returns a PNG path, not pixels in the receipt. "
             "Does not skip hop-1 watch. Not Hailuo/Veo/Kling."
         ),
     ),
@@ -129,18 +178,20 @@ CATALOG: tuple[AdapterSlot, ...] = (
         live=True,
         transport="webhook-or-cli",
         note=(
-            "Documented clip slot for native H3 on a Comfy box. Measured hop-1 window: "
-            "10.125 s / 243 f @ 24 fps. Needs STUDIO_ADAPTER_WEBHOOK_URL or STUDIO_ADAPTER_CLI. "
-            "Unset → stub only. Hop-1 watch protocol is required before generate-ok."
+            "MiniMax H3 clip factory on ComfyUI. Measured hop-1 window: "
+            "10.125 s / 243 f @ 24 fps. Set STUDIO_COMFY_CLIP_LANES (private network) "
+            "or a webhook/CLI hook. Unset → stub only. Clip jobs return a job id and ETA, "
+            "then a path when the mp4 is saved. Hop-1 watch is required before generate-ok."
         ),
         window_s=H3_WINDOW_S,
         frames=H3_FRAMES,
         fps=H3_FPS,
         hop1_watch_required=True,
-        config_schema=COMIFY_ENV_SCHEMA,
+        config_schema=COMFY_CLIP_ENV_SCHEMA,
         honesty=(
-            "Measured hop-1 10.125s / 243f @ 24fps. Unset hook is not live (resolves to stub). "
-            "Live adapters must not skip hop-1 watch. Not Hailuo/Veo/Kling."
+            "Measured hop-1 10.125s / 243f @ 24fps. Unset lanes are not live (resolves to stub). "
+            "Live clip jobs stay async and do not stamp preview-watched. "
+            "Not Hailuo/Veo/Kling."
         ),
     ),
     AdapterSlot(

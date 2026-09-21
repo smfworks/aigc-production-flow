@@ -76,8 +76,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.10.0",
+        version="0.11.0",
         description=(
+            "Phase 11 studio: native ComfyUI still and clip engines when lanes are set. "
             "Phase 10 studio: one app to create the pack. "
             "New project, blank pack, vertical template, or brain dump — no zip required. "
             "Four stages edit inside the episode. Export for agent hands a zip to "
@@ -147,7 +148,7 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 10,
+            "phase": 11,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",

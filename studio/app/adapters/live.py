@@ -30,7 +30,12 @@ def live_configured(settings: Settings) -> bool:
     return transport_ready(settings, "webhook-or-cli")
 
 
-def transport_ready(settings: Settings, transport: str) -> bool:
+def transport_ready(settings: Settings, transport: str, slot_id: str | None = None) -> bool:
+    if slot_id:
+        from .comfy_client import native_ready
+
+        if native_ready(settings, slot_id):
+            return True
     webhook = bool((settings.adapter_webhook_url or "").strip())
     cli = bool((settings.adapter_cli or "").strip())
     if transport == "webhook":
