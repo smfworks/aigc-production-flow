@@ -687,6 +687,9 @@ class ContinuitySummaryOut(BaseModel):
 
 class IdentityApprove(BaseModel):
     note: str = ""
+    lock_keywords: str | None = None
+    entity_label: str | None = Field(default=None, max_length=200)
+    entity_type: str | None = None
 
 
 class IdentityLink(BaseModel):

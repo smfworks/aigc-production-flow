@@ -163,6 +163,8 @@ Failure modes (documented in the builder toast — never claimed as auto-generat
 
 `POST /api/handoffs` · `GET /api/handoffs/{id}` · `POST /api/episodes/{id}/pack` with `handoff_id`
 
+A `handoff_id` is the zip that imports (it wins over a file part sent in the same request). Consume is single-use. `episode_id` on the handoff must belong to the active org. Studio-web accepts builder `postMessage` bytes only from the pack-builder origin (or the studio origin).
+
 ## Presence + comments
 
 `POST /api/episodes/{id}/presence` heartbeat; `GET` who’s on the episode (TTL `STUDIO_PRESENCE_TTL_SECONDS`, default 60). Optional `GET …/presence/stream` SSE.
@@ -214,7 +216,7 @@ Before `generate-ok`:
 1. Latest pack revision: all gates green
 2. Each required hop-1: preview-watched continuity receipt, no NG reason — **live adapters (comfy-h3 / comfy-qwen / webhook / cli) must not skip this**
 3. At least one **sign-off** record from a `reviewer` or `producer` (who / when / note)
-4. I2VA plate bind uses **approved** identity plates only (draft sheets/plates do not count)
+4. I2VA plate bind uses **approved** identity plates only (draft sheets/plates do not count). Label match is exact (take `A` does not match a plate named `smith`). `generate-ok` returns 409 `identity_lock_diff` or `plates_unbound` when this fails. Approved lock keywords are stamped on approve.
 
 `POST /api/episodes/{id}/review/signoff`. Viewers cannot sign off. Editors cannot sign off. A producer may stamp `generate-ok` with `{ "override": true }` — audited as `review.override`. Sign-off itself is `review.signoff`.
 

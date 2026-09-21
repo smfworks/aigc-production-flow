@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { IdentityAsset } from "./types.ts";
 
 export function IdentityStore({
@@ -17,10 +18,16 @@ export function IdentityStore({
   selectedId?: string | null;
   canMutate: boolean;
   honesty: string;
-  onApprove: (assetId: string) => void;
+  onApprove: (assetId: string, lockKeywords: string) => void;
   onLink: (assetId: string, shotId: string) => void;
   onSelect: (assetId: string) => void;
 }) {
+  const [keywords, setKeywords] = useState<Record<string, string>>({});
+
+  function keywordsFor(asset: IdentityAsset): string {
+    return keywords[asset.id] ?? asset.lock_keywords ?? "";
+  }
+
   return (
     <section className="panel" id="identity-store">
       <div className="panel-head">
@@ -48,12 +55,22 @@ export function IdentityStore({
                   {asset.approved_by ? ` · approved by ${asset.approved_by}` : " · draft"}
                 </span>
               </button>
+              <label>
+                Lock keywords
+                <input
+                  value={keywordsFor(asset)}
+                  disabled={!canMutate || asset.approved}
+                  onChange={(event) =>
+                    setKeywords((current) => ({ ...current, [asset.id]: event.target.value }))
+                  }
+                />
+              </label>
               {asset.approved ? null : (
                 <button
                   type="button"
                   className="btn"
                   disabled={!canMutate}
-                  onClick={() => onApprove(asset.id)}
+                  onClick={() => onApprove(asset.id, keywordsFor(asset))}
                 >
                   Approve sheet
                 </button>
@@ -96,12 +113,22 @@ export function IdentityStore({
                   ))}
                 </select>
               </label>
+              <label>
+                Lock keywords
+                <input
+                  value={keywordsFor(asset)}
+                  disabled={!canMutate || asset.approved}
+                  onChange={(event) =>
+                    setKeywords((current) => ({ ...current, [asset.id]: event.target.value }))
+                  }
+                />
+              </label>
               {asset.approved ? null : (
                 <button
                   type="button"
                   className="btn"
                   disabled={!canMutate}
-                  onClick={() => onApprove(asset.id)}
+                  onClick={() => onApprove(asset.id, keywordsFor(asset))}
                 >
                   Approve plate
                 </button>

@@ -130,8 +130,41 @@ def generate_ok_blockers(episode: Episode) -> dict[str, Any] | None:
             ),
             "gates": gates or [],
         }
-    missing: list[dict[str, str]] = []
     pack = revision.pack_json if isinstance(revision.pack_json, dict) else {}
+    from .identity import identity_lock_diff_problems
+
+    identity_problems = identity_lock_diff_problems(episode, pack)
+    if identity_problems:
+        return {
+            "code": "identity_lock_diff",
+            "message": (
+                "Refuse generate-ok while approved identity sheets or plates rotate lock synonyms. "
+                "Draft sheets and plates do not count. Synonym groups stay an explicit list, not embeddings."
+            ),
+            "problems": identity_problems,
+        }
+    unbound: list[dict[str, str]] = []
+    for shot in hop1_required_shots(episode, pack):
+        bound, detail = plates_bound_for_shot(shot, pack, list(episode.media))
+        if not bound:
+            unbound.append(
+                {
+                    "shot_id": shot.id,
+                    "take": shot.take or "",
+                    "sort_index": str(shot.sort_index),
+                    "reason": detail,
+                }
+            )
+    if unbound:
+        return {
+            "code": "plates_unbound",
+            "message": (
+                "Refuse generate-ok until each required hop-1 has a bound plate. "
+                "I2VA counts an approved identity plate only — draft plates do not."
+            ),
+            "missing": unbound,
+        }
+    missing: list[dict[str, str]] = []
     for shot in hop1_required_shots(episode, pack):
         blockers = receipt_blockers(shot.receipt)
         if blockers:
@@ -431,7 +464,11 @@ def plates_bound_for_shot(
     if mode == "i2va":
         if is_real_still_file(plate):
             return True, "pack plate file"
-        labels = {(asset.entity_label or "").strip().lower() for asset in approved_plates}
+        labels = {
+            (asset.entity_label or "").strip().lower()
+            for asset in approved_plates
+            if (asset.entity_label or "").strip()
+        }
         entities = [part.strip().lower() for part in (shot.entities or "").split(",") if part.strip()]
         take_key = (shot.take or "").strip().lower()
         if any((asset.shot_id or "") == shot.id for asset in approved_plates):
@@ -441,14 +478,10 @@ def plates_bound_for_shot(
             for asset in approved_plates
         ):
             return True, "approved identity plate (window)"
-        if take_key and any(take_key in label for label in labels):
+        if take_key and take_key in labels:
             return True, "approved identity plate (take)"
-        if any(entity and any(entity in label for label in labels) for entity in entities):
+        if any(entity in labels for entity in entities):
             return True, "approved identity plate (entity)"
-        for asset in approved_plates:
-            if (asset.entity_type or "") in {"character", "prop", "scene"}:
-                if (asset.entity_label or "").strip().lower() in entities:
-                    return True, "approved identity plate"
         draft_plates = [asset for asset in media if asset.kind == "plate" and not is_approved(asset)]
         if draft_plates:
             return False, "I2VA hop-1 needs an *approved* identity plate (draft plates do not count)."

@@ -34,7 +34,16 @@ def approve_identity(
 ) -> MediaAssetOut:
     episode = get_episode(db, episode_id, user)
     asset = get_identity_asset(db, episode, asset_id)
-    approve_asset(db, episode, asset, user_name=user.name, note=(body.note if body else ""))
+    approve_asset(
+        db,
+        episode,
+        asset,
+        user_name=user.name,
+        note=(body.note if body else ""),
+        lock_keywords=body.lock_keywords if body else None,
+        entity_label=body.entity_label if body else None,
+        entity_type=body.entity_type if body else None,
+    )
     episode.updated_at = utcnow()
     touch(episode.project)
     db.commit()

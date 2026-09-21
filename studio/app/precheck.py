@@ -64,6 +64,17 @@ def run_batch_precheck(
                 "shot_id": shot.id if shot else "",
             }
         )
+    else:
+        from .identity import identity_lock_diff_problems
+
+        for text in identity_lock_diff_problems(episode, pack):
+            problems.append(
+                {
+                    "code": "identity_lock_diff",
+                    "message": text,
+                    "shot_id": shot.id if shot else "",
+                }
+            )
 
     targets: list[Shot]
     if shot is not None:

@@ -107,12 +107,15 @@ export default function App() {
       const pending = getPendingHandoff();
       if (pending) setHandoffNotice(pending.notice);
     }
-    return listenForBuilderHandoff((_file, filename) => {
-      setHandoffNotice(
-        `Builder zip “${filename}” landed. Pick a project/episode to import it. Not auto-generate.`,
-      );
-    });
-  }, []);
+    return listenForBuilderHandoff(
+      (_file, filename) => {
+        setHandoffNotice(
+          `Builder zip “${filename}” landed. Pick a project/episode to import it. Not auto-generate.`,
+        );
+      },
+      [packBuilderUrl, window.location.origin],
+    );
+  }, [packBuilderUrl]);
 
   useEffect(() => {
     const onHash = () => setView(parseHash());
@@ -512,6 +515,11 @@ function ProjectList({
             void api
               .restoreBackup(file, true)
               .then((dry) => {
+                if (dry.cross_org_conflicts?.length) {
+                  throw new Error(
+                    `Cross-org restore refused. These ids belong to another organization: ${dry.cross_org_conflicts.join(", ")}`,
+                  );
+                }
                 const summary = `Dry-run: create ${dry.would_create_projects?.length ?? 0} projects, add ${
                   dry.would_add_revisions?.length ?? 0
                 } missing pack revisions, keep ${dry.would_keep_revisions?.length ?? 0} existing. Pack revisions are never deleted. Apply?`;
@@ -969,14 +977,15 @@ function EpisodeView({
   }
 
   useEffect(() => {
+    if (!can(me, "pack")) return;
     const pending = getPendingHandoff();
     const file = getPendingFile();
     if (!pending && !file) return;
     if (packDiff || pendingImport) return;
     void previewThenImport(file || undefined, pending?.id);
-    // preview once per episode when a builder handoff is waiting
+    // Preview once per episode when a builder handoff is waiting. Confirm still applies it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episodeId]);
+  }, [episodeId, me]);
 
   async function exportPack() {
     try {
@@ -1196,11 +1205,13 @@ function EpisodeView({
         selectedId={identityId}
         canMutate={can(me, "media")}
         honesty={identity?.honesty || "Approved sheets and per-window plates. Not embeddings."}
-        onApprove={(assetId) => {
+        onApprove={(assetId, lockKeywords) => {
           void api
-            .approveIdentity(episodeId, assetId)
+            .approveIdentity(episodeId, assetId, "", lockKeywords)
             .then(() => {
-              onNotice("Identity asset approved (who/when recorded). Draft no longer — counts for lock-diff / generate readiness.");
+              onNotice(
+                "Identity asset approved (who/when recorded). Approved lock keywords count for lock-diff and generate-ok. Draft does not.",
+              );
               return load();
             })
             .catch(onError);

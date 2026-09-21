@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, status
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from .models import PackHandoff, utcnow
-from .packzip import PackZipError, extract_pack_json, slugify
+from .models import Episode, PackHandoff, utcnow
+from .packzip import PackZipError, extract_pack_json, safe_filename
 from .store import get_store
 
 HANDOFF_TTL = timedelta(hours=2)
@@ -18,6 +19,20 @@ HONESTY = (
     "Builder Open in Studio stages a pack zip. Pick a project/episode to import. "
     "Never auto-generate. Failure modes: studio down, auth refused, expired handoff."
 )
+
+
+def assert_episode_in_org(db: Session, episode_id: str | None, organization_id: str) -> None:
+    """Refuse a handoff pinned to an episode outside the caller's org."""
+    token = (episode_id or "").strip()
+    if not token:
+        return
+    episode = db.get(Episode, token)
+    project = episode.project if episode is not None else None
+    if project is None or project.organization_id != organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Episode not found in this organization.",
+        )
 
 
 def create_handoff(
@@ -31,15 +46,19 @@ def create_handoff(
 ) -> PackHandoff:
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload.")
+    assert_episode_in_org(db, episode_id, organization_id)
     try:
         extract_pack_json(data)
     except PackZipError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     now = utcnow()
+    safe_name = safe_filename(filename or "", "pack.zip")
+    if not safe_name.lower().endswith(".zip"):
+        safe_name = f"{safe_name}.zip"
     row = PackHandoff(
         organization_id=organization_id,
-        episode_id=episode_id,
-        filename=filename or f"pack-{slugify('handoff')}.zip",
+        episode_id=(episode_id or "").strip() or None,
+        filename=safe_name,
         zip_path="",
         created_by=user_name,
         created_at=now,
@@ -84,8 +103,24 @@ def read_handoff_bytes(row: PackHandoff) -> bytes:
         ) from exc
 
 
-def mark_consumed(row: PackHandoff) -> None:
-    row.consumed_at = utcnow()
+def consume_handoff(db: Session, row: PackHandoff) -> None:
+    """Single-use consume. A second import loses the compare-and-set and rolls back."""
+    now = utcnow()
+    result = db.execute(
+        update(PackHandoff)
+        .where(
+            PackHandoff.id == row.id,
+            PackHandoff.organization_id == row.organization_id,
+            PackHandoff.consumed_at.is_(None),
+        )
+        .values(consumed_at=now)
+    )
+    if result.rowcount != 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Handoff already imported. Export a new zip to hand off again.",
+        )
+    row.consumed_at = now
 
 
 def handoff_out(row: PackHandoff) -> dict[str, Any]:

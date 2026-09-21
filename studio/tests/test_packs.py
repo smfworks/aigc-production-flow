@@ -1,3 +1,4 @@
+from app import packzip
 from tests.fixtures import green_pack, pack_zip_bytes, red_haft_pack
 
 
@@ -68,3 +69,31 @@ def test_red_pack_snapshot_is_not_all_green(client, auth):
         gate for gate in imported.json()["gate_snapshot"]["gates"] if gate["id"] == "props"
     )
     assert props["ok"] is False
+
+
+def test_oversized_pack_json_is_refused(client, auth, monkeypatch):
+    monkeypatch.setattr(packzip, "MAX_PACK_JSON_BYTES", 32)
+    episode = _episode(client, auth)
+    response = client.post(
+        f"/api/episodes/{episode['id']}/pack",
+        headers=auth,
+        files={"file": ("big.zip", pack_zip_bytes(green_pack()), "application/zip")},
+    )
+    assert response.status_code == 400
+    assert "too large" in response.json()["detail"]
+
+
+def test_export_filename_strips_header_breaks(client, auth):
+    episode = _episode(client, auth)
+    imported = client.post(
+        f"/api/episodes/{episode['id']}/pack",
+        headers=auth,
+        files={"file": ('evil\r\nX".zip', pack_zip_bytes(green_pack()), "application/zip")},
+    )
+    assert imported.status_code == 201, imported.text
+    exported = client.get(f"/api/episodes/{episode['id']}/pack", headers=auth)
+    assert exported.status_code == 200
+    disposition = exported.headers["content-disposition"]
+    assert "\r" not in disposition
+    assert "\n" not in disposition
+    assert "evil" in disposition

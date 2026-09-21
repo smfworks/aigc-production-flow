@@ -73,6 +73,24 @@ def test_seed_demo_stays_in_active_org(client, auth):
     assert visible.status_code == 200
 
 
+def test_job_in_another_org_is_not_found(client, auth):
+    _, episode = create_episode(client, auth, "Job owner")
+    job = client.post(
+        "/api/jobs",
+        headers=auth,
+        json={"episode_id": episode["id"], "job_type": "batch-precheck"},
+    )
+    assert job.status_code == 201, job.text
+    other = client.post("/api/orgs", headers=auth, json={"name": "Job lot"}).json()
+    hidden = client.get(f"/api/jobs/{job.json()['id']}", headers=as_org(auth, other["id"]))
+    assert hidden.status_code == 404
+    cancel = client.post(
+        f"/api/jobs/{job.json()['id']}/cancel",
+        headers=as_org(auth, other["id"]),
+    )
+    assert cancel.status_code == 404
+
+
 def test_seed_keeps_default_org(client, auth):
     me = client.get("/api/me", headers=auth).json()
     orgs = client.get("/api/orgs", headers=auth).json()

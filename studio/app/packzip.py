@@ -13,11 +13,25 @@ class PackZipError(ValueError):
     pass
 
 
+# Pack zips are JSON contracts, not media libraries. Cap both the archive and pack.json.
+MAX_PACK_ZIP_BYTES = 32 * 1024 * 1024
+MAX_PACK_JSON_BYTES = 8 * 1024 * 1024
+
+
 def _basename(path: str) -> str:
     return path.replace("\\", "/").split("/")[-1]
 
 
+def safe_filename(name: str, fallback: str = "download.bin") -> str:
+    """Strip path and header characters from a download name."""
+    base = _basename(name or "").replace("\r", "").replace("\n", "").replace('"', "")
+    cleaned = "".join(ch if ch.isalnum() or ch in "._- " else "_" for ch in base).strip(" .")
+    return (cleaned[:180] or fallback)
+
+
 def extract_pack_json(data: bytes) -> dict[str, Any]:
+    if len(data) > MAX_PACK_ZIP_BYTES:
+        raise PackZipError("Pack zip is too large.")
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile as exc:
@@ -33,6 +47,9 @@ def extract_pack_json(data: bytes) -> dict[str, Any]:
     )
     if not json_path:
         raise PackZipError("No pack.json in this zip. Re-export from the pack builder to round-trip.")
+    info = archive.getinfo(json_path)
+    if info.file_size > MAX_PACK_JSON_BYTES:
+        raise PackZipError("pack.json is too large.")
     try:
         text = archive.read(json_path).decode("utf-8")
         parsed = json.loads(text)
