@@ -257,10 +257,14 @@ export default function App() {
       </div>
       <footer className="site-foot">
         <p>
-          H3 Capture Pack · SMF Works ·{" "}
-          <a href="https://github.com/smfworks/h3-longform-capture">GitHub</a>
+          AIGC Production Flow · SMF Works ·{" "}
+          <a href="https://github.com/smfworks/aigc-production-flow">GitHub</a>
           {" · "}
-          <a href="https://github.com/smfworks/h3-longform-capture/blob/main/docs/IMAGE-STILLS.md">
+          <a href="https://github.com/smfworks/aigc-production-flow/blob/main/docs/PRODUCTION-FLOW.md">
+            Four stages
+          </a>
+          {" · "}
+          <a href="https://github.com/smfworks/aigc-production-flow/blob/main/docs/IMAGE-STILLS.md">
             Still factory → clip factory
           </a>
           {" · "}
@@ -270,10 +274,11 @@ export default function App() {
         </p>
         <p className="fineprint">
           MIT templates remain the source of truth under <code>templates/</code>{" "}
-          and <code>docs/</code> (especially <code>docs/IMAGE-STILLS.md</code> and{" "}
+          and <code>docs/</code> (especially <code>docs/PRODUCTION-FLOW.md</code>,{" "}
+          <code>docs/IMAGE-STILLS.md</code>, and{" "}
           <code>templates/still-card.md</code>). This app is a client-side form
-          over that gate. No MiniMax weights, no Qwen graphs, no generated media,
-          no uploads. Intelligence is abundant. Judgment is the product.
+          over that gate. No engine weights, no generated media, no uploads.
+          Intelligence is abundant. Judgment is the product.
         </p>
       </footer>
       <pre className="print-summary">{packSummaryMarkdown(pack)}</pre>

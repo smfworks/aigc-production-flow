@@ -1,6 +1,8 @@
 # Framework
 
-Long-form generative video is not a longer prompt. It is a **capture pack**, then many short generations with locked references.
+Long-form generative video is not a longer prompt. It is a **production pack**, then many short generations with locked references.
+
+The public name of this work is **AIGC production flow** ([PRODUCTION-FLOW.md](PRODUCTION-FLOW.md)): script analysis → asset setup → storyboard → video preview. MiniMax H3 is the first clip adapter we measured, not the title of the product.
 
 ## Why Sigils missed the song
 

@@ -1,23 +1,25 @@
 # How to use this on GitHub
 
-This is the operator path. The why is in [FRAMEWORK.md](FRAMEWORK.md).
+This is the operator path. The why is in [FRAMEWORK.md](FRAMEWORK.md). The four stages are in [PRODUCTION-FLOW.md](PRODUCTION-FLOW.md).
 
 ## Create or fork
 
 **Clone (read-only or if you have push):**
 
 ```bash
-git clone https://github.com/smfworks/h3-longform-capture.git
-cd h3-longform-capture
+git clone https://github.com/smfworks/aigc-production-flow.git
+cd aigc-production-flow
 ```
 
 **Fork (your packs stay on your account):**
 
-1. Open https://github.com/smfworks/h3-longform-capture
+1. Open https://github.com/smfworks/aigc-production-flow
 2. Fork
-3. `git clone https://github.com/<you>/h3-longform-capture.git`
+3. `git clone https://github.com/<you>/aigc-production-flow.git`
 
-Do not open a PR that contains your unreleased music, likeness stills, or MiniMax MP4s. Packs with private stills belong in a **private** fork or a sibling private repo. This public tree is templates + process.
+The previous name `h3-longform-capture` redirects here.
+
+Do not open a PR that contains your unreleased music, likeness stills, or engine MP4s. Packs with private stills belong in a **private** fork or a sibling private repo. This public tree is templates + process.
 
 ## One job = one directory
 
@@ -38,15 +40,26 @@ Stills go in `$JOB/stills/` and are referenced by relative path. Name sheets `{e
 
 ## Fill order (do not skip)
 
+**1. Script analysis**
+
 1. `README.md` log line + duration + audio path
-2. Map table (clock → verse/chorus)
-3. Takes table (location, grade, prefix)
-4. Character + prop cards (units, forbidden, still or `none`)
-5. Look card (one style line)
-6. Edit list (every row: join + one camera verb)
-7. Still factory: sheets, then plates at 1344×768 (see [IMAGE-STILLS.md](IMAGE-STILLS.md))
+2. Map table (clock → verse/chorus) — beats, not cameras
+
+**2. Asset setup**
+
+3. Character + prop cards (units, forbidden, still or `none`)
+4. Look card (one style line)
+5. Still factory: sheets, then plates at 1344×768 (see [IMAGE-STILLS.md](IMAGE-STILLS.md))
+
+**3. Storyboard**
+
+6. Takes table (location, grade, prefix)
+7. Edit list (every row: join + one camera verb)
+
+**4. Video preview**
+
 8. Smoke plan (I2VA hop-1 if a plate exists)
-9. Only then: hop-1 on the clip Spark
+9. Only then: hop-1 on the clip box
 
 Ambiguous prop fields (overall vs haft length) must be resolved or the pack is incomplete.
 
