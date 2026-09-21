@@ -4,13 +4,14 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
 from ..audit import PACK_EXPORT, PACK_IMPORT, record
-from ..config import get_settings
-from ..deps import DbDep, UserDep, get_episode, latest_revision, touch
+from ..deps import DbDep, get_episode, latest_revision, touch
 from ..gates import gate_snapshot
 from ..models import PackRevision, utcnow
-from ..packzip import PackZipError, extract_pack_json, slugify, write_bytes
+from ..packzip import PackZipError, extract_pack_json, slugify
+from ..rbac import PackUser, ReadUser
 from ..schemas import GateSnapshotOut, PackRevisionOut, PackRevisionSummary
 from ..shots import sync_shots_from_pack
+from ..store import get_store
 
 router = APIRouter(tags=["packs"])
 
@@ -29,14 +30,14 @@ def _revision_out(revision: PackRevision) -> PackRevisionOut:
 
 
 @router.get("/api/episodes/{episode_id}/revisions", response_model=list[PackRevisionSummary])
-def list_revisions(episode_id: str, _user: UserDep, db: DbDep) -> list[PackRevisionSummary]:
+def list_revisions(episode_id: str, _user: ReadUser, db: DbDep) -> list[PackRevisionSummary]:
     episode = get_episode(db, episode_id)
     return [PackRevisionSummary.model_validate(row) for row in episode.revisions]
 
 
 @router.get("/api/episodes/{episode_id}/revisions/{revision_id}", response_model=PackRevisionOut)
 def get_revision(
-    episode_id: str, revision_id: str, _user: UserDep, db: DbDep
+    episode_id: str, revision_id: str, _user: ReadUser, db: DbDep
 ) -> PackRevisionOut:
     episode = get_episode(db, episode_id)
     revision = db.get(PackRevision, revision_id)
@@ -46,7 +47,7 @@ def get_revision(
 
 
 @router.get("/api/episodes/{episode_id}/gates", response_model=GateSnapshotOut)
-def get_gates(episode_id: str, _user: UserDep, db: DbDep) -> GateSnapshotOut:
+def get_gates(episode_id: str, _user: ReadUser, db: DbDep) -> GateSnapshotOut:
     episode = get_episode(db, episode_id)
     revision = latest_revision(episode)
     if not revision:
@@ -64,7 +65,7 @@ def get_gates(episode_id: str, _user: UserDep, db: DbDep) -> GateSnapshotOut:
 )
 async def import_pack(
     episode_id: str,
-    user: UserDep,
+    user: PackUser,
     db: DbDep,
     file: UploadFile = File(..., description="Pack zip exported from the builder (must include pack.json)."),
 ) -> PackRevisionOut:
@@ -78,7 +79,6 @@ async def import_pack(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     snapshot = gate_snapshot(pack)
-    settings = get_settings()
     revision = PackRevision(
         episode_id=episode.id,
         filename=file.filename or f"pack-{slugify(str(pack.get('title') or episode.title))}.zip",
@@ -91,7 +91,7 @@ async def import_pack(
     db.add(revision)
     db.flush()
     rel = Path(episode.id) / "revisions" / f"{revision.id}.zip"
-    write_bytes(settings.media_path / rel, data)
+    get_store().put(str(rel), data)
     revision.zip_path = str(rel)
     sync_shots_from_pack(db, episode, revision)
     episode.updated_at = utcnow()
@@ -115,7 +115,7 @@ async def import_pack(
 
 
 @router.get("/api/episodes/{episode_id}/pack")
-def export_pack(episode_id: str, user: UserDep, db: DbDep) -> FileResponse:
+def export_pack(episode_id: str, user: ReadUser, db: DbDep):
     episode = get_episode(db, episode_id)
     revision = latest_revision(episode)
     if not revision:
@@ -123,13 +123,8 @@ def export_pack(episode_id: str, user: UserDep, db: DbDep) -> FileResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No pack revision yet. Import a pack zip first.",
         )
-    settings = get_settings()
-    path = settings.media_path / revision.zip_path
-    if not path.is_file():
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Stored pack zip is missing from the media store.",
-        )
+    store = get_store()
+    local = store.local_path(revision.zip_path)
     record(
         db,
         actor=user.name,
@@ -141,8 +136,22 @@ def export_pack(episode_id: str, user: UserDep, db: DbDep) -> FileResponse:
         detail={"filename": revision.filename},
     )
     db.commit()
-    return FileResponse(
-        path,
+    if local is not None:
+        if not local.is_file():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Stored pack zip is missing from the media store.",
+            )
+        return FileResponse(
+            local,
+            media_type="application/zip",
+            filename=revision.filename,
+        )
+    data = store.get_bytes(revision.zip_path)
+    from fastapi.responses import Response
+
+    return Response(
+        content=data,
         media_type="application/zip",
-        filename=revision.filename,
+        headers={"Content-Disposition": f'attachment; filename="{revision.filename}"'},
     )

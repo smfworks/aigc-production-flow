@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CandidateKind, MediaAsset, Shot, ShotReadiness } from "./types.ts";
 import { CANDIDATE_KINDS, SHOT_READINESS } from "./types.ts";
+import { CommentsDrawer } from "./CommentsDrawer.tsx";
 
 type Props = {
   shots: Shot[];
@@ -16,6 +17,11 @@ type Props = {
     body: { status?: string; linked_asset_id?: string; linked_ref?: string },
   ) => void;
   onAddCandidate: (shotId: string, body: { kind: CandidateKind; label: string }) => void;
+  episodeId?: string;
+  canComment?: boolean;
+  canMutate?: boolean;
+  onError?: (err: unknown) => void;
+  onNotice?: (msg: string) => void;
 };
 
 function continueChain(shots: Shot[], shotId: string): Set<string> {
@@ -38,6 +44,11 @@ export function ShotBoard({
   onReadiness,
   onCandidate,
   onAddCandidate,
+  episodeId,
+  canComment = false,
+  canMutate = true,
+  onError,
+  onNotice,
 }: Props) {
   const [view, setView] = useState<"list" | "canvas">("list");
   const [kind, setKind] = useState<CandidateKind>("character");
@@ -76,7 +87,7 @@ export function ShotBoard({
         >
           Canvas
         </button>
-        <button type="button" className="btn" onClick={onExtract}>
+        <button type="button" className="btn" onClick={onExtract} disabled={!canMutate}>
           Extract candidates (stub)
         </button>
       </div>
@@ -160,6 +171,7 @@ export function ShotBoard({
                 key={state}
                 type="button"
                 className={selected.readiness === state ? "btn btn-go" : "btn"}
+                disabled={!canMutate}
                 onClick={() => onReadiness(selected.id, state)}
               >
                 {state}
@@ -256,9 +268,18 @@ export function ShotBoard({
                 setLabel("");
               }}
             >
-              Add candidate
-            </button>
+            Add candidate
+          </button>
           </div>
+          {episodeId && selected && onError ? (
+            <CommentsDrawer
+              episodeId={episodeId}
+              shotId={selected.id}
+              canComment={canComment}
+              onError={onError}
+              onNotice={onNotice}
+            />
+          ) : null}
         </div>
       ) : null}
     </section>

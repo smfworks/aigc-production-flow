@@ -18,14 +18,15 @@ def test_comments_thread(client, auth):
     episode = _episode(client, auth)
     created = client.post(
         f"/api/episodes/{episode['id']}/comments",
-        json={"body": "Haft is still none — not generate-ok."},
-        headers={**auth, "X-User-Name": "editor"},
+        json={"body": "Haft is still none — not generate-ok.", "author": "editor"},
+        headers=auth,
     )
     assert created.status_code == 201
     assert created.json()["author"] == "editor"
     listed = client.get(f"/api/episodes/{episode['id']}/comments", headers=auth)
     assert listed.status_code == 200
     assert listed.json()[0]["body"].startswith("Haft")
+    assert listed.json()[0]["resolved"] is False
 
 
 def test_media_upload_download_plate(client, auth):

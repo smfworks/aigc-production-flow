@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 from typing import Any
 from xml.sax.saxutils import escape
 
-from .config import get_settings
 from .models import Episode, MediaAsset, Shot
 from .shots import continue_chains
+from .store import get_store
 
 DEFAULT_FPS = 24.0
 DEFAULT_DURATION_S = 10.125
@@ -67,8 +67,11 @@ def _media_path(shot: Shot) -> str:
     stored = asset.path or ""
     if not stored:
         return ""
-    root = get_settings().media_path
-    return str((root / stored).resolve())
+    store = get_store()
+    local = store.local_path(stored)
+    if local is not None:
+        return str(local.resolve())
+    return stored
 
 
 def _tc(frames: int, fps: float) -> str:

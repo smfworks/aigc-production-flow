@@ -37,6 +37,11 @@ _ADDITIVE_COLUMNS = (
     ("jobs", "actual_cost_units", "FLOAT"),
     ("jobs", "cost_currency", "VARCHAR(32) DEFAULT 'credits'"),
     ("jobs", "cost_note", "TEXT DEFAULT ''"),
+    ("comments", "shot_id", "VARCHAR(36)"),
+    ("comments", "board_node_id", "VARCHAR(80) DEFAULT ''"),
+    ("comments", "resolved", "BOOLEAN DEFAULT 0"),
+    ("comments", "resolved_by", "VARCHAR(120) DEFAULT ''"),
+    ("comments", "resolved_at", "DATETIME"),
 )
 
 

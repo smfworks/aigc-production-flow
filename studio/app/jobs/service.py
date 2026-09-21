@@ -136,6 +136,10 @@ def enqueue_job(
         if job_type == "batch-precheck"
         else resolve_adapter_name(job_type, cfg, requested=requested, project=episode.project)
     )
+    if resolved != "stub":
+        from ..adapters.health import refuse_if_unhealthy
+
+        refuse_if_unhealthy(resolved, cfg)
     estimated = estimate_units(job_type, resolved, cfg)
     refuse_if_over_cap(db, episode.project, estimated, cfg)
     job = Job(

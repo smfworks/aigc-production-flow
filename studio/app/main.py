@@ -13,6 +13,7 @@ from .database import Base, get_db
 from .deps import DbDep, UserDep
 from .jobs.worker import start_worker, stop_worker
 from .models import Organization
+from .rbac import attach_role
 from .routers import (
     adapters,
     audit,
@@ -22,7 +23,9 @@ from .routers import (
     export,
     jobs,
     media,
+    members,
     packs,
+    presence,
     preview,
     projects,
     retention,
@@ -32,6 +35,7 @@ from .routers import (
 )
 from .schemas import MetaOut, OrganizationOut, UserOut
 from .seed import seed_default_org
+from .store import active_backend, media_note, requested_backend, s3_ready
 
 # Import models so metadata.create_all sees every table.
 from . import models as _models  # noqa: F401
@@ -57,15 +61,17 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.4.0",
+        version="0.5.0",
         description=(
-            "Phase 4 studio spine for the AIGC production flow. "
+            "Phase 5 studio spine for the AIGC production flow. "
             "Pack zip remains the collaboration contract. "
-            "Auth is a local-dev API token plus an optional X-Forwarded-User hook — SSO/OIDC is not implemented. "
+            "App-level org roles (producer / editor / reviewer / viewer) sit on top of "
+            "local-dev Bearer + optional X-Forwarded-User. SSO/OIDC is not implemented. "
             "This is not multi-tenant SaaS security. "
             "Jobs run in-process (thread worker). Celery is the documented upgrade path, not this process. "
             "Adapter catalog: stub plus documented slots (comfy-h3, comfy-qwen, webhook, cli). "
-            "Budget units come from an operator rate table — not a cloud invoice."
+            "Budget units come from an operator rate table — not a cloud invoice. "
+            "Media defaults to local disk; S3/MinIO is opt-in and never claimed live when unset."
         ),
         license_info={"name": "MIT", "identifier": "MIT"},
         lifespan=lifespan,
@@ -92,18 +98,22 @@ def create_app() -> FastAPI:
     application.include_router(retention.router)
     application.include_router(export.router)
     application.include_router(templates.router)
+    application.include_router(members.router)
+    application.include_router(presence.router)
 
     @application.get("/", tags=["meta"])
     def root() -> dict:
+        cfg = get_settings()
         return {
             "name": "AIGC Studio Spine",
-            "phase": 4,
+            "phase": 5,
             "docs": "/docs",
             "openapi": "/openapi.json",
-            "auth": "local Bearer token; optional forward-header identity",
+            "auth": "local Bearer token; optional forward-header identity; app-level org roles",
             "sso": "not implemented — see docs/AUTH.md",
             "job_worker": "in-process thread (Celery later)",
             "adapters": [slot.id for slot in CATALOG],
+            "media_backend": active_backend(cfg),
             "budget": DISCLAIMER,
         }
 
@@ -124,14 +134,20 @@ def create_app() -> FastAPI:
             cost_currency=cfg.cost_currency or "credits",
             retention_days=int(cfg.retention_days or 0),
             budget_hard_stop=bool(cfg.budget_hard_stop),
+            media_backend=active_backend(cfg),
+            media_s3_configured=requested_backend(cfg) == "s3" and s3_ready(cfg),
+            media_note=media_note(cfg),
+            presence_ttl_seconds=int(cfg.presence_ttl_seconds or 60),
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])
-    def me(user: UserDep) -> UserOut:
-        return user
+    def me(user: UserDep, db: DbDep) -> UserOut:
+        return attach_role(user, db, required=False)
 
     @application.get("/api/orgs", response_model=list[OrganizationOut], tags=["meta"])
-    def list_orgs(_user: UserDep, db: DbDep) -> list[OrganizationOut]:
+    def list_orgs(user: UserDep, db: DbDep) -> list[OrganizationOut]:
+        # Membership is not required to see the default org name; mutating it is.
+        _ = user
         rows = db.query(Organization).order_by(Organization.created_at.asc()).all()
         return [OrganizationOut.model_validate(row) for row in rows]
 

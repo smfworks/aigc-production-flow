@@ -1,16 +1,17 @@
 from fastapi import APIRouter, HTTPException, status
 
 from ..audit import REVIEW_SET, record
-from ..deps import DbDep, UserDep, get_episode, latest_revision, touch
+from ..deps import DbDep, get_episode, latest_revision, touch
 from ..models import ReviewState, utcnow
 from ..preview import generate_ok_blockers
+from ..rbac import ReadUser, ReviewUser
 from ..schemas import GateSnapshotOut, ReviewOut, ReviewSet, ReviewStateOut
 
 router = APIRouter(tags=["review"])
 
 
 @router.get("/api/episodes/{episode_id}/review", response_model=ReviewOut)
-def get_review(episode_id: str, _user: UserDep, db: DbDep) -> ReviewOut:
+def get_review(episode_id: str, _user: ReadUser, db: DbDep) -> ReviewOut:
     episode = get_episode(db, episode_id)
     revision = latest_revision(episode)
     snapshot = (
@@ -24,7 +25,7 @@ def get_review(episode_id: str, _user: UserDep, db: DbDep) -> ReviewOut:
 
 
 @router.put("/api/episodes/{episode_id}/review", response_model=ReviewOut)
-def set_review(episode_id: str, body: ReviewSet, user: UserDep, db: DbDep) -> ReviewOut:
+def set_review(episode_id: str, body: ReviewSet, user: ReviewUser, db: DbDep) -> ReviewOut:
     episode = get_episode(db, episode_id)
     if body.state == "generate-ok":
         blocked = generate_ok_blockers(episode)

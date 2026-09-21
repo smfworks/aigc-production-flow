@@ -14,6 +14,11 @@ REVIEW_STATES = (
     "preview-watched",
     "generate-ok",
 )
+ROLE_PRODUCER = "producer"
+ROLE_EDITOR = "editor"
+ROLE_REVIEWER = "reviewer"
+ROLE_VIEWER = "viewer"
+ORG_ROLES = frozenset({ROLE_PRODUCER, ROLE_EDITOR, ROLE_REVIEWER, ROLE_VIEWER})
 
 MEDIA_KINDS = ("sheet", "plate", "costume", "preview", "other")
 ENTITY_TYPES = ("character", "prop", "scene", "costume")
@@ -46,6 +51,29 @@ class Organization(Base):
         back_populates="organization",
         cascade="all, delete-orphan",
     )
+    members: Mapped[list["OrgMember"]] = relationship(
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        order_by="OrgMember.created_at.asc()",
+    )
+
+
+class OrgMember(Base):
+    """App-level role on the default org. Identity still comes from AUTH.md — not OIDC."""
+
+    __tablename__ = "org_members"
+    __table_args__ = (UniqueConstraint("organization_id", "user_name", name="uq_org_member_name"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    user_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default=ROLE_VIEWER)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    organization: Mapped[Organization] = relationship(back_populates="members")
 
 
 class Project(Base):
@@ -104,6 +132,11 @@ class Episode(Base):
         back_populates="episode",
         cascade="all, delete-orphan",
         order_by="Comment.created_at.asc()",
+    )
+    presence: Mapped[list["PresenceHeartbeat"]] = relationship(
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="PresenceHeartbeat.last_seen.desc()",
     )
     media: Mapped[list["MediaAsset"]] = relationship(
         back_populates="episode",
@@ -164,11 +197,35 @@ class Comment(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    shot_id: Mapped[str | None] = mapped_column(ForeignKey("shots.id"), nullable=True)
+    board_node_id: Mapped[str] = mapped_column(String(80), default="")
     author: Mapped[str] = mapped_column(String(120), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    resolved_by: Mapped[str] = mapped_column(String(120), default="")
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     episode: Mapped[Episode] = relationship(back_populates="comments")
+    shot: Mapped["Shot | None"] = relationship(back_populates="comments")
+
+
+class PresenceHeartbeat(Base):
+    """Who is on an episode. TTL is enforced at read time (~60s)."""
+
+    __tablename__ = "presence_heartbeats"
+    __table_args__ = (
+        UniqueConstraint("episode_id", "user_name", name="uq_presence_episode_user"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    user_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), default="")
+    shot_id: Mapped[str] = mapped_column(String(36), default="")
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    episode: Mapped[Episode] = relationship(back_populates="presence")
 
 
 class MediaAsset(Base):
@@ -224,6 +281,10 @@ class Shot(Base):
         back_populates="shot",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+    comments: Mapped[list["Comment"]] = relationship(
+        back_populates="shot",
+        foreign_keys="Comment.shot_id",
     )
     jobs: Mapped[list["Job"]] = relationship(
         back_populates="shot",

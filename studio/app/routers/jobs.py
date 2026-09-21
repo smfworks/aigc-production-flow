@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Query, status
 
 from ..audit import JOB_CANCEL, JOB_ENQUEUE, record
-from ..deps import DbDep, UserDep, get_episode, touch
+from ..deps import DbDep, get_episode, touch
 from ..jobs.service import cancel_job, enqueue_job, get_job, job_out, list_jobs, retry_job
 from ..models import utcnow
+from ..rbac import JobsUser, ReadUser
 from ..schemas import JobEnqueue, JobOut
 
 router = APIRouter(tags=["jobs"])
@@ -11,7 +12,7 @@ router = APIRouter(tags=["jobs"])
 
 @router.get("/api/jobs", response_model=list[JobOut])
 def list_all_jobs(
-    _user: UserDep,
+    _user: ReadUser,
     db: DbDep,
     episode_id: str | None = None,
     job_status: str | None = Query(default=None, alias="status"),
@@ -27,7 +28,7 @@ def list_all_jobs(
 @router.get("/api/episodes/{episode_id}/jobs", response_model=list[JobOut])
 def list_episode_jobs(
     episode_id: str,
-    _user: UserDep,
+    _user: ReadUser,
     db: DbDep,
     job_status: str | None = Query(default=None, alias="status"),
     job_type: str | None = None,
@@ -40,7 +41,7 @@ def list_episode_jobs(
 
 
 @router.post("/api/jobs", response_model=JobOut, status_code=status.HTTP_201_CREATED)
-def enqueue(body: JobEnqueue, user: UserDep, db: DbDep) -> JobOut:
+def enqueue(body: JobEnqueue, user: JobsUser, db: DbDep) -> JobOut:
     episode = get_episode(db, body.episode_id)
     job = enqueue_job(
         db,
@@ -74,12 +75,12 @@ def enqueue(body: JobEnqueue, user: UserDep, db: DbDep) -> JobOut:
 
 
 @router.get("/api/jobs/{job_id}", response_model=JobOut)
-def get_one(job_id: str, _user: UserDep, db: DbDep) -> JobOut:
+def get_one(job_id: str, _user: ReadUser, db: DbDep) -> JobOut:
     return job_out(get_job(db, job_id))
 
 
 @router.post("/api/jobs/{job_id}/cancel", response_model=JobOut)
-def cancel(job_id: str, user: UserDep, db: DbDep) -> JobOut:
+def cancel(job_id: str, user: JobsUser, db: DbDep) -> JobOut:
     job = cancel_job(db, get_job(db, job_id))
     record(
         db,
@@ -97,7 +98,7 @@ def cancel(job_id: str, user: UserDep, db: DbDep) -> JobOut:
 
 
 @router.post("/api/jobs/{job_id}/retry", response_model=JobOut, status_code=status.HTTP_201_CREATED)
-def retry(job_id: str, user: UserDep, db: DbDep) -> JobOut:
+def retry(job_id: str, user: JobsUser, db: DbDep) -> JobOut:
     original = get_job(db, job_id)
     job = retry_job(db, original, user.name)
     record(

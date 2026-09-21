@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status
 
-from ..deps import DbDep, UserDep, get_episode, latest_revision
+from ..deps import DbDep, get_episode, latest_revision
 from ..models import Shot, ShotCandidate, utcnow
+from ..rbac import MutateUser, ReadUser
 from ..schemas import BoardOut, CandidateCreate, CandidateOut, CandidateUpdate, ShotOut, ShotReadinessSet
 from ..serializers import shot_out
 from .. import shots as shot_ops
@@ -23,13 +24,13 @@ def _get_shot(db, episode_id: str, shot_id: str) -> Shot:
 
 
 @router.get("/api/episodes/{episode_id}/shots", response_model=list[ShotOut])
-def list_shots(episode_id: str, _user: UserDep, db: DbDep) -> list[ShotOut]:
+def list_shots(episode_id: str, _user: ReadUser, db: DbDep) -> list[ShotOut]:
     episode = get_episode(db, episode_id)
     return [_shot_out(row) for row in episode.shots]
 
 
 @router.get("/api/episodes/{episode_id}/board", response_model=BoardOut)
-def get_board(episode_id: str, _user: UserDep, db: DbDep) -> BoardOut:
+def get_board(episode_id: str, _user: ReadUser, db: DbDep) -> BoardOut:
     episode = get_episode(db, episode_id)
     shots = list(episode.shots)
     chains, boundaries = continue_chains(shots)
@@ -44,7 +45,7 @@ def get_board(episode_id: str, _user: UserDep, db: DbDep) -> BoardOut:
     "/api/episodes/{episode_id}/shots/extract-candidates",
     response_model=list[ShotOut],
 )
-def extract_candidates(episode_id: str, _user: UserDep, db: DbDep) -> list[ShotOut]:
+def extract_candidates(episode_id: str, _user: MutateUser, db: DbDep) -> list[ShotOut]:
     episode = get_episode(db, episode_id)
     revision = latest_revision(episode)
     if not revision:
@@ -64,13 +65,13 @@ def extract_candidates(episode_id: str, _user: UserDep, db: DbDep) -> list[ShotO
 
 
 @router.get("/api/episodes/{episode_id}/shots/{shot_id}", response_model=ShotOut)
-def get_shot(episode_id: str, shot_id: str, _user: UserDep, db: DbDep) -> ShotOut:
+def get_shot(episode_id: str, shot_id: str, _user: ReadUser, db: DbDep) -> ShotOut:
     return _shot_out(_get_shot(db, episode_id, shot_id))
 
 
 @router.put("/api/episodes/{episode_id}/shots/{shot_id}/readiness", response_model=ShotOut)
 def set_shot_readiness(
-    episode_id: str, shot_id: str, body: ShotReadinessSet, _user: UserDep, db: DbDep
+    episode_id: str, shot_id: str, body: ShotReadinessSet, _user: MutateUser, db: DbDep
 ) -> ShotOut:
     shot = _get_shot(db, episode_id, shot_id)
     shot_ops.set_readiness(shot, body.readiness)
@@ -86,7 +87,7 @@ def set_shot_readiness(
     status_code=status.HTTP_201_CREATED,
 )
 def add_candidate(
-    episode_id: str, shot_id: str, body: CandidateCreate, _user: UserDep, db: DbDep
+    episode_id: str, shot_id: str, body: CandidateCreate, _user: MutateUser, db: DbDep
 ) -> CandidateOut:
     shot = _get_shot(db, episode_id, shot_id)
     candidate = ShotCandidate(
@@ -114,7 +115,7 @@ def update_candidate(
     shot_id: str,
     candidate_id: str,
     body: CandidateUpdate,
-    _user: UserDep,
+    _user: MutateUser,
     db: DbDep,
 ) -> CandidateOut:
     shot = _get_shot(db, episode_id, shot_id)

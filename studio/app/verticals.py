@@ -13,8 +13,9 @@ from fastapi import HTTPException, status
 from .config import get_settings
 from .gates import gate_snapshot
 from .models import Episode, PackRevision, Project
-from .packzip import PackZipError, extract_pack_json, slugify, write_bytes
+from .packzip import PackZipError, extract_pack_json, slugify
 from .shots import sync_shots_from_pack
+from .store import get_store
 
 STAGES = ["script", "assets", "storyboard", "preview"]
 
@@ -105,7 +106,6 @@ def template_zip_bytes(template_id: str) -> bytes:
 def seed_pack_revision(db, episode: Episode, user_name: str, data: bytes, filename: str) -> PackRevision:
     pack = extract_pack_json(data)
     snapshot = gate_snapshot(pack)
-    settings = get_settings()
     revision = PackRevision(
         episode_id=episode.id,
         filename=filename,
@@ -118,7 +118,7 @@ def seed_pack_revision(db, episode: Episode, user_name: str, data: bytes, filena
     db.add(revision)
     db.flush()
     rel = Path(episode.id) / "revisions" / f"{revision.id}.zip"
-    write_bytes(settings.media_path / rel, data)
+    get_store().put(str(rel), data)
     revision.zip_path = str(rel)
     sync_shots_from_pack(db, episode, revision)
     return revision

@@ -113,16 +113,16 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
-## Studio spine (Phase 4) vs pack builder
+## Studio spine (Phase 5) vs pack builder
 
 Two pieces, one contract:
 
 | | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
 |---|---|---|
-| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. | Projects, episodes, pack revisions, review, comments, media, shots, job center, stub adapters, hop-1 desk, **budget**, **audit**, **EDL export**, **vertical templates**. |
-| Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. |
-| Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User`. **OIDC not implemented.** [docs/AUTH.md](docs/AUTH.md). |
-| Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green **and** hop-1 receipts are preview-watched. Default adapter=`stub`. Budget units are operator credits, not a cloud bill. |
+| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. | Projects, episodes, pack revisions, review, comments, media, shots, job center, stub adapters, hop-1 desk, budget, audit, EDL, templates, **RBAC lite**, **presence**, **adapter health**. |
+| Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. Compose pack: `docker-compose.studio.yml`. |
+| Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles. **OIDC not implemented.** [docs/AUTH.md](docs/AUTH.md). |
+| Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green **and** hop-1 receipts are preview-watched. Default adapter=`stub`. Budget units are operator credits, not a cloud bill. Media is local disk unless S3 is configured. |
 | Not this | NLE, GPU, MP4. | Full NLE, Celery broker, OIDC. |
 
 Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/STUDIO.md](docs/STUDIO.md).
@@ -134,21 +134,28 @@ Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/
 # Builder http://localhost:5173
 ```
 
-Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. `generate-ok` stays blocked while any gate is red or a required hop-1 has no receipt.
+Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. `generate-ok` stays blocked while any gate is red or a required hop-1 has no receipt.
+
+```bash
+docker compose -f docker-compose.studio.yml up --build
+# API     http://localhost:8000/docs
+# Studio  http://localhost:5174  (/api proxied)
+```
 
 ## Layout
 
 ```
 app/                     client-side pack builder (Vite + React) — do not rewrite
 studio/                  FastAPI spine (SQLite default, Postgres-ready URL)
-studio-web/              thin studio shell (lists, review, jobs, budget, audit, EDL)
+studio-web/              thin studio shell (lists, review, jobs, budget, audit, EDL, members)
+docker-compose.studio.yml  API + studio-web (optional worker / postgres / minio profiles)
 scripts/dev-studio.sh    local API + studio + builder
 data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 templates/verticals/     education / brand promo / short-drama empty packs
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 4 studio operator path (budget, audit, EDL, templates)
-docs/AUTH.md             local vs forward-header — no OIDC in this repo
+docs/STUDIO.md           Phase 5 studio operator path (RBAC, presence, compose, health)
+docs/AUTH.md             local vs forward-header — roles are app-level; no OIDC in this repo
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)
 docs/HOW-TO.md           GitHub + local workflow, step by step

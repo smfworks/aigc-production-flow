@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+OrgRole = Literal["producer", "editor", "reviewer", "viewer"]
+
 ReviewStateName = Literal[
     "draft",
     "needs-art",
@@ -26,11 +28,14 @@ class UserOut(BaseModel):
     name: str
     auth_mode: Literal["local", "forward-header"] = "local"
     sso: str = "not implemented — see docs/AUTH.md"
+    role: OrgRole | None = None
+    org_id: str | None = None
+    permissions: list[str] = Field(default_factory=list)
 
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 4
+    phase: int = 5
     auth_mode: Literal["local", "forward-header"] = "local"
     sso: str = "not implemented — see docs/AUTH.md"
     pack_builder_url: str
@@ -42,6 +47,11 @@ class MetaOut(BaseModel):
     cost_currency: str = "credits"
     retention_days: int = 30
     budget_hard_stop: bool = False
+    media_backend: str = "local"
+    media_s3_configured: bool = False
+    media_note: str = "Local disk. S3/MinIO is not live until backend=s3 and a bucket are set."
+    presence_ttl_seconds: int = 60
+    roles: list[str] = Field(default_factory=lambda: ["producer", "editor", "reviewer", "viewer"])
 
 
 class OrganizationOut(BaseModel):
@@ -178,14 +188,55 @@ class ReviewOut(BaseModel):
 class CommentCreate(BaseModel):
     body: str = Field(min_length=1, max_length=8000)
     author: str | None = Field(default=None, max_length=120)
+    shot_id: str | None = None
+    board_node_id: str | None = Field(default=None, max_length=80)
 
 
 class CommentOut(BaseModel):
     id: str
     episode_id: str
+    shot_id: str | None = None
+    board_node_id: str = ""
     author: str
     body: str
+    resolved: bool = False
+    resolved_by: str = ""
+    resolved_at: datetime | None = None
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MemberCreate(BaseModel):
+    user_name: str = Field(min_length=1, max_length=120)
+    role: OrgRole = "viewer"
+
+
+class MemberUpdate(BaseModel):
+    role: OrgRole
+
+
+class MemberOut(BaseModel):
+    id: str
+    organization_id: str
+    user_name: str
+    role: OrgRole
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PresenceBeat(BaseModel):
+    shot_id: str | None = None
+
+
+class PresenceOut(BaseModel):
+    user_name: str
+    role: str = ""
+    shot_id: str = ""
+    last_seen: datetime
+    ttl_seconds: int = 60
 
     model_config = {"from_attributes": True}
 
@@ -378,6 +429,16 @@ class PrecheckProblem(BaseModel):
     shot_id: str | None = None
 
 
+class AdapterHealthOut(BaseModel):
+    id: str
+    ok: bool
+    live: bool
+    config_present: bool
+    reachable: bool | None = None
+    transport: str
+    detail: str
+
+
 class AdapterSlotOut(BaseModel):
     id: str
     label: str
@@ -385,15 +446,18 @@ class AdapterSlotOut(BaseModel):
     live: bool
     transport: str
     note: str
+    health: AdapterHealthOut | None = None
 
 
 class AdapterCatalogOut(BaseModel):
     adapters: list[AdapterSlotOut]
     still_default: str
     clip_default: str
+    health: list[AdapterHealthOut] = Field(default_factory=list)
     note: str = (
         "Documented slots (comfy-h3, comfy-qwen, webhook, cli) fall back to stub "
-        "when the live hook is unset. Stub never claims H3 or Qwen ran."
+        "when the live hook is unset. Stub never claims H3 or Qwen ran. "
+        "Health is a dry-run (reachable? config present?) — not a generate."
     )
 
 

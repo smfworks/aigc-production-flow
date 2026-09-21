@@ -26,6 +26,8 @@ def test_me_and_default_org(client, auth):
     me = client.get("/api/me", headers=auth)
     assert me.status_code == 200
     assert me.json()["auth_mode"] == "local"
+    assert me.json()["role"] == "producer"
+    assert "jobs" in me.json()["permissions"]
     assert "AUTH.md" in me.json()["sso"]
     orgs = client.get("/api/orgs", headers=auth)
     assert orgs.status_code == 200
@@ -62,9 +64,11 @@ def test_forward_header_mode(tmp_path, monkeypatch, auth):
         assert ok.status_code == 200
         assert ok.json()["name"] == "proxy-user"
         assert ok.json()["auth_mode"] == "forward-header"
+        assert ok.json()["role"] is None
         assert "AUTH.md" in ok.json()["sso"]
         meta = client.get("/api/meta")
         assert meta.status_code == 200
         assert meta.json()["auth_mode"] == "forward-header"
-        assert meta.json()["phase"] == 4
+        assert meta.json()["phase"] == 5
+        assert meta.json()["media_backend"] == "local"
     del Path
