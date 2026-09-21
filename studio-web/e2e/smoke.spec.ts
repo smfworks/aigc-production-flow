@@ -66,6 +66,17 @@ test("demo seed shows continuity and identity signals, then stub precheck", asyn
   await expect(page.getByText("batch-precheck · failed")).toBeVisible();
 });
 
+test("new project opens pack stages without a zip", async ({ page }) => {
+  await page.goto("/");
+  const start = page.getByTestId("start-here");
+  await start.getByLabel("Project name").fill("Phase 10 hallway");
+  await start.getByRole("button", { name: "New project" }).click();
+  await expect(page.getByTestId("pack-stage")).toBeVisible();
+  await expect(page.getByTestId("pack-save-state")).toContainText(/Draft|Stored|blank|red/i);
+  await expect(page.getByTestId("export-agent")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Optional zip" })).toBeVisible();
+});
+
 async function jobStatus(
   request: APIRequestContext,
   episodeId: string,

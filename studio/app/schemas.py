@@ -40,7 +40,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 9
+    phase: int = 10
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -68,6 +68,12 @@ class MetaOut(BaseModel):
     multi_org_note: str = (
         "Multi-org lite: membership isolation only. Not SaaS billing, not SSO org mapping."
     )
+    llm_configured: bool = False
+    llm_note: str = (
+        "No model configured. Brain dump uses a deterministic template expansion. "
+        "Set STUDIO_LLM_BASE_URL for an optional local/OpenAI-compatible endpoint."
+    )
+    primary_create: str = "studio"
 
 
 class RoleMatrixRow(BaseModel):
@@ -152,6 +158,10 @@ class EpisodeCreate(BaseModel):
     log_line: str = ""
     map_notes: str = ""
     dialogue: str = ""
+    # none keeps the Phase 1–9 episode-without-pack behavior. blank/template/brain create a revision.
+    pack: Literal["none", "blank"] = "none"
+    template_id: str | None = None
+    brain_dump: str = ""
 
 
 class EpisodeUpdate(BaseModel):
@@ -657,6 +667,49 @@ class ProjectFromTemplate(BaseModel):
     description: str | None = None
     still_adapter: str | None = None
     clip_adapter: str | None = None
+
+
+class StudioStartIn(BaseModel):
+    name: str = ""
+    description: str = ""
+    mode: Literal["blank", "template", "brain"] = "blank"
+    template_id: str | None = None
+    brain_dump: str = Field(default="", max_length=20000)
+    episode_title: str = "Ep 1"
+
+
+class BrainDumpIn(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)
+    title: str = ""
+
+
+class PackJsonIn(BaseModel):
+    pack: dict[str, Any]
+
+
+class PackResetIn(BaseModel):
+    confirm: str = ""
+
+
+class PackSaveOut(BaseModel):
+    project_id: str
+    episode_id: str
+    revision_id: str
+    filename: str
+    gates_green: bool
+    generate_ready: bool = False
+
+
+class DraftHonestyOut(BaseModel):
+    project_id: str
+    episode_id: str
+    revision_id: str
+    gates_green: bool
+    generate_ready: bool = False
+    model_ran: bool = False
+    model: str = "none"
+    model_note: str = ""
+    source: str = "blank"
 
 
 class NotificationOut(BaseModel):

@@ -92,7 +92,7 @@ export function ContinuityPanel({
           ))}
         </ul>
       ) : (
-        <p className="empty">Import a pack to see shots on the continuity panel.</p>
+        <p className="empty">No shots yet. Fill the storyboard stage, or import a zip.</p>
       )}
     </section>
   );

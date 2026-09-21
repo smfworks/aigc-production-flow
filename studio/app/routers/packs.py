@@ -1,17 +1,29 @@
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
-from ..audit import PACK_DIFF, PACK_EXPORT, PACK_IMPORT, record
+from ..audit import PACK_DIFF, PACK_EXPORT, PACK_IMPORT, PACK_SAVE, record
+from ..blankpack import pack_zip_bytes
+from ..createflow import seed_blank_pack
 from ..deps import DbDep, get_episode, latest_revision, touch
 from ..gates import gate_snapshot
 from ..handoff import consume_handoff, get_live_handoff, read_handoff_bytes
 from ..models import PackRevision, utcnow
 from ..packdiff import diff_packs, pack_payload, revision_ref
-from ..packzip import PackZipError, extract_pack_json, safe_filename, slugify
-from ..rbac import PackUser, ReadUser
-from ..schemas import GateSnapshotOut, PackDiffOut, PackDiffRef, PackRevisionOut, PackRevisionSummary
+from ..packzip import MAX_PACK_JSON_BYTES, PackZipError, extract_pack_json, safe_filename, slugify
+from ..rbac import CraftUser, PackUser, ReadUser
+from ..schemas import (
+    GateSnapshotOut,
+    PackDiffOut,
+    PackDiffRef,
+    PackJsonIn,
+    PackResetIn,
+    PackRevisionOut,
+    PackRevisionSummary,
+    PackSaveOut,
+)
 from ..shots import sync_shots_from_pack
 from ..store import get_store
 
@@ -185,7 +197,7 @@ def get_gates(episode_id: str, user: ReadUser, db: DbDep) -> GateSnapshotOut:
     if not revision:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No pack revision yet. Import a pack zip first.",
+            detail="No pack revision yet. Start a blank pack, template, or brain dump in Studio. Zip import is optional.",
         )
     return GateSnapshotOut.model_validate(revision.gate_snapshot)
 
@@ -281,7 +293,7 @@ def export_pack(episode_id: str, user: ReadUser, db: DbDep):
     if not revision:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No pack revision yet. Import a pack zip first.",
+            detail="No pack revision yet. Start a blank pack, template, or brain dump in Studio. Zip import is optional.",
         )
     store = get_store()
     local = store.local_path(revision.zip_path)
@@ -315,4 +327,131 @@ def export_pack(episode_id: str, user: ReadUser, db: DbDep):
         content=data,
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
+    )
+
+
+def _prepare_editor_pack(raw: dict) -> dict:
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pack must be a JSON object.")
+    encoded = json.dumps(raw).encode("utf-8")
+    if len(encoded) > MAX_PACK_JSON_BYTES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="pack.json is too large.")
+    pack = dict(raw)
+    if not isinstance(pack.get("look"), dict):
+        pack["look"] = {
+            "styleLine": "",
+            "paletteGrade": "",
+            "era": "",
+            "lensGrain": "",
+            "extrasForbidden": "",
+        }
+    if not isinstance(pack.get("title"), str):
+        pack["title"] = str(pack.get("title") or "")
+    meta = pack.get("studioMeta") if isinstance(pack.get("studioMeta"), dict) else {}
+    meta = dict(meta)
+    meta.setdefault("source", "studio-editor")
+    meta.setdefault("status", "draft")
+    meta["generate_ready"] = False
+    meta["model_ran"] = bool(meta.get("model_ran"))
+    meta["note"] = str(meta.get("note") or "Saved from the in-studio pack editor. Not a generate.")
+    pack["studioMeta"] = meta
+    return pack
+
+
+def _save_pack_dict(db, episode, user, pack: dict) -> PackRevision:
+    snapshot = gate_snapshot(pack)
+    filename = f"studio-{slugify(str(pack.get('title') or episode.title))}.zip"
+    data = pack_zip_bytes(pack)
+    revision = PackRevision(
+        episode_id=episode.id,
+        filename=filename,
+        pack_json=pack,
+        gate_snapshot=snapshot,
+        all_gates_green=bool(snapshot["all_green"]),
+        zip_path="",
+        created_by=user.name,
+    )
+    db.add(revision)
+    db.flush()
+    rel = Path(episode.id) / "revisions" / f"{revision.id}.zip"
+    get_store().put(str(rel), data)
+    revision.zip_path = str(rel)
+    sync_shots_from_pack(db, episode, revision)
+    episode.updated_at = utcnow()
+    touch(episode.project)
+    record(
+        db,
+        actor=user.name,
+        action=PACK_SAVE,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="pack",
+        entity_id=revision.id,
+        detail={
+            "filename": revision.filename,
+            "all_gates_green": revision.all_gates_green,
+            "generate_ready": False,
+            "source": "studio-editor",
+        },
+    )
+    return revision
+
+
+@router.post("/api/episodes/{episode_id}/pack/json", response_model=PackSaveOut)
+def save_pack_json(
+    episode_id: str, body: PackJsonIn, user: CraftUser, db: DbDep
+) -> PackSaveOut:
+    """Autosave from the in-studio stages. A new revision. Does not generate."""
+    episode = get_episode(db, episode_id, user)
+    pack = _prepare_editor_pack(body.pack)
+    revision = _save_pack_dict(db, episode, user, pack)
+    db.commit()
+    return PackSaveOut(
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        revision_id=revision.id,
+        filename=revision.filename,
+        gates_green=bool(revision.all_gates_green),
+        generate_ready=False,
+    )
+
+
+@router.post("/api/episodes/{episode_id}/pack/blank", response_model=PackSaveOut)
+def reset_blank_pack(
+    episode_id: str, body: PackResetIn, user: CraftUser, db: DbDep
+) -> PackSaveOut:
+    """Replace the working pack with a blank revision. Earlier revisions stay."""
+    episode = get_episode(db, episode_id, user)
+    if episode.revisions and (body.confirm or "").strip() != "reset":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "confirm_reset",
+                "message": (
+                    "Resetting replaces the working pack with a blank one. "
+                    "Look stays blank and gates stay red. Earlier revisions are kept. "
+                    "Send confirm=reset after an in-app confirm."
+                ),
+            },
+        )
+    revision = seed_blank_pack(db, episode, user.name)
+    record(
+        db,
+        actor=user.name,
+        action=PACK_SAVE,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="pack",
+        entity_id=revision.id,
+        detail={"source": "blank-reset", "gates_green": False, "generate_ready": False},
+    )
+    touch(episode.project)
+    db.commit()
+    return PackSaveOut(
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        revision_id=revision.id,
+        filename=revision.filename,
+        gates_green=False,
+        generate_ready=False,
     )

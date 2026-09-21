@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, status
 
-from ..audit import EPISODE_REORDER, record
+from ..audit import BRAIN_DUMP, EPISODE_REORDER, PACK_IMPORT, record
+from ..createflow import seed_blank_pack, seed_brain_pack, seed_template_pack
 from ..deps import DbDep, get_episode, get_project, touch
 from ..models import Episode, utcnow
 from ..rbac import ReadUser, ScriptUser
-from ..schemas import EpisodeCreate, EpisodeOut, EpisodeReorder, EpisodeUpdate
+from ..schemas import BrainDumpIn, DraftHonestyOut, EpisodeCreate, EpisodeOut, EpisodeReorder, EpisodeUpdate
 from ..serializers import episode_out
 
 router = APIRouter(tags=["episodes"])
@@ -87,6 +88,50 @@ def create_episode(
         review_state="draft",
     )
     db.add(episode)
+    db.flush()
+    if (body.brain_dump or "").strip():
+        revision, honesty = seed_brain_pack(
+            db, episode, user.name, body.brain_dump, title=episode.title
+        )
+        record(
+            db,
+            actor=user.name,
+            action=BRAIN_DUMP,
+            project_id=project.id,
+            episode_id=episode.id,
+            entity_type="pack",
+            entity_id=revision.id,
+            detail={
+                "model_ran": honesty.get("model_ran"),
+                "model": honesty.get("model"),
+                "gates_green": bool(revision.all_gates_green),
+                "generate_ready": False,
+            },
+        )
+    elif (body.template_id or "").strip():
+        revision = seed_template_pack(db, episode, user.name, body.template_id.strip())
+        record(
+            db,
+            actor=user.name,
+            action=PACK_IMPORT,
+            project_id=project.id,
+            episode_id=episode.id,
+            entity_type="pack",
+            entity_id=revision.id,
+            detail={"template_id": body.template_id, "source": "template", "fake_generate": False},
+        )
+    elif body.pack == "blank":
+        revision = seed_blank_pack(db, episode, user.name)
+        record(
+            db,
+            actor=user.name,
+            action=PACK_IMPORT,
+            project_id=project.id,
+            episode_id=episode.id,
+            entity_type="pack",
+            entity_id=revision.id,
+            detail={"source": "blank", "gates_green": False, "fake_generate": False},
+        )
     touch(project)
     db.commit()
     db.refresh(episode)
@@ -180,6 +225,43 @@ def update_episode(
     db.commit()
     db.refresh(episode)
     return episode_out(episode)
+
+
+@router.post("/api/episodes/{episode_id}/brain-dump", response_model=DraftHonestyOut)
+def brain_dump_episode(
+    episode_id: str, body: BrainDumpIn, user: ScriptUser, db: DbDep
+) -> DraftHonestyOut:
+    """Turn a freeform brief into a draft pack revision. Does not call Comfy."""
+    episode = get_episode(db, episode_id, user)
+    revision, honesty = seed_brain_pack(db, episode, user.name, body.text, title=body.title or episode.title)
+    record(
+        db,
+        actor=user.name,
+        action=BRAIN_DUMP,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="pack",
+        entity_id=revision.id,
+        detail={
+            "model_ran": honesty.get("model_ran"),
+            "model": honesty.get("model"),
+            "gates_green": bool(revision.all_gates_green),
+            "generate_ready": False,
+        },
+    )
+    touch(episode.project)
+    db.commit()
+    return DraftHonestyOut(
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        revision_id=revision.id,
+        gates_green=bool(revision.all_gates_green),
+        generate_ready=False,
+        model_ran=bool(honesty.get("model_ran")),
+        model=str(honesty.get("model") or "none"),
+        model_note=str(honesty.get("note") or ""),
+        source="brain-dump",
+    )
 
 
 @router.delete("/api/episodes/{episode_id}", status_code=status.HTTP_204_NO_CONTENT)

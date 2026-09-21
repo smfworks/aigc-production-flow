@@ -1,6 +1,18 @@
-# Studio spine (Phase 9)
+# Studio spine (Phase 10)
 
-The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes (season/sequence order), pack zip revisions, **pack revision diff**, review, **reviewer/producer sign-off**, comments, **visual identity store** (approved sheets + per-window plates, unapprove, keyword edit), sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **soft playlist scrubber**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC** (writer / art plus the Phase 5 roles), **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, optional **OIDC**, **multi-org lite**, **in-app notifications**, **ops probes**, a **continuity panel**, **demo seed**, **backup/restore**, and **builder Open in Studio auto-import**.
+Studio is the primary create surface. Projects, Task Center, Budget, and Audit chrome can start a pack: **New project**, **New blank pack**, **New from template**, or a **brain dump**. The four stages (Script → Assets → Storyboard → Preview) edit inside the episode. **Export for agent** downloads a zip an agent (Hermes, OpenClaw, or a Grok bot) can feed to Comfy MCP — still sheets and plates, then hop-1 clips. Pack zip remains the collaboration/export contract. It is not CapCut and not a generate API that invents MP4s.
+
+The Hermes plugin `smf-h3-capture` can stay. It is not required to create a pack. Import zip and Open in Studio remain secondary paths.
+
+The pack builder in `app/` is still a four-stage walk and the zip round-trip. The local studio around it covers projects, episodes (season/sequence order), pack zip revisions, **in-studio stage editing**, **brain-dump drafts**, **agent export**, **pack revision diff**, review, **reviewer/producer sign-off**, comments, **visual identity store** (approved sheets + per-window plates, unapprove, keyword edit), sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **soft playlist scrubber**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC** (writer / art plus the Phase 5 roles), **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, optional **OIDC**, **multi-org lite**, **in-app notifications**, **ops probes**, a **continuity panel**, **demo seed**, **backup/restore**, and **builder Open in Studio auto-import**.
+
+Brain dump is stub/local only. `STUDIO_LLM_BASE_URL` may point at a local or OpenAI-compatible chat endpoint. When it is unset, Studio expands the dump with a deterministic template and says **no model configured**. It does not invent that an LLM ran. Look starts blank on a new pack. Destructive resets use an in-app confirm (`confirm=reset`); earlier revisions are kept. Export for agent does **not** call Comfy. Adapter labels say stub or live. Unset hooks stay stub.
+
+| Env | Default | Notes |
+|---|---|---|
+| `STUDIO_LLM_BASE_URL` | empty | Optional `…/v1` or full `…/chat/completions` URL. Unset → deterministic brain dump |
+| `STUDIO_LLM_MODEL` | `local` when a URL is set | Model name sent to that endpoint |
+| `STUDIO_LLM_API_KEY` | empty | Optional bearer for that endpoint. Stays in the process environment, not git |
 
 It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is opt-in and off by default.** Celery is opt-in and off by default (`STUDIO_JOB_WORKER=thread`). **Multi-org lite is membership isolation, not SaaS billing, and not SSO org mapping.**
 
@@ -44,6 +56,14 @@ Do not treat the token as multi-tenant SaaS security. **Multi-org lite** lets a 
 - Default DB: SQLite at `data/studio.db` (gitignored). Override with `STUDIO_DATABASE_URL` (Postgres URL works if you install `pip install -e "./studio[postgres]"`).
 - Media (sheets/plates/costumes/**hop-1 previews**) and stored pack zips: `data/media/` (gitignored) via the **local** media adapter. Do not commit likeness stills or engine MP4s. Preview MP4s are allowed **on disk** with `kind=preview` only.
 - Optional S3/MinIO: `STUDIO_MEDIA_BACKEND=s3` plus `STUDIO_S3_BUCKET` (and `STUDIO_S3_ENDPOINT` for MinIO). Incomplete config **stays local** and `/api/meta` says so. Credentials stay in the process environment, not git. Install `pip install -e "./studio[s3]"` for boto3.
+
+## Operator path (Phase 10)
+
+1. Open Studio (`http://localhost:5174`). Chrome **New project** works from Projects, Task Center, Budget, and Audit
+2. **Start here**: blank pack, vertical template, or paste a brain dump. You land on the episode. No zip
+3. Edit Script → Assets → Storyboard → Preview in the episode. Autosave writes a pack revision. Gates stay red until filled. A new pack’s Look line is blank
+4. **Export for agent**. The zip contains `pack.zip`, `pack.json`, `gate-snapshot.json`, `agent-brief.json`, and `README.md`. Jobs are still sheets, then still plates, then hop-1 clips, with measured window metadata (10.125 s / 243 f @ 24 fps, canvas 1344×768). `honesty.called_comfy` is false
+5. Import zip / Open in Studio remain available under **Optional zip**
 
 ## Operator path (Phase 9)
 
@@ -193,7 +213,7 @@ This never claims a cloud bill was paid.
 
 ## Audit + retention
 
-Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `pack.diff`, `media.upload`, `identity.approve`, `identity.unapprove`, `identity.keywords`, `identity.link`, `episode.reorder`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
+Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `pack.diff`, `pack.save`, `brain.dump`, `agent.export`, `media.upload`, `identity.approve`, `identity.unapprove`, `identity.keywords`, `identity.link`, `episode.reorder`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
 
 Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed (producer). `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.** Episode **season/sequence order is preserved**; retention does not reorder or delete episodes. Backup manifests store that order and restore it with the episode.
 
@@ -240,7 +260,19 @@ Required hop-1 = first edit-list row of each take with `hop1Planned`. `generate-
 
 OpenAPI is canonical: http://localhost:8000/docs
 
-Phase 2–8 surface still applies. Phase 9 adds:
+Phase 2–9 surface still applies. Phase 10 adds:
+
+| Area | Methods |
+|---|---|
+| Create | `POST /api/studio/start` with `mode` `blank` \| `template` \| `brain`. Org-scoped project + episode + pack revision. No zip |
+| Episodes | `POST /api/projects/{id}/episodes` accepts `pack=blank`, `template_id`, or `brain_dump` |
+| Brain dump | `POST /api/episodes/{id}/brain-dump`. Draft skeleton. `model_ran` is false unless the optional endpoint returned JSON |
+| Editor | `POST /api/episodes/{id}/pack/json` saves a new revision from the in-studio stages |
+| Reset | `POST /api/episodes/{id}/pack/blank` with `confirm=reset` when a revision already exists |
+| Agent | `GET /api/episodes/{id}/export/agent` — zip contract for Hermes / OpenClaw / Grok. Does not call Comfy |
+| Meta | `phase` is 10. `llm_configured` is false when `STUDIO_LLM_BASE_URL` is unset. `primary_create` is `studio` |
+
+Phase 9 adds:
 
 | Area | Methods |
 |---|---|
@@ -259,7 +291,7 @@ Phase 8 surface:
 | Pack diff | `GET /api/episodes/{id}/revisions/{left}/diff/{right}`, `POST /api/episodes/{id}/pack/diff` |
 | Handoff | `POST /api/handoffs`, `GET /api/handoffs/{id}`; import accepts `handoff_id` |
 | Adapters | catalog/health include window metadata, `not_live`, `schema_ok`, `hop1_watch_required` |
-| Meta | response `phase` is 9 (see the Phase 9 table) |
+| Meta | response `phase` is 10 (see the Phase 10 table). Phase 9 fields remain |
 | Orgs | `GET/POST /api/orgs`, `GET /api/orgs/{id}`; members stay `…/members`. Header `X-Org-Id` selects the active org |
 | Notifications | `GET /api/notifications`, `POST /api/notifications/read-all`, `POST /api/notifications/{id}/read` |
 | Continuity | `GET /api/episodes/{id}/continuity` (read/visualize + navigate, not an NLE; identity deep-links) |
@@ -294,7 +326,10 @@ GitHub Actions (`.github/workflows/ci.yml`) runs studio pytest, pack-builder `np
 - Multi-org lite is **not** SaaS billing, SSO org mapping, or a multi-tenant product
 - Optional notify webhook is **unset by default** — `/api/meta` says so; we never invent delivery
 - `/metrics` is an optional Prometheus scrape, not a claimed SaaS APM
-- No rewrite of the pack builder
+- No rewrite of the pack builder. Studio reuses its stage components. The builder’s New pack / Load sample / Import zip ask with an in-app confirm
+- Hermes `smf-h3-capture` is not rewritten. Studio is the primary create surface
+- No mandatory live LLM and no mandatory live Comfy. Brain dump without `STUDIO_LLM_BASE_URL` is a template expansion. Agent export does not call Comfy
+- A brain dump or blank pack is not generate-ready. Gates stay red until filled. `generate_ready` on these responses is false
 - No engine MP4s in git
 - No auto generate-ok from shot `ready`, candidate extract, a succeeded stub job, a vertical template, or a missing sign-off
 - No claim that budget units are a paid cloud invoice

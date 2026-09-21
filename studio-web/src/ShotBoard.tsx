@@ -92,7 +92,7 @@ export function ShotBoard({
         </button>
       </div>
       {shots.length === 0 ? (
-        <p className="empty">Import a pack zip to map edit-list rows to shots.</p>
+        <p className="empty">No edit-list shots yet. Fill the storyboard stage, or import a zip.</p>
       ) : view === "canvas" ? (
         <div className="board-canvas" role="list">
           {shots.map((shot, index) => (

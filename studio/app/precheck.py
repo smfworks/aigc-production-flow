@@ -49,7 +49,7 @@ def run_batch_precheck(
         problems.append(
             {
                 "code": "no_pack",
-                "message": "Import a pack zip before hop-1. Pack zip is the contract.",
+                "message": "Start a pack in Studio (or import a zip) before hop-1. Pack zip is the contract.",
                 "shot_id": shot.id if shot else "",
             }
         )

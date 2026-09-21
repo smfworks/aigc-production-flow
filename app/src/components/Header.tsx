@@ -23,7 +23,8 @@ export function Header({ onLoadSample, onNewPack, onImport, onOpenStudio, studio
         canvas <strong>1344×768</strong> (do not stretch 1024²). This builder
         encodes the production pack (nine gates plus entity schedule and
         lock-diff) — it does not run a video engine, and it does not export
-        MP4s.
+        MP4s. Studio is the primary place to create a pack; this builder remains
+        the zip round-trip. Hermes <code>smf-h3-capture</code> can stay.
       </p>
       <p className="lede lede-sub">
         Flow:{" "}

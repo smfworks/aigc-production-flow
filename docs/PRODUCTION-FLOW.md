@@ -118,6 +118,14 @@ OIDC and Celery are **optional in Phase 6** and **off by default**. They are not
 - **Builder → studio auto-import** — Open in Studio stages the zip (`POST /api/handoffs`) when `VITE_STUDIO_URL` is set (CORS/token documented). Pick project/episode → import uses the handed-off zip (no re-choose file). Failure modes: studio down, auth. Never auto-generate
 - **Measured live Comfy hooks** — `comfy-h3` declares hop-1 **10.125 s / 243 f @ 24 fps**; `comfy-qwen` declares canvas **1344×768**. Health/dry-run include config schema validation. Unset env is **not live** and still resolves to stub. Hop-1 watch protocol remains required; live adapters must not skip it. Stub remains default. No Hailuo/Veo/Kling in this phase
 
+**Phase 10 (this repo, one AIGC Studio):**
+
+- **Create in Studio** — New project, new blank pack/episode, or new from a vertical template. Org-scoped project + episode + pack revision. No zip required. Empty states say start here. Import zip and Open in Studio stay secondary
+- **Four stages inside the episode** — Script → Assets → Storyboard → Preview reuse the pack builder’s stage components. Autosave writes an honest pack revision. Look is blank on a new pack. Reset asks in the app (`confirm=reset`); earlier revisions stay
+- **Brain dump → draft pack** — freeform brief becomes a draft skeleton (log line, rough beats, placeholder entities). Gates stay red. Optional `STUDIO_LLM_BASE_URL` (local/OpenAI-compatible). Unset uses a deterministic expansion and says no model ran
+- **Export for agent** — zip with pack.zip, pack.json, gate snapshot, `agent-brief.json`, and a short README for Hermes / OpenClaw / Grok. Jobs are ordered still sheets, still plates, then hop-1 clips, with measured Comfy window metadata and stub vs live adapter labels. Studio does not call Comfy from this export
+- Hermes `smf-h3-capture` can stay. Studio is the primary create surface
+
 **Phase 9 (this repo, roles, order, scrub, identity edit):**
 
 - **Role matrix** — pack-convention `writer` (script/map/dialogue, episode order) and `art` (sheets/plates/identity approve) sit beside the Phase 5 roles. Legacy `editor` stays the craft bundle (those writes plus joins/board/edit-list, jobs, pack). `producer` keeps gates governance, GPU budget, retention, members, and generate-ok override. Reviewers still sign off. Viewers stay read-only. App-level only — not IdP groups unless the OIDC claim map is on
