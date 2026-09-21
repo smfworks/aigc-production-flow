@@ -1,0 +1,16 @@
+services:
+  studio-api:
+    build:
+      context: ./studio
+    ports:
+      - "8000:8000"
+    environment:
+      STUDIO_DATABASE_URL: sqlite:////data/studio.db
+      STUDIO_MEDIA_ROOT: /data/media
+      STUDIO_API_TOKEN: ${STUDIO_API_TOKEN:-local-dev-token}
+      STUDIO_PACK_BUILDER_URL: http://localhost:5173
+    volumes:
+      - studio-data:/data
+
+volumes:
+  studio-data:

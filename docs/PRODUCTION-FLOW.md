@@ -77,6 +77,8 @@ v2 (platform):
 - review states: draft / needs-art / needs-edit / preview-watched / generate-ok
 - async generate jobs with cancel/retry, one engine adapter at a time per GPU
 
+**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + nine-gate snapshot). `generate-ok` is refused unless that snapshot is all green. Auth is a local-dev API token — not SSO. Async generate jobs stay deferred. Operator path: [STUDIO.md](STUDIO.md).
+
 ## Multi-user collaboration
 
 v1 (now, honest): the pack **is** the collaboration object.
@@ -86,7 +88,9 @@ v1 (now, honest): the pack **is** the collaboration object.
 - Public GitHub is process only. Private fork (or sibling private repo) holds likeness stills and unreleased music
 - Roles on a pack (convention, not auth): **writer** (script + map), **art** (sheets/plates), **editor** (joins + verbs), **producer** (gates green / GPU spend)
 
-v2 (build, do not pretend we have it):
+Phase 1 (this repo): a **studio spine** holds projects / episodes, comments, review state, and a gitignored media directory. The zip is still the round-trip. Roles stay convention, not SSO. Do not treat `STUDIO_API_TOKEN` as multi-tenant isolation.
+
+v2 leftover (build, do not pretend we have it):
 
 | Role | Writes | Reviews |
 |---|---|---|
@@ -129,6 +133,7 @@ The flow is real when:
 3. Export still requires nine green gates.
 4. A pack zip round-trips without a GPU.
 5. GPU spend still happens somewhere else, after preview.
+6. Studio `generate-ok` is refused unless the stored nine-gate snapshot is green.
 
 ## Sources
 
