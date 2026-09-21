@@ -30,16 +30,28 @@ export function AdapterStrip({
       {health.map((row) => (
         <span
           key={row.id}
-          className={`adapter-chip ${row.ok ? "is-ok" : "is-bad"}`}
+          className={`adapter-chip ${
+            row.ok ? (row.not_live && row.id !== "stub" ? "is-muted" : "is-ok") : "is-bad"
+          }`}
           title={row.detail}
         >
           {row.id}
-          {row.ok ? " · ok" : row.config_present ? " · down" : " · unset"}
+          {row.ok
+            ? row.not_live || !row.live
+              ? row.id === "stub"
+                ? " · ok"
+                : " · not live"
+              : " · live"
+            : row.config_present
+              ? " · down"
+              : " · not live"}
         </span>
       ))}
       <span className="hint">
         Defaults still={stillDefault || "stub"} · clip={clipDefault || "stub"}. Stub is the CI
-        default. Unset live hooks stay stub — health is a dry-run, not a generate.
+        default. Unset live hooks are <strong>not live</strong> and stay stub. comfy-h3 window is
+        measured 10.125s / 243f @ 24fps. Health is a dry-run, not a generate. Live adapters never
+        skip hop-1 watch.
       </span>
       {liveUnhealthy.length ? (
         <span className="hint adapter-warn">

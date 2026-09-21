@@ -30,6 +30,8 @@ from .routers import (
     demo,
     episodes,
     export,
+    handoffs,
+    identity,
     jobs,
     media,
     members,
@@ -72,10 +74,14 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.7.0",
+        version="0.8.0",
         description=(
-            "Phase 7 studio spine for the AIGC production flow. "
+            "Phase 8 studio spine for the AIGC production flow. "
             "Pack zip remains the collaboration contract. "
+            "Visual identity store (approved sheets + per-window plates). "
+            "Pack revision diff before import overwrite. "
+            "Builder Open in Studio can stage a zip for auto-import after episode pick. "
+            "comfy-h3 / comfy-qwen declare measured window metadata; unset hooks are not live. "
             "Multi-org lite: membership isolation, not SaaS billing, not SSO org mapping. "
             "App-level org roles (producer / editor / reviewer / viewer) sit on top of "
             "local-dev Bearer, optional X-Forwarded-User, or optional OIDC JWKS. "
@@ -85,7 +91,7 @@ def create_app() -> FastAPI:
             "Budget units come from an operator rate table — not a cloud invoice. "
             "Media defaults to local disk; S3/MinIO is opt-in and never claimed live when unset. "
             "generate-ok requires gates + hop-1 receipts + a reviewer/producer sign-off "
-            "(producer override is audited). "
+            "(producer override is audited). Live adapters must not skip hop-1 watch. "
             "Optional notify webhook is unset by default. /metrics is a tiny Prometheus scrape, not APM."
         ),
         license_info={"name": "MIT", "identifier": "MIT"},
@@ -102,6 +108,8 @@ def create_app() -> FastAPI:
     application.include_router(projects.router)
     application.include_router(episodes.router)
     application.include_router(packs.router)
+    application.include_router(handoffs.router)
+    application.include_router(identity.router)
     application.include_router(review.router)
     application.include_router(comments.router)
     application.include_router(media.router)
@@ -128,7 +136,7 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 7,
+            "phase": 8,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",

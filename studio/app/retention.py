@@ -22,6 +22,8 @@ def effective_days(project: Project | None, settings: Settings | None = None) ->
 
 
 def is_ephemeral(asset: MediaAsset) -> bool:
+    if (asset.approval_status or "") == "approved" and asset.kind in {"sheet", "plate"}:
+        return False
     path = (asset.path or "").replace("\\", "/")
     notes = asset.notes or ""
     if "/jobs/" in f"/{path}":

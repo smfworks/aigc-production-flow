@@ -1,4 +1,4 @@
-"""Health / dry-run for adapter slots. Stub is always ok. Live slots report config + reachability."""
+"""Health / dry-run for adapter slots. Stub is always ok. Unset live hooks report not live."""
 
 from __future__ import annotations
 
@@ -14,11 +14,12 @@ from .catalog import CATALOG, STUB_NAME, AdapterSlot, slot_for
 from .live import transport_ready
 
 _HEALTH_TIMEOUT = 2.5
+_ALLOWED_SCHEMES = {"http", "https"}
 
 
 def _webhook_reachable(url: str, timeout: float) -> tuple[bool | None, str]:
     parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if parsed.scheme not in _ALLOWED_SCHEMES or not parsed.netloc:
         return False, "webhook URL must be http(s) with a host"
     try:
         response = httpx.request("HEAD", url, timeout=timeout, follow_redirects=True)
@@ -46,11 +47,46 @@ def _cli_reachable(command: str) -> tuple[bool | None, str]:
     return False, f"CLI binary not on PATH: {token}"
 
 
+def validate_slot_config(slot: AdapterSlot, settings: Settings) -> tuple[bool, list[str]]:
+    """Schema-level checks for the live hook env. Unset is not a schema error."""
+    errors: list[str] = []
+    webhook = (settings.adapter_webhook_url or "").strip()
+    cli = (settings.adapter_cli or "").strip()
+    timeout = float(settings.adapter_timeout_seconds or 0)
+    if timeout <= 0:
+        errors.append("STUDIO_ADAPTER_TIMEOUT_SECONDS must be > 0")
+    if slot.transport in {"webhook", "webhook-or-cli"} and webhook:
+        parsed = urlparse(webhook)
+        if parsed.scheme not in _ALLOWED_SCHEMES or not parsed.netloc:
+            errors.append("STUDIO_ADAPTER_WEBHOOK_URL must be http(s) with a host")
+    if slot.transport in {"cli", "webhook-or-cli"} and cli:
+        try:
+            cli.format(job_id="id", job_type="type", episode_id="ep", shot_id="shot")
+        except (KeyError, IndexError, ValueError) as exc:
+            errors.append(f"STUDIO_ADAPTER_CLI template invalid: {exc}")
+    if slot.id == "comfy-h3" and slot.window_s is None:
+        errors.append("comfy-h3 must declare hop-1 window length")
+    if slot.id == "comfy-qwen" and not slot.canvas:
+        errors.append("comfy-qwen must declare still canvas")
+    return not errors, errors
+
+
+def _meta(slot: AdapterSlot) -> dict[str, Any]:
+    return {
+        "window_s": slot.window_s,
+        "frames": slot.frames,
+        "fps": slot.fps,
+        "canvas": slot.canvas,
+        "hop1_watch_required": bool(slot.hop1_watch_required),
+    }
+
+
 def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str, Any]:
     cfg = settings or get_settings()
     timeout = min(_HEALTH_TIMEOUT, max(0.5, float(cfg.adapter_timeout_seconds or 2)))
     webhook = (cfg.adapter_webhook_url or "").strip()
     cli = (cfg.adapter_cli or "").strip()
+    schema_ok, schema_errors = validate_slot_config(slot, cfg)
     if slot.id == STUB_NAME or not slot.live:
         return {
             "id": slot.id,
@@ -59,11 +95,12 @@ def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str
             "config_present": True,
             "reachable": True,
             "transport": slot.transport,
-            "detail": "Stub fixture receipts. Always healthy. Never claims H3 or Qwen ran.",
+            "detail": slot.honesty or "Stub fixture receipts. Always healthy. Never claims H3 or Qwen ran.",
+            "schema_ok": True,
+            "not_live": True,
+            **_meta(slot),
         }
     present = transport_ready(cfg, slot.transport)
-    reachable: bool | None = None
-    detail = ""
     if not present:
         needed = []
         if slot.transport in {"webhook", "webhook-or-cli"}:
@@ -71,20 +108,26 @@ def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str
         if slot.transport in {"cli", "webhook-or-cli"}:
             needed.append("STUDIO_ADAPTER_CLI")
         detail = (
-            f"{slot.id} hook unset ({' or '.join(needed)}). "
-            "Enqueue falls back to stub. Live adapter is not healthy."
+            f"Not live. {slot.id} hook unset ({' or '.join(needed)}). "
+            "Enqueue resolves to stub. This is not a Hailuo/Veo/Kling adapter."
         )
         return {
             "id": slot.id,
-            "ok": False,
-            "live": True,
+            "ok": True,
+            "live": False,
             "config_present": False,
             "reachable": None,
             "transport": slot.transport,
             "detail": detail,
+            "schema_ok": True,
+            "not_live": True,
+            **_meta(slot),
         }
     notes: list[str] = []
-    ok = True
+    ok = schema_ok
+    reachable: bool | None = None
+    if not schema_ok:
+        notes.extend(schema_errors)
     if slot.transport in {"webhook", "webhook-or-cli"} and webhook:
         reachable, note = _webhook_reachable(webhook, timeout)
         notes.append(note)
@@ -93,6 +136,12 @@ def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str
         reachable, note = _cli_reachable(cli)
         notes.append(note)
         ok = ok and bool(reachable)
+    window_note = ""
+    if slot.window_s:
+        window_note = f" Window {slot.window_s}s / {slot.frames}f @ {slot.fps}fps."
+    elif slot.canvas:
+        window_note = f" Canvas {slot.canvas}."
+    watch = " Hop-1 watch protocol required before generate-ok."
     return {
         "id": slot.id,
         "ok": ok,
@@ -100,7 +149,10 @@ def slot_health(slot: AdapterSlot, settings: Settings | None = None) -> dict[str
         "config_present": True,
         "reachable": reachable,
         "transport": slot.transport,
-        "detail": "; ".join(notes) or "config present",
+        "detail": ("; ".join(notes) or "config present") + window_note + watch,
+        "schema_ok": schema_ok,
+        "not_live": False,
+        **_meta(slot),
     }
 
 
@@ -118,12 +170,11 @@ def refuse_if_unhealthy(adapter_id: str, settings: Settings | None = None) -> di
     from fastapi import HTTPException, status as http_status
 
     report = health_for(adapter_id, settings)
-    if report["id"] == STUB_NAME or not report["live"]:
+    if report["id"] == STUB_NAME or not report["live"] or report.get("not_live"):
         return report
     if report["ok"]:
         return report
     if not report["config_present"]:
-        # Unset hooks already resolve to stub; callers should not hit this after resolve.
         return report
     raise HTTPException(
         status_code=http_status.HTTP_409_CONFLICT,

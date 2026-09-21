@@ -157,6 +157,13 @@ export type AdapterHealth = {
   reachable: boolean | null;
   transport: string;
   detail: string;
+  schema_ok?: boolean | null;
+  not_live?: boolean;
+  window_s?: number | null;
+  frames?: number | null;
+  fps?: number | null;
+  canvas?: string | null;
+  hop1_watch_required?: boolean;
 };
 
 export type MediaAsset = {
@@ -172,6 +179,13 @@ export type MediaAsset = {
   notes: string;
   created_by: string;
   created_at: string;
+  approval_status?: "draft" | "approved";
+  approved_by?: string;
+  approved_at?: string | null;
+  shot_id?: string | null;
+  edit_row_id?: string;
+  lock_keywords?: string;
+  approved?: boolean;
 };
 
 export type Meta = {
@@ -347,6 +361,13 @@ export type AdapterSlot = {
   transport: string;
   note: string;
   health?: AdapterHealth | null;
+  window_s?: number | null;
+  frames?: number | null;
+  fps?: number | null;
+  canvas?: string | null;
+  hop1_watch_required?: boolean;
+  config_schema?: Record<string, unknown>;
+  honesty?: string;
 };
 
 export type AdapterCatalog = {
@@ -471,6 +492,8 @@ export type ContinuityShot = {
   entities: string;
   issues: string[];
   href: string;
+  identity_href?: string;
+  identity_hrefs?: string[];
 };
 
 export type ContinuitySummary = {
@@ -484,6 +507,85 @@ export type ContinuitySummary = {
   lock_diff_problems: string[];
   mismatches: string[];
   shots: ContinuityShot[];
+  identity?: IdentityStore;
+  identity_href?: string;
+  identity_lock_diff_problems?: string[];
+};
+
+export type IdentityAsset = {
+  id: string;
+  kind: "sheet" | "plate";
+  original_name: string;
+  entity_label: string;
+  entity_type: string;
+  notes: string;
+  href: string;
+  approval_status: "draft" | "approved";
+  approved_by: string;
+  approved_at: string | null;
+  shot_id: string | null;
+  edit_row_id: string;
+  lock_keywords: string;
+  approved: boolean;
+  created_by: string;
+  created_at: string;
+};
+
+export type IdentityStore = {
+  episode_id: string;
+  project_id: string;
+  honesty: string;
+  embeddings: boolean;
+  likeness: boolean;
+  sheets: IdentityAsset[];
+  plates: IdentityAsset[];
+  approved_sheet_count: number;
+  approved_plate_count: number;
+};
+
+export type PackDiffGate = {
+  id: string;
+  n: number;
+  label: string;
+  left_ok: boolean | null;
+  right_ok: boolean | null;
+  left_detail: string;
+  right_detail: string;
+  changed: boolean;
+};
+
+export type PackDiffRef = {
+  id?: string | null;
+  filename: string;
+  all_gates_green?: boolean;
+  created_by?: string;
+  created_at?: string | null;
+  label?: string;
+  candidate?: boolean;
+};
+
+export type PackDiff = {
+  honesty: string;
+  left: PackDiffRef | null;
+  right: PackDiffRef | null;
+  gates: PackDiffGate[];
+  entity_schedule: { added?: unknown[]; removed?: unknown[]; changed?: unknown[] };
+  edit_list: { added?: unknown[]; removed?: unknown[]; changed?: unknown[] };
+  identity_keywords: { added?: unknown[]; removed?: unknown[]; changed?: unknown[] };
+  summary: Record<string, unknown>;
+  auto_generate: boolean;
+};
+
+export type PackHandoff = {
+  id: string;
+  filename: string;
+  created_by: string;
+  created_at: string;
+  expires_at: string;
+  consumed: boolean;
+  episode_id: string | null;
+  honesty: string;
+  auto_generate: boolean;
 };
 
 export type DemoSeed = {

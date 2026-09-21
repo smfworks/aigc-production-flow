@@ -1,6 +1,6 @@
-# AIGC studio API (Phase 7)
+# AIGC studio API (Phase 8)
 
-FastAPI spine for projects, episodes, pack zip revisions, review states, reviewer/producer sign-off, comments, media, shots, jobs, adapters, hop-1 preview desk, budget, audit, retention, EDL export, vertical templates, org members, presence, media store adapters, multi-org lite, notifications, continuity, demo seed, and backup. Optional Celery worker. Optional OIDC JWKS.
+FastAPI spine for projects, episodes, pack zip revisions, pack revision diff, review states, reviewer/producer sign-off, comments, visual identity store, media, shots, jobs, adapters, hop-1 preview desk, budget, audit, retention, EDL export, vertical templates, org members, presence, media store adapters, multi-org lite, notifications, continuity, demo seed, backup, and builder pack handoff. Optional Celery worker. Optional OIDC JWKS.
 
 Operator docs: [../docs/STUDIO.md](../docs/STUDIO.md). Auth: [../docs/AUTH.md](../docs/AUTH.md).
 

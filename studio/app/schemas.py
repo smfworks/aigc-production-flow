@@ -14,6 +14,7 @@ ReviewStateName = Literal[
 ]
 
 MediaKind = Literal["sheet", "plate", "costume", "preview", "other"]
+ApprovalStatus = Literal["draft", "approved"]
 JobType = Literal["still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck"]
 JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 ReceiptSource = Literal["manual", "parsed"]
@@ -39,7 +40,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 7
+    phase: int = 8
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -299,6 +300,13 @@ class MediaAssetOut(BaseModel):
     notes: str
     created_by: str
     created_at: datetime
+    approval_status: ApprovalStatus = "draft"
+    approved_by: str = ""
+    approved_at: datetime | None = None
+    shot_id: str | None = None
+    edit_row_id: str = ""
+    lock_keywords: str = ""
+    approved: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -482,6 +490,13 @@ class AdapterHealthOut(BaseModel):
     reachable: bool | None = None
     transport: str
     detail: str
+    schema_ok: bool | None = None
+    not_live: bool = False
+    window_s: float | None = None
+    frames: int | None = None
+    fps: float | None = None
+    canvas: str | None = None
+    hop1_watch_required: bool = True
 
 
 class AdapterSlotOut(BaseModel):
@@ -492,6 +507,13 @@ class AdapterSlotOut(BaseModel):
     transport: str
     note: str
     health: AdapterHealthOut | None = None
+    window_s: float | None = None
+    frames: int | None = None
+    fps: float | None = None
+    canvas: str | None = None
+    hop1_watch_required: bool = True
+    config_schema: dict[str, Any] = Field(default_factory=dict)
+    honesty: str = ""
 
 
 class AdapterCatalogOut(BaseModel):
@@ -502,7 +524,9 @@ class AdapterCatalogOut(BaseModel):
     note: str = (
         "Documented slots (comfy-h3, comfy-qwen, webhook, cli) fall back to stub "
         "when the live hook is unset. Stub never claims H3 or Qwen ran. "
-        "Health is a dry-run (reachable? config present?) — not a generate."
+        "Health is a dry-run (reachable? config present? schema valid?) — not a generate. "
+        "Unset live hooks report not live. comfy-h3 declares hop-1 10.125s / 243f @ 24fps. "
+        "Live adapters never skip the hop-1 watch protocol."
     )
 
 
@@ -641,6 +665,8 @@ class ContinuityShotOut(BaseModel):
     entities: str = ""
     issues: list[str] = Field(default_factory=list)
     href: str = ""
+    identity_href: str = ""
+    identity_hrefs: list[str] = Field(default_factory=list)
 
 
 class ContinuitySummaryOut(BaseModel):
@@ -654,6 +680,86 @@ class ContinuitySummaryOut(BaseModel):
     lock_diff_problems: list[str] = Field(default_factory=list)
     mismatches: list[str] = Field(default_factory=list)
     shots: list[ContinuityShotOut] = Field(default_factory=list)
+    identity: dict[str, Any] = Field(default_factory=dict)
+    identity_href: str = ""
+    identity_lock_diff_problems: list[str] = Field(default_factory=list)
+
+
+class IdentityApprove(BaseModel):
+    note: str = ""
+
+
+class IdentityLink(BaseModel):
+    shot_id: str | None = None
+    edit_row_id: str | None = None
+    lock_keywords: str | None = None
+    entity_label: str | None = Field(default=None, max_length=200)
+    entity_type: str | None = None
+
+
+class IdentityAssetOut(BaseModel):
+    id: str
+    kind: Literal["sheet", "plate"]
+    original_name: str
+    entity_label: str = ""
+    entity_type: str = ""
+    notes: str = ""
+    href: str = ""
+    approval_status: ApprovalStatus = "draft"
+    approved_by: str = ""
+    approved_at: datetime | None = None
+    shot_id: str | None = None
+    edit_row_id: str = ""
+    lock_keywords: str = ""
+    approved: bool = False
+    created_by: str = ""
+    created_at: datetime
+
+
+class IdentityStoreOut(BaseModel):
+    episode_id: str
+    project_id: str
+    honesty: str
+    embeddings: bool = False
+    likeness: bool = False
+    sheets: list[IdentityAssetOut] = Field(default_factory=list)
+    plates: list[IdentityAssetOut] = Field(default_factory=list)
+    approved_sheet_count: int = 0
+    approved_plate_count: int = 0
+
+
+class PackDiffRef(BaseModel):
+    id: str | None = None
+    filename: str = ""
+    all_gates_green: bool = False
+    created_by: str = ""
+    created_at: datetime | None = None
+    label: str = ""
+    candidate: bool = False
+
+
+class PackDiffOut(BaseModel):
+    honesty: str
+    left: PackDiffRef | None = None
+    right: PackDiffRef | None = None
+    gates: list[dict[str, Any]] = Field(default_factory=list)
+    entity_schedule: dict[str, Any] = Field(default_factory=dict)
+    edit_list: dict[str, Any] = Field(default_factory=dict)
+    identity_keywords: dict[str, Any] = Field(default_factory=dict)
+    summary: dict[str, Any] = Field(default_factory=dict)
+    auto_generate: bool = False
+
+
+class PackHandoffOut(BaseModel):
+    id: str
+    filename: str
+    created_by: str
+    created_at: datetime
+    expires_at: datetime
+    consumed: bool = False
+    episode_id: str | None = None
+    honesty: str
+    auto_generate: bool = False
 
 
 UserOut.model_rebuild()

@@ -10,11 +10,15 @@ import type {
   ContinuitySummary,
   DemoSeed,
   Episode,
+  IdentityStore,
   Job,
   MediaAsset,
   Meta,
   NotificationList,
   OrgMember,
+  PackDiff,
+  PackHandoff,
+  PackRevisionSummary,
   PresenceUser,
   PreviewDesk,
   Project,
@@ -109,6 +113,27 @@ export const api = {
     request<StudioNotification>(`/api/notifications/${id}/read`, { method: "POST" }),
   markNotificationsRead: () => request<{ ok: boolean; marked: number }>("/api/notifications/read-all", { method: "POST" }),
   continuity: (episodeId: string) => request<ContinuitySummary>(`/api/episodes/${episodeId}/continuity`),
+  identity: (episodeId: string) => request<IdentityStore>(`/api/episodes/${episodeId}/identity`),
+  approveIdentity: (episodeId: string, assetId: string, note = "") =>
+    request<MediaAsset>(`/api/episodes/${episodeId}/identity/${assetId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
+  linkIdentityPlate: (episodeId: string, assetId: string, shotId: string) =>
+    request<MediaAsset>(`/api/episodes/${episodeId}/identity/${assetId}/link`, {
+      method: "POST",
+      body: JSON.stringify({ shot_id: shotId }),
+    }),
+  revisions: (episodeId: string) => request<PackRevisionSummary[]>(`/api/episodes/${episodeId}/revisions`),
+  revisionDiff: (episodeId: string, leftId: string, rightId: string) =>
+    request<PackDiff>(`/api/episodes/${episodeId}/revisions/${leftId}/diff/${rightId}`),
+  previewPackDiff: (episodeId: string, file?: File, handoffId?: string) => {
+    const data = new FormData();
+    if (file) data.append("file", file);
+    if (handoffId) data.append("handoff_id", handoffId);
+    return request<PackDiff>(`/api/episodes/${episodeId}/pack/diff`, { method: "POST", body: data });
+  },
+  handoff: (id: string) => request<PackHandoff>(`/api/handoffs/${id}`),
   seedDemo: () => request<DemoSeed>("/api/demo/seed", { method: "POST" }),
   restoreBackup: (file: File, dryRun: boolean) => {
     const data = new FormData();
@@ -209,9 +234,10 @@ export const api = {
     return request<MediaAsset>(`/api/episodes/${episodeId}/media`, { method: "POST", body: data });
   },
   mediaUrl: (assetId: string) => `/api/media/${assetId}`,
-  importPack: (episodeId: string, file: File) => {
+  importPack: (episodeId: string, file?: File, handoffId?: string) => {
     const data = new FormData();
-    data.append("file", file);
+    if (file) data.append("file", file);
+    if (handoffId) data.append("handoff_id", handoffId);
     return request<{ all_gates_green: boolean; filename: string }>(
       `/api/episodes/${episodeId}/pack`,
       { method: "POST", body: data },

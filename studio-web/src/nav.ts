@@ -1,7 +1,7 @@
 export type View =
   | { page: "projects" }
   | { page: "project"; projectId: string }
-  | { page: "episode"; projectId: string; episodeId: string; shotId?: string }
+  | { page: "episode"; projectId: string; episodeId: string; shotId?: string; identityId?: string }
   | { page: "tasks"; jobId?: string }
   | { page: "budget"; projectId?: string }
   | { page: "audit"; projectId?: string; episodeId?: string };
@@ -24,6 +24,7 @@ export function parseHash(hash = window.location.hash): View {
       projectId: parts[1],
       episodeId: parts[3],
       shotId: parts[4] === "shots" ? parts[5] : undefined,
+      identityId: parts[4] === "identity" ? parts[5] || "" : undefined,
     };
   }
   if (parts[0] === "projects" && parts[1]) {
@@ -49,6 +50,9 @@ export function viewToHash(view: View): string {
   }
   if (view.page === "episode") {
     const base = `#/projects/${view.projectId}/episodes/${view.episodeId}`;
+    if (view.identityId !== undefined) {
+      return view.identityId ? `${base}/identity/${view.identityId}` : `${base}/identity`;
+    }
     return view.shotId ? `${base}/shots/${view.shotId}` : base;
   }
   return "#/projects";

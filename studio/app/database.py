@@ -44,6 +44,12 @@ _ADDITIVE_COLUMNS = (
     ("comments", "resolved_at", "DATETIME"),
     ("organizations", "is_default", "BOOLEAN DEFAULT 0"),
     ("audit_events", "organization_id", "VARCHAR(36)"),
+    ("media_assets", "approval_status", "VARCHAR(20) DEFAULT 'draft'"),
+    ("media_assets", "approved_by", "VARCHAR(120) DEFAULT ''"),
+    ("media_assets", "approved_at", "DATETIME"),
+    ("media_assets", "shot_id", "VARCHAR(36) DEFAULT ''"),
+    ("media_assets", "edit_row_id", "VARCHAR(80) DEFAULT ''"),
+    ("media_assets", "lock_keywords", "TEXT DEFAULT ''"),
 )
 
 

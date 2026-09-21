@@ -5,9 +5,11 @@ import type {
   AdapterHealth,
   Comment,
   Episode,
+  IdentityStore as IdentityStoreData,
   Job,
   MediaAsset,
   Meta,
+  PackDiff,
   PreviewDesk,
   Project,
   RetentionPreview,
@@ -31,7 +33,18 @@ import { AdapterStrip } from "./AdapterStrip.tsx";
 import { OrgSwitcher } from "./OrgSwitcher.tsx";
 import { NotificationBell } from "./NotificationBell.tsx";
 import { ContinuityPanel } from "./ContinuityPanel.tsx";
+import { IdentityStore } from "./IdentityStore.tsx";
+import { PackDiffPanel } from "./PackDiffPanel.tsx";
 import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
+import {
+  clearHandoffSearch,
+  clearPendingHandoff,
+  getPendingFile,
+  getPendingHandoff,
+  listenForBuilderHandoff,
+  parseHandoffSearch,
+  setPendingHandoff,
+} from "./handoff.ts";
 
 function can(user: StudioUser | null, perm: string): boolean {
   return Boolean(user?.permissions?.includes(perm));
@@ -59,6 +72,8 @@ export default function App() {
   const [orgs, setOrgs] = useState<StudioOrg[]>([]);
   const [adapterHealth, setAdapterHealth] = useState<AdapterHealth[]>([]);
 
+  const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
+
   const packBuilderUrl =
     meta?.pack_builder_url || import.meta.env.VITE_PACK_BUILDER_URL || "http://localhost:5173";
 
@@ -75,6 +90,29 @@ export default function App() {
     api.orgs().then(setOrgs).catch(() => setOrgs([]));
     api.adapterHealth().then(setAdapterHealth).catch(() => setAdapterHealth([]));
   }, [token, userName, view.page]);
+
+  useEffect(() => {
+    const parsed = parseHandoffSearch();
+    if (parsed.handoffId) {
+      setPendingHandoff({
+        id: parsed.handoffId,
+        filename: "builder pack.zip",
+        notice:
+          "Builder handoff is ready. Pick a project/episode — import uses the staged zip (no re-choose file). Not auto-generate.",
+      });
+      setHandoffNotice(
+        "Builder handoff is ready. Pick a project/episode — import uses the staged zip. Not auto-generate.",
+      );
+    } else if (parsed.importHint) {
+      const pending = getPendingHandoff();
+      if (pending) setHandoffNotice(pending.notice);
+    }
+    return listenForBuilderHandoff((_file, filename) => {
+      setHandoffNotice(
+        `Builder zip “${filename}” landed. Pick a project/episode to import it. Not auto-generate.`,
+      );
+    });
+  }, []);
 
   useEffect(() => {
     const onHash = () => setView(parseHash());
@@ -96,15 +134,17 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 7</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 8</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects, hop-1 preview desk, members, presence, continuity, and adapter health around the pack zip.
-          Multi-org lite is membership isolation — not SaaS billing. Jobs default to an in-process thread
-          worker; Celery is opt-in. Budget units are operator credits — not a cloud bill. Media is local
-          disk unless S3 is configured. OIDC is opt-in and off by default. Pack zip remains the contract.
+          Projects, identity store, pack revision diff, hop-1 preview desk, members, presence,
+          continuity, and adapter health around the pack zip. Multi-org lite is membership
+          isolation — not SaaS billing. Jobs default to an in-process thread worker; Celery is
+          opt-in. Budget units are operator credits — not a cloud bill. Media is local disk unless
+          S3 is configured. OIDC is opt-in and off by default. Pack zip remains the contract.
+          Unset comfy-* hooks are not live.
         </p>
         <nav className="mast-nav" aria-label="Studio">
           <button
@@ -213,6 +253,22 @@ export default function App() {
           </button>
         </p>
       ) : null}
+      {handoffNotice ? (
+        <p className="banner banner-ok" role="status">
+          {handoffNotice}{" "}
+          <button
+            type="button"
+            className="text-btn"
+            onClick={() => {
+              clearPendingHandoff();
+              clearHandoffSearch();
+              setHandoffNotice(null);
+            }}
+          >
+            dismiss
+          </button>
+        </p>
+      ) : null}
       {importHint() ? (
         <p className="banner banner-ok" role="status">
           Pack builder handoff: export a zip there, open a project/episode, then{" "}
@@ -262,6 +318,7 @@ export default function App() {
           projectId={view.projectId}
           episodeId={view.episodeId}
           shotId={view.shotId}
+          identityId={view.identityId}
           packBuilderUrl={packBuilderUrl}
           me={me}
           adapterHealth={adapterHealth}
@@ -735,6 +792,7 @@ function EpisodeView({
   projectId,
   episodeId,
   shotId,
+  identityId,
   packBuilderUrl,
   me,
   adapterHealth,
@@ -745,6 +803,7 @@ function EpisodeView({
   projectId: string;
   episodeId: string;
   shotId?: string;
+  identityId?: string;
   packBuilderUrl: string;
   me: StudioUser | null;
   adapterHealth: AdapterHealth[];
@@ -769,12 +828,16 @@ function EpisodeView({
   const [entity, setEntity] = useState("");
   const [mediaNotes, setMediaNotes] = useState("");
   const [showBuilder, setShowBuilder] = useState(false);
+  const [identity, setIdentity] = useState<IdentityStoreData | null>(null);
+  const [packDiff, setPackDiff] = useState<PackDiff | null>(null);
+  const [pendingImport, setPendingImport] = useState<{ file?: File; handoffId?: string } | null>(null);
+  const [diffBusy, setDiffBusy] = useState(false);
   const packRef = useRef<HTMLInputElement>(null);
   const mediaRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
-      const [nextEpisode, nextReview, nextComments, nextMedia, nextShots, nextJobs, nextDesk] =
+      const [nextEpisode, nextReview, nextComments, nextMedia, nextShots, nextJobs, nextDesk, nextIdentity] =
         await Promise.all([
           api.episode(episodeId),
           api.review(episodeId),
@@ -783,6 +846,7 @@ function EpisodeView({
           api.shots(episodeId).catch(() => [] as Shot[]),
           api.episodeJobs(episodeId).catch(() => [] as Job[]),
           api.previewDesk(episodeId).catch(() => null),
+          api.identity(episodeId).catch(() => null),
         ]);
       setEpisode(nextEpisode);
       setReview(nextReview);
@@ -791,6 +855,7 @@ function EpisodeView({
       setShots(nextShots);
       setJobs(nextJobs);
       setDesk(nextDesk);
+      setIdentity(nextIdentity);
       setSelectedShotId((current) => {
         if (shotId) return shotId;
         if (current && nextShots.some((shot) => shot.id === current)) return current;
@@ -871,19 +936,47 @@ function EpisodeView({
     }
   }
 
-  async function importPack(file: File) {
+  async function previewThenImport(file?: File, handoffId?: string) {
     try {
-      const result = await api.importPack(episodeId, file);
+      setDiffBusy(true);
+      const diff = await api.previewPackDiff(episodeId, file, handoffId);
+      setPackDiff(diff);
+      setPendingImport({ file, handoffId });
+      onNotice("Review the pack diff, then Confirm import. Not auto-generate.");
+    } catch (err) {
+      onError(err);
+    } finally {
+      setDiffBusy(false);
+    }
+  }
+
+  async function importPack(file?: File, handoffId?: string) {
+    try {
+      const result = await api.importPack(episodeId, file, handoffId);
       onNotice(
         result.all_gates_green
           ? `Imported ${result.filename} — all gates green`
           : `Imported ${result.filename} — gates still red (generate-ok blocked)`,
       );
+      clearPendingHandoff();
+      clearHandoffSearch();
+      setPackDiff(null);
+      setPendingImport(null);
       await load();
     } catch (err) {
       onError(err);
     }
   }
+
+  useEffect(() => {
+    const pending = getPendingHandoff();
+    const file = getPendingFile();
+    if (!pending && !file) return;
+    if (packDiff || pendingImport) return;
+    void previewThenImport(file || undefined, pending?.id);
+    // preview once per episode when a builder handoff is waiting
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episodeId]);
 
   async function exportPack() {
     try {
@@ -936,11 +1029,19 @@ function EpisodeView({
         <div className="toolbar">
           <button
             type="button"
-            className={importHint() ? "btn btn-go" : "btn"}
-            onClick={() => packRef.current?.click()}
-            disabled={!can(me, "pack")}
+            className={importHint() || getPendingHandoff() ? "btn btn-go" : "btn"}
+            onClick={() => {
+              const pending = getPendingHandoff();
+              const file = getPendingFile();
+              if (pending?.id || file) {
+                void previewThenImport(file || undefined, pending?.id);
+                return;
+              }
+              packRef.current?.click();
+            }}
+            disabled={!can(me, "pack") || diffBusy}
           >
-            Import pack zip
+            {getPendingHandoff() || getPendingFile() ? "Import handed-off zip" : "Import pack zip"}
           </button>
           <button type="button" className="btn" onClick={() => void exportPack()}>
             Export pack zip
@@ -1009,7 +1110,7 @@ function EpisodeView({
             hidden
             onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file) void importPack(file);
+              if (file) void previewThenImport(file);
               event.target.value = "";
             }}
           />
@@ -1023,10 +1124,26 @@ function EpisodeView({
           </p>
         ) : (
           <p className="hint">
-            No revision yet. Export from the builder at {packBuilderUrl}, then Import pack zip here
-            {importHint() ? " (handoff from the pack builder)." : "."}
+            No revision yet. Export from the builder at {packBuilderUrl}, then Open in Studio
+            (auto-import after you pick this episode when the handoff carried the zip)
+            {importHint() || getPendingHandoff() ? "." : "."}
           </p>
         )}
+        {packDiff ? (
+          <PackDiffPanel
+            diff={packDiff}
+            canApply={can(me, "pack")}
+            applying={diffBusy}
+            onApply={() => {
+              setDiffBusy(true);
+              void importPack(pendingImport?.file, pendingImport?.handoffId).finally(() => setDiffBusy(false));
+            }}
+            onCancel={() => {
+              setPackDiff(null);
+              setPendingImport(null);
+            }}
+          />
+        ) : null}
         {showBuilder ? (
           <iframe
             className="builder-frame"
@@ -1062,6 +1179,40 @@ function EpisodeView({
           const next = href.startsWith("#") ? href : `#${href}`;
           window.location.hash = next;
         }}
+      />
+
+      <IdentityStore
+        sheets={identity?.sheets || []}
+        plates={identity?.plates || []}
+        shots={shots.map((shot) => ({
+          id: shot.id,
+          sort_index: shot.sort_index,
+          take: shot.take,
+          edit_row_id: shot.edit_row_id,
+        }))}
+        selectedId={identityId}
+        canMutate={can(me, "media")}
+        honesty={identity?.honesty || "Approved sheets and per-window plates. Not embeddings."}
+        onApprove={(assetId) => {
+          void api
+            .approveIdentity(episodeId, assetId)
+            .then(() => {
+              onNotice("Identity asset approved (who/when recorded). Draft no longer — counts for lock-diff / generate readiness.");
+              return load();
+            })
+            .catch(onError);
+        }}
+        onLink={(assetId, nextShotId) => {
+          void api
+            .linkIdentityPlate(episodeId, assetId, nextShotId)
+            .then(() => {
+              onNotice("Plate linked to shot/window.");
+              navigate({ page: "episode", projectId, episodeId, identityId: assetId });
+              return load();
+            })
+            .catch(onError);
+        }}
+        onSelect={(assetId) => navigate({ page: "episode", projectId, episodeId, identityId: assetId })}
       />
 
       <ShotBoard
@@ -1346,6 +1497,9 @@ function EpisodeView({
                     {asset.kind}
                     {asset.entity_type ? ` · ${asset.entity_type}` : ""}
                     {asset.entity_label ? ` · ${asset.entity_label}` : ""}
+                    {asset.kind === "sheet" || asset.kind === "plate"
+                      ? ` · ${asset.approval_status || "draft"}`
+                      : ""}
                   </span>
                 </li>
               ))}

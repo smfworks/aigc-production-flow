@@ -9,18 +9,19 @@ from ..models import ContinuityReceipt, ENTITY_TYPES, Job, MEDIA_KINDS, MediaAss
 from ..packzip import slugify
 from ..rbac import MediaUser, ReadUser
 from ..schemas import MediaAssetOut
+from ..serializers import media_out
 from ..store import get_store
 
 router = APIRouter(tags=["media"])
 
-IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".txt", ".md"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".txt", ".md", ".json"}
 PREVIEW_SUFFIXES = IMAGE_SUFFIXES | {".json", ".mp4", ".webm", ".mov"}
 
 
 @router.get("/api/episodes/{episode_id}/media", response_model=list[MediaAssetOut])
 def list_media(episode_id: str, user: ReadUser, db: DbDep) -> list[MediaAssetOut]:
     episode = get_episode(db, episode_id, user)
-    return [MediaAssetOut.model_validate(row) for row in episode.media]
+    return [media_out(row) for row in episode.media]
 
 
 @router.post(
@@ -107,7 +108,7 @@ async def upload_media(
     )
     db.commit()
     db.refresh(asset)
-    return MediaAssetOut.model_validate(asset)
+    return media_out(asset)
 
 
 @router.get("/api/media/{asset_id}")

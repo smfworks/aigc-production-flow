@@ -15,7 +15,10 @@ JOB_ENQUEUE = "job.enqueue"
 JOB_CANCEL = "job.cancel"
 PACK_IMPORT = "pack.import"
 PACK_EXPORT = "pack.export"
+PACK_DIFF = "pack.diff"
 MEDIA_UPLOAD = "media.upload"
+IDENTITY_APPROVE = "identity.approve"
+IDENTITY_LINK = "identity.link"
 PROJECT_CREATE = "project.create"
 RETENTION_APPLY = "retention.apply"
 COMMENT_CREATE = "comment.create"
@@ -35,7 +38,10 @@ ACTIONS = (
     JOB_CANCEL,
     PACK_IMPORT,
     PACK_EXPORT,
+    PACK_DIFF,
     MEDIA_UPLOAD,
+    IDENTITY_APPROVE,
+    IDENTITY_LINK,
     PROJECT_CREATE,
     RETENTION_APPLY,
     COMMENT_CREATE,

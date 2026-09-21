@@ -36,8 +36,9 @@ export function ContinuityPanel({
         <p>{summary.honesty}</p>
       </div>
       <p className="hint">
-        Entity schedule + lock-diff from the imported pack. Red gates are highlighted. Click a shot
-        to open the board — this is not an NLE.
+        Entity schedule + lock-diff from the imported pack. Identity store is approved
+        sheets/plates — not embeddings. Red gates are highlighted. Click a shot to open the board,
+        or an identity link for the sheet/plate. This is not an NLE.
       </p>
       {red.length ? (
         <ol className="gates">
@@ -78,6 +79,11 @@ export function ContinuityPanel({
                 <span>{shot.entities || "no entities"}</span>
                 {shot.issues.length ? <em>{shot.issues[0]}</em> : null}
               </button>
+              {shot.identity_href ? (
+                <button type="button" className="text-btn" onClick={() => onOpenHref(shot.identity_href || "")}>
+                  identity
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
