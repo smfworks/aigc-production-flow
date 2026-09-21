@@ -1,8 +1,9 @@
-"""Nine-gate honesty for pack.json stored on a PackRevision.
+"""Gate honesty for pack.json stored on a PackRevision.
 
 This is the studio spine's refuse-path, not a rewrite of the TypeScript builder.
-The builder in `app/` remains the operator UI. Studio re-evaluates the same nine
-README gates so `generate-ok` cannot be stamped on a red pack.
+The builder in `app/` remains the operator UI. Studio re-evaluates the same
+README gates (nine plus entity-schedule and lock-diff) so `generate-ok` cannot
+be stamped on a red pack.
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ GATE_DEFS = [
     {"id": "look", "n": 7, "label": "Look card (one style line)"},
     {"id": "audio", "n": 8, "label": "Audio path (exactly one)"},
     {"id": "smoke", "n": 9, "label": "Hop-1 smoke plan (I2VA if a plate exists, else T2V)"},
+    {"id": "entity-schedule", "n": 10, "label": "Entity schedule (who persists on which windows)"},
+    {"id": "lock-diff", "n": 11, "label": "Lock diff (same keywords every hop)"},
 ]
 
 JOIN_TYPES = {"continue", "cut", "fadeblack"}
@@ -422,6 +425,36 @@ def evaluate_smoke(pack: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def evaluate_entity_schedule(pack: dict[str, Any]) -> dict[str, Any]:
+    from .consistency import entity_schedule_problems, is_filled_schedule
+
+    problems = entity_schedule_problems(pack)
+    if problems:
+        return _gate(9, False, "; ".join(problems[:3]))
+    n = sum(1 for row in as_list(pack.get("entitySchedule")) if is_filled_schedule(as_record(row)))
+    noun = "y" if n == 1 else "ies"
+    return _gate(
+        9,
+        True,
+        f"{n} scheduled entit{noun}; windows list them; cut/fadeblack identity holds have plates.",
+    )
+
+
+def evaluate_lock_diff(pack: dict[str, Any]) -> dict[str, Any]:
+    from .consistency import lock_diff_problems
+
+    texts_ok = any(
+        filled(as_record(card).get("name")) and filled(as_record(card).get("lockParagraph"))
+        for card in [*as_list(pack.get("characters")), *as_list(pack.get("props"))]
+    )
+    if not texts_ok:
+        return _gate(10, False, "Need lock paragraphs on named entities before a lock-diff can pass.")
+    problems = lock_diff_problems(pack)
+    if problems:
+        return _gate(10, False, "; ".join(problems[:3]))
+    return _gate(10, True, "Lock keywords match across cards and stills. No rotating synonyms.")
+
+
 EVALUATORS = [
     evaluate_log_line,
     evaluate_map,
@@ -432,6 +465,8 @@ EVALUATORS = [
     evaluate_look,
     evaluate_audio,
     evaluate_smoke,
+    evaluate_entity_schedule,
+    evaluate_lock_diff,
 ]
 
 

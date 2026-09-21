@@ -5,6 +5,7 @@ import {
   type TakeCard,
 } from "../types";
 import { hop1ModeForPlate, hop1PlateStills, isRealStillFile } from "../lib/stills";
+import { missingIdentityHoldPlate, scheduleAppliesToRow } from "../lib/entitySchedule";
 import { SelectField, TextField } from "./Field";
 
 const HOP1_OPTIONS = [
@@ -88,6 +89,28 @@ export function Hop1Fields({ pack, take, onChange, showAttestation }: Props) {
       {take.hop1Mode === "t2v" && isRealStillFile(take.hop1Plate) ? (
         <p className="danger">A plate exists — hop-1 must be I2VA.</p>
       ) : null}
+      {pack.entitySchedule
+        .filter(
+          (row) =>
+            row.identityHold &&
+            (row.take.trim() === "*" || row.take.trim() === take.take.trim()),
+        )
+        .map((row) => {
+          const hopIndex = pack.editList.findIndex(
+            (item, index) =>
+              item.take.trim() === take.take.trim() &&
+              scheduleAppliesToRow(pack, row, index) &&
+              (item.join === "cut" || item.join === "fadeblack"),
+          );
+          if (hopIndex < 0) return null;
+          const gap = missingIdentityHoldPlate(pack, row, hopIndex);
+          if (!gap) return null;
+          return (
+            <p key={row.id} className="danger">
+              {gap} Bind a hop-1 / cut plate whose entity is {row.entityName}.
+            </p>
+          );
+        })}
       {showAttestation ? (
         <>
           <label className="check">

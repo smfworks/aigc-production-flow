@@ -10,6 +10,7 @@ import {
   type CharacterCard,
   type ContinuityRow,
   type EditRow,
+  type EntityScheduleRow,
   type MapRow,
   type PropCard,
   type PropFieldKey,
@@ -101,6 +102,18 @@ export function emptyEditRow(): EditRow {
     action: "",
     hold: "",
     notes: "",
+    entities: "",
+  };
+}
+
+export function emptyEntitySchedule(): EntityScheduleRow {
+  return {
+    id: uid(),
+    entityKind: "",
+    entityName: "",
+    take: "",
+    windows: "all",
+    identityHold: true,
   };
 }
 
@@ -200,6 +213,7 @@ export function emptyPack(): CapturePack {
       extrasForbidden: DEFAULT_LOOK_FORBIDDEN,
     },
     stills: [emptyStill()],
+    entitySchedule: [emptyEntitySchedule()],
     smokeNotes: DEFAULT_SMOKE_NOTES,
     continuityRows: [emptyContinuity()],
     polaroidPath: "",

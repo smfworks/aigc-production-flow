@@ -1,4 +1,6 @@
 import { formatCameraCell, holdOkForJoin, isSingleOfficialCamera } from "./camera.ts";
+import { entityScheduleProblems } from "./entitySchedule.ts";
+import { lockDiffProblems } from "./lockDiff.ts";
 import { filled, isNumericPin, mentionsResearch, stillOk } from "./pack.ts";
 import {
   canvasLooksStretched,
@@ -35,11 +37,13 @@ export const GATE_DEFS = [
   { id: "look", n: 7, label: "Look card (one style line)" },
   { id: "audio", n: 8, label: "Audio path (exactly one)" },
   { id: "smoke", n: 9, label: "Hop-1 smoke plan (I2VA if a plate exists, else T2V)" },
+  { id: "entity-schedule", n: 10, label: "Entity schedule (who persists on which windows)" },
+  { id: "lock-diff", n: 11, label: "Lock diff (same keywords every hop)" },
 ] as const;
 
 export type GateId = (typeof GATE_DEFS)[number]["id"];
 
-export type CardsTab = "characters" | "props" | "look" | "stills";
+export type CardsTab = "characters" | "props" | "look" | "stills" | "schedule";
 
 export const GATE_DESTINATION: Record<GateId, { step: StepId; cardsTab?: CardsTab }> = {
   "log-line": { step: "pack" },
@@ -51,6 +55,8 @@ export const GATE_DESTINATION: Record<GateId, { step: StepId; cardsTab?: CardsTa
   look: { step: "cards", cardsTab: "look" },
   audio: { step: "pack" },
   smoke: { step: "smoke" },
+  "entity-schedule": { step: "cards", cardsTab: "schedule" },
+  "lock-diff": { step: "cards", cardsTab: "characters" },
 };
 
 export type GateResult = {
@@ -429,6 +435,40 @@ function evaluateSmoke(pack: CapturePack): GateResult {
   };
 }
 
+function evaluateEntitySchedule(pack: CapturePack): GateResult {
+  const problems = entityScheduleProblems(pack);
+  if (problems.length) {
+    return { ...GATE_DEFS[9], ok: false, detail: problems.slice(0, 3).join("; ") };
+  }
+  const n = pack.entitySchedule.filter((row) => row.entityName.trim()).length;
+  return {
+    ...GATE_DEFS[9],
+    ok: true,
+    detail: `${n} scheduled entit${n === 1 ? "y" : "ies"}; windows list them; cut/fadeblack identity holds have plates.`,
+  };
+}
+
+function evaluateLockDiff(pack: CapturePack): GateResult {
+  const textsOk = pack.characters.some((card) => filled(card.name) && filled(card.lockParagraph))
+    || pack.props.some((card) => filled(card.name) && filled(card.lockParagraph));
+  if (!textsOk) {
+    return {
+      ...GATE_DEFS[10],
+      ok: false,
+      detail: "Need lock paragraphs on named entities before a lock-diff can pass.",
+    };
+  }
+  const problems = lockDiffProblems(pack);
+  if (problems.length) {
+    return { ...GATE_DEFS[10], ok: false, detail: problems.slice(0, 3).map((item) => item.detail).join("; ") };
+  }
+  return {
+    ...GATE_DEFS[10],
+    ok: true,
+    detail: "Lock keywords match across cards and stills. No rotating synonyms.",
+  };
+}
+
 const EVALUATORS = [
   evaluateLogLine,
   evaluateMap,
@@ -439,6 +479,8 @@ const EVALUATORS = [
   evaluateLook,
   evaluateAudio,
   evaluateSmoke,
+  evaluateEntitySchedule,
+  evaluateLockDiff,
 ];
 
 export function evaluateGates(pack: CapturePack): GateResult[] {

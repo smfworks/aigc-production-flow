@@ -83,6 +83,7 @@ def empty_pack() -> dict[str, Any]:
                 "action": "",
                 "hold": "",
                 "notes": "",
+                "entities": "",
             }
         ],
         "characters": [
@@ -110,6 +111,7 @@ def empty_pack() -> dict[str, Any]:
         ],
         "look": {"styleLine": ""},
         "stills": [],
+        "entitySchedule": [],
         "smokeNotes": "",
         "continuityRows": [],
         "polaroidPath": "",
@@ -157,6 +159,7 @@ def green_pack() -> dict[str, Any]:
                 "action": "title overlay",
                 "hold": "yes before fade",
                 "notes": "",
+                "entities": "smith, francisca",
             }
         ],
         "characters": [
@@ -183,7 +186,52 @@ def green_pack() -> dict[str, Any]:
             }
         ],
         "look": {"styleLine": "Live-action, photoreal cinematic, crushed blacks."},
-        "stills": [],
+        "stills": [
+            {
+                "id": "s1",
+                "entity": "smith",
+                "role": "hop-1 plate",
+                "source": "none",
+                "canvas": "1344×768",
+                "file": none_plate,
+                "conditions": "hop-1 of take A",
+                "lookLock": "",
+                "lockFromStill": "",
+                "forbidden": "",
+                "notes": "Identity hold — public fixture, none + why.",
+            },
+            {
+                "id": "s2",
+                "entity": "francisca",
+                "role": "hop-1 plate",
+                "source": "none",
+                "canvas": "1344×768",
+                "file": none_plate,
+                "conditions": "hop-1 of take A",
+                "lookLock": "",
+                "lockFromStill": "",
+                "forbidden": "",
+                "notes": "Identity hold — public fixture, none + why.",
+            },
+        ],
+        "entitySchedule": [
+            {
+                "id": "sch1",
+                "entityKind": "character",
+                "entityName": "smith",
+                "take": "A",
+                "windows": "all",
+                "identityHold": True,
+            },
+            {
+                "id": "sch2",
+                "entityKind": "prop",
+                "entityName": "francisca",
+                "take": "A",
+                "windows": "all",
+                "identityHold": True,
+            },
+        ],
         "smokeNotes": "One hop-1 per take, watched before hopping.",
         "continuityRows": [],
         "polaroidPath": "",

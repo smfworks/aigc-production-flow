@@ -9,6 +9,7 @@ from ..gates import gate_snapshot
 from ..models import PackRevision, utcnow
 from ..packzip import PackZipError, extract_pack_json, slugify, write_bytes
 from ..schemas import GateSnapshotOut, PackRevisionOut, PackRevisionSummary
+from ..shots import sync_shots_from_pack
 
 router = APIRouter(tags=["packs"])
 
@@ -91,6 +92,7 @@ async def import_pack(
     rel = Path(episode.id) / "revisions" / f"{revision.id}.zip"
     write_bytes(settings.media_path / rel, data)
     revision.zip_path = str(rel)
+    sync_shots_from_pack(db, episode, revision)
     episode.updated_at = utcnow()
     touch(episode.project)
     db.commit()

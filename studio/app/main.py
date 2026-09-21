@@ -8,7 +8,7 @@ from .config import get_settings
 from .database import Base, get_db
 from .deps import DbDep, UserDep
 from .models import Organization
-from .routers import comments, episodes, media, packs, projects, review
+from .routers import comments, episodes, media, packs, projects, review, shots
 from .schemas import MetaOut, OrganizationOut, UserOut
 from .seed import seed_default_org
 
@@ -19,6 +19,7 @@ from . import models as _models  # noqa: F401
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=database_module.engine)
+    database_module.ensure_schema(database_module.engine)
     db = next(get_db())
     try:
         seed_default_org(db)
@@ -33,10 +34,11 @@ def create_app() -> FastAPI:
         title="AIGC Studio Spine",
         version="0.1.0",
         description=(
-            "Phase 1 studio spine for the AIGC production flow. "
+            "Phase 2 studio spine for the AIGC production flow. "
             "Pack zip remains the collaboration contract. "
             "Auth is a local-dev API token — SSO is not in this phase. "
-            "This is not multi-tenant SaaS security."
+            "This is not multi-tenant SaaS security. "
+            "Async generate jobs are deferred to Phase 3."
         ),
         license_info={"name": "MIT", "identifier": "MIT"},
         lifespan=lifespan,
@@ -54,12 +56,13 @@ def create_app() -> FastAPI:
     application.include_router(review.router)
     application.include_router(comments.router)
     application.include_router(media.router)
+    application.include_router(shots.router)
 
     @application.get("/", tags=["meta"])
     def root() -> dict:
         return {
             "name": "AIGC Studio Spine",
-            "phase": 1,
+            "phase": 2,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local-dev Bearer token",

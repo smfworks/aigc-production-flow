@@ -96,6 +96,25 @@ export type EditRow = {
   action: string;
   hold: string;
   notes: string;
+  /** Comma-separated character/prop names present in this window. */
+  entities: string;
+};
+
+export const ENTITY_KINDS = ["character", "prop"] as const;
+export type EntityKind = (typeof ENTITY_KINDS)[number];
+
+/**
+ * Who/what must persist on which takes/windows.
+ * `take` is a take letter or `*` (every take). `windows` is `all`, `hop-1`,
+ * song clocks (`0:18`), or 1-based edit-row numbers (`3`, `#3`, `1-2`).
+ */
+export type EntityScheduleRow = {
+  id: string;
+  entityKind: EntityKind | "";
+  entityName: string;
+  take: string;
+  windows: string;
+  identityHold: boolean;
 };
 
 export type CharacterCard = {
@@ -182,6 +201,7 @@ export type CapturePack = {
   props: PropCard[];
   look: LookCard;
   stills: StillCard[];
+  entitySchedule: EntityScheduleRow[];
   smokeNotes: string;
   continuityRows: ContinuityRow[];
   polaroidPath: string;

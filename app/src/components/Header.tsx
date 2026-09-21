@@ -19,8 +19,9 @@ export function Header({ onLoadSample, onNewPack, onImport }: Props) {
         <strong>sheet</strong> is the character/prop bible; a{" "}
         <strong>plate</strong> is the first frame of this window. Native still
         canvas <strong>1344×768</strong> (do not stretch 1024²). This builder
-        encodes the nine-gate production pack — it does not run a video engine,
-        and it does not export MP4s.
+        encodes the production pack (nine gates plus entity schedule and
+        lock-diff) — it does not run a video engine, and it does not export
+        MP4s.
       </p>
       <p className="lede lede-sub">
         Flow:{" "}

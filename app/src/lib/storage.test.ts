@@ -74,6 +74,7 @@ describe("pack storage v2", () => {
     assert.ok(migrated);
     assert.equal(migrated.takes.length, emptyPack().takes.length);
     assert.equal(migrated.stills.length, emptyPack().stills.length);
+    assert.equal(migrated.entitySchedule.length, emptyPack().entitySchedule.length);
     assert.equal(migrated.characters[0].stillSource, "");
   });
 
@@ -87,6 +88,7 @@ describe("pack storage v2", () => {
       characters: [],
       props: [],
       stills: [],
+      entitySchedule: [],
       continuityRows: [],
     });
     assert.ok(migrated);
@@ -94,6 +96,7 @@ describe("pack storage v2", () => {
     assert.equal(migrated.takes.length, 0);
     assert.equal(migrated.stills.length, 0);
     assert.equal(migrated.characters.length, 0);
+    assert.equal(migrated.entitySchedule.length, 0);
   });
 
   it("coerces invalid audio and speech instead of false-greening", () => {

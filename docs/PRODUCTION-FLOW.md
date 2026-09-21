@@ -64,20 +64,27 @@ The pack builder already refuses export until gates are green. That is the v1 co
 - hop-1 mode: I2VA if a plate exists, else T2V
 - no “research …” language on a pin field
 
-v1.5 (next, still this repo):
+**Phase 2 (this repo, delivered):**
 
-- **Entity schedule** — who/what must persist across which windows (papers: identity is grounding, not local continuation).[6][7][8]
-- **Diff the lock** — same keywords every hop; rotating “brown”/“brunette” is a red gate
+- **Entity schedule** — who/what must persist across which takes/windows. Gate `entity-schedule` fails if a scheduled entity is missing from a required window, or if identity must hold at `cut` / `fadeblack` and no plate is bound to that entity (or explicit `none` + why). `continue` hop 2+ is the latent — no new plate.
+- **Lock-diff** — same identity keywords every hop. Rotating synonyms (`brown` / `brunette`) are a red `lock-diff` gate. The synonym groups are an explicit list, not embeddings.
+- **Studio shot readiness** — edit-list rows map to shots: `draft → candidates → linked → ready`. `ready` means prepared, not generating.
+- **Candidate confirm** — stub extract or manual add; accept / ignore / link existing character|prop|scene|costume assets. Human in the loop. Never auto-stamps `generate-ok`.
+- **Costume** — linkable media kind / entity type in the studio library.
+- **Storyboard canvas** — list (precision) + board of takes/edit rows with join types; join inspector highlights continue chains vs cut/fadeblack boundaries.
+
+Still deferred (Phase 3+):
+
 - **Preview receipt** — ffprobe + still-vs-lock + NG reason required before hop 2+
-- **License/output policy** — public tree never takes likeness stills or engine MP4s
+- Async generate jobs with cancel/retry (Celery / GPU queue)
+- NLE, SSO / multi-tenant isolation
 
-v2 (platform):
+v2 leftover (platform, do not pretend we have it):
 
 - visual identity store (approved sheet + per-window plates), not a pasted wardrobe paragraph
-- review states: draft / needs-art / needs-edit / preview-watched / generate-ok
 - async generate jobs with cancel/retry, one engine adapter at a time per GPU
 
-**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + nine-gate snapshot). `generate-ok` is refused unless that snapshot is all green. Auth is a local-dev API token — not SSO. Async generate jobs stay deferred. Operator path: [STUDIO.md](STUDIO.md).
+**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). `generate-ok` is refused unless that snapshot is all green. Auth is a local-dev API token — not SSO. Operator path: [STUDIO.md](STUDIO.md).
 
 ## Multi-user collaboration
 
@@ -130,10 +137,10 @@ The flow is real when:
 
 1. A stranger can name the four stages from the README without seeing “MiniMax” in the title.
 2. The builder walks Script → Assets → Storyboard → Preview.
-3. Export still requires nine green gates.
+3. Export still requires every gate green (nine README gates plus entity-schedule and lock-diff).
 4. A pack zip round-trips without a GPU.
 5. GPU spend still happens somewhere else, after preview.
-6. Studio `generate-ok` is refused unless the stored nine-gate snapshot is green.
+6. Studio `generate-ok` is refused unless the stored gate snapshot is all green. Shot `ready` is prepared, not generating.
 
 ## Sources
 

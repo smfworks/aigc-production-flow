@@ -35,8 +35,9 @@ def set_review(episode_id: str, body: ReviewSet, user: UserDep, db: DbDep) -> Re
                 detail={
                     "code": "gates_not_green",
                     "message": (
-                        "Refuse generate-ok until the latest pack revision shows all nine gates green. "
-                        "Do not skip the four-stage / nine-gate order."
+                        "Refuse generate-ok until the latest pack revision shows all gates green "
+                        "(nine README gates plus entity-schedule and lock-diff). "
+                        "Do not skip the four-stage / gate order. Shot ready ≠ generating."
                     ),
                     "gates": gates or [],
                 },

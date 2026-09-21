@@ -121,6 +121,7 @@ See \`edit-list.md\` in this pack. Every row: join ∈ {continue, cut, fadeblack
 - Props: \`prop-*.md\`
 - Stills: \`still-*.md\`
 - Look: \`look.md\`
+- Entity schedule: \`entity-schedule.md\`
 
 Look lock:
 ${quote(lookLock)}
@@ -329,6 +330,26 @@ A sheet is the bible. A plate is the first frame of a window. Wikipedia is not a
 `;
 }
 
+export function renderEntitySchedule(pack: CapturePack): string {
+  const title = filled(pack.title) ? pack.title.trim() : "{TITLE}";
+  const rows = pack.entitySchedule.map((row) => [
+    row.entityKind,
+    row.entityName,
+    row.take,
+    row.windows || "all",
+    row.identityHold ? "yes" : "no",
+  ]);
+  return `# Entity schedule — ${title}
+
+Who/what must persist across which takes/windows. Identity hold at \`cut\` / \`fadeblack\` needs a plate bound to that entity (or \`none\` + why). \`continue\` hop 2+ is the latent — no new plate.
+
+${table(
+    ["Kind", "Entity", "Take (* = all)", "Windows", "Identity hold"],
+    rows,
+  )}
+`;
+}
+
 export type PackFiles = Record<string, string>;
 
 function uniqueFilename(used: Set<string>, base: string): string {
@@ -350,11 +371,13 @@ export function packToFiles(pack: CapturePack): PackFiles {
     "edit-list.md": renderEditList(pack),
     "look.md": renderLook(pack),
     "continuity-log.md": renderContinuity(pack),
+    "entity-schedule.md": renderEntitySchedule(pack),
   };
   used.add("README.md");
   used.add("edit-list.md");
   used.add("look.md");
   used.add("continuity-log.md");
+  used.add("entity-schedule.md");
 
   for (const card of pack.characters) {
     const name = uniqueFilename(used, `character-${fileSlug(card.name, "unnamed")}.md`);

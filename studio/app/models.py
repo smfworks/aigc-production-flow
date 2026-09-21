@@ -15,7 +15,12 @@ REVIEW_STATES = (
     "generate-ok",
 )
 
-MEDIA_KINDS = ("sheet", "plate", "other")
+MEDIA_KINDS = ("sheet", "plate", "costume", "other")
+ENTITY_TYPES = ("character", "prop", "scene", "costume")
+SHOT_READINESS = ("draft", "candidates", "linked", "ready")
+CANDIDATE_KINDS = ("character", "prop", "scene", "costume")
+CANDIDATE_STATUSES = ("pending", "accepted", "ignored", "linked")
+CANDIDATE_SOURCES = ("stub", "manual")
 
 
 def utcnow() -> datetime:
@@ -96,6 +101,11 @@ class Episode(Base):
         cascade="all, delete-orphan",
         order_by="MediaAsset.created_at.desc()",
     )
+    shots: Mapped[list["Shot"]] = relationship(
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="Shot.sort_index.asc()",
+    )
 
 
 class PackRevision(Base):
@@ -152,8 +162,62 @@ class MediaAsset(Base):
     content_type: Mapped[str] = mapped_column(String(120), default="application/octet-stream")
     path: Mapped[str] = mapped_column(String(500), nullable=False)
     entity_label: Mapped[str] = mapped_column(String(200), default="")
+    entity_type: Mapped[str] = mapped_column(String(32), default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     episode: Mapped[Episode] = relationship(back_populates="media")
+
+
+class Shot(Base):
+    """One edit-list row mapped to a studio shot. ready = prepared, not generating."""
+
+    __tablename__ = "shots"
+    __table_args__ = (UniqueConstraint("episode_id", "edit_row_id", name="uq_shot_episode_row"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    pack_revision_id: Mapped[str | None] = mapped_column(ForeignKey("pack_revisions.id"), nullable=True)
+    edit_row_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    sort_index: Mapped[int] = mapped_column(Integer, default=0)
+    song_t: Mapped[str] = mapped_column(String(40), default="")
+    join: Mapped[str] = mapped_column(String(20), default="")
+    take: Mapped[str] = mapped_column(String(40), default="")
+    location_grade: Mapped[str] = mapped_column(String(200), default="")
+    camera_verb: Mapped[str] = mapped_column(String(40), default="")
+    action: Mapped[str] = mapped_column(Text, default="")
+    entities: Mapped[str] = mapped_column(String(400), default="")
+    readiness: Mapped[str] = mapped_column(String(20), default="draft")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    episode: Mapped[Episode] = relationship(back_populates="shots")
+    candidates: Mapped[list["ShotCandidate"]] = relationship(
+        back_populates="shot",
+        cascade="all, delete-orphan",
+        order_by="ShotCandidate.created_at.asc()",
+    )
+
+
+class ShotCandidate(Base):
+    __tablename__ = "shot_candidates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    shot_id: Mapped[str] = mapped_column(ForeignKey("shots.id"), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    label: Mapped[str] = mapped_column(String(200), nullable=False)
+    evidence: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    source: Mapped[str] = mapped_column(String(20), default="stub")
+    linked_asset_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id"), nullable=True)
+    linked_ref: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    shot: Mapped[Shot] = relationship(back_populates="candidates")
+

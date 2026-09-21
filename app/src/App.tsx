@@ -30,10 +30,30 @@ function typingInField(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
+const CARD_TABS: CardsTab[] = ["characters", "props", "look", "stills", "schedule"];
+
+function stepFromSearch(): StepId {
+  if (typeof window === "undefined") return "pack";
+  const step = new URLSearchParams(window.location.search).get("step");
+  return STEPS.some((item) => item.id === step) ? (step as StepId) : "pack";
+}
+
+function tabFromSearch(): CardsTab {
+  if (typeof window === "undefined") return "characters";
+  const tab = new URLSearchParams(window.location.search).get("tab");
+  return CARD_TABS.includes(tab as CardsTab) ? (tab as CardsTab) : "characters";
+}
+
+function rowFromSearch(): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("row") ?? "";
+}
+
 export default function App() {
   const [pack, setPack] = useState<CapturePack>(() => initialPack(sigilsSample()));
-  const [step, setStep] = useState<StepId>("pack");
-  const [cardsTab, setCardsTab] = useState<CardsTab>("characters");
+  const [step, setStep] = useState<StepId>(stepFromSearch);
+  const [cardsTab, setCardsTab] = useState<CardsTab>(tabFromSearch);
+  const [boardRow, setBoardRow] = useState(rowFromSearch);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -99,7 +119,7 @@ export default function App() {
   const exportZip = useCallback(
     async (asDraft: boolean) => {
       if (asDraft === false && !complete) {
-        showToast("Nine gates not green. Use D for an incomplete draft.");
+        showToast("Nine+ consistency gates not green. Use D for an incomplete draft.");
         return;
       }
       setBusy(true);
@@ -224,6 +244,8 @@ export default function App() {
               pack={pack}
               onChange={setPack}
               gates={gates}
+              selectedId={boardRow}
+              onSelect={setBoardRow}
               onOpenStills={() => {
                 setCardsTab("stills");
                 setStep("cards");

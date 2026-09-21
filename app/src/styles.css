@@ -327,6 +327,133 @@ textarea::placeholder {
   border-color: rgba(244, 63, 94, 0.55);
 }
 
+.row-card.is-selected {
+  border-color: rgba(0, 212, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.25);
+}
+
+.board-wrap {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.board-canvas {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 8px 0 16px;
+  align-items: stretch;
+}
+
+.board-slot {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.board-join {
+  display: flex;
+  align-items: center;
+  min-width: 72px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.board-join span {
+  display: block;
+  width: 100%;
+  text-align: center;
+  border-top: 2px solid var(--line);
+  padding-top: 2px;
+}
+
+.board-join.join-continue span {
+  border-top-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.board-join.join-cut span {
+  border-top-style: dashed;
+  border-top-color: var(--ember);
+  color: var(--ember);
+}
+
+.board-join.join-fade span {
+  border-top-style: dotted;
+  border-top-color: #64748b;
+  color: #94a3b8;
+}
+
+.board-card {
+  width: 220px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #121a33;
+  color: inherit;
+  cursor: pointer;
+}
+
+.board-card.join-continue {
+  border-color: rgba(0, 212, 255, 0.35);
+}
+
+.board-card.join-cut {
+  border-color: rgba(234, 88, 12, 0.55);
+}
+
+.board-card.join-fade {
+  border-color: rgba(148, 163, 184, 0.45);
+  background: #0b1020;
+}
+
+.board-card.is-selected,
+.board-card.in-chain {
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.35);
+}
+
+.board-card.is-bad {
+  border-color: rgba(244, 63, 94, 0.6);
+}
+
+.board-kicker,
+.board-meta,
+.board-cast {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.board-cast.is-muted {
+  opacity: 0.7;
+}
+
+.board-card em {
+  font-style: normal;
+  color: var(--ink);
+  font-size: 0.92em;
+}
+
+.join-inspector {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(10, 15, 31, 0.4);
+}
+
+.join-inspector h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+
 .row-top {
   display: flex;
   justify-content: space-between;

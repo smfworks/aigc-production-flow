@@ -1,6 +1,6 @@
-# AIGC studio API (Phase 1)
+# AIGC studio API (Phase 2)
 
-FastAPI spine for projects, episodes, pack zip revisions, review states, comments, and a local media store.
+FastAPI spine for projects, episodes, pack zip revisions, review states, comments, media (including costume), shots, and candidate confirm.
 
 Operator docs: [../docs/STUDIO.md](../docs/STUDIO.md).
 

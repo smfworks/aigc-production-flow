@@ -8,6 +8,7 @@ import {
   renderCharacter,
   renderContinuity,
   renderEditList,
+  renderEntitySchedule,
   renderLook,
   renderProp,
   renderReadme,
@@ -154,11 +155,16 @@ describe("export matches template shapes", () => {
       "character-thrower.md",
       "continuity-log.md",
       "edit-list.md",
+      "entity-schedule.md",
       "look.md",
       "pack.json",
       "prop-francisca.md",
+      "still-cut-3-2.md",
+      "still-cut-3-3.md",
       "still-cut-3.md",
       "still-francisca-sheet.md",
+      "still-hop1-a-2.md",
+      "still-hop1-a-3.md",
       "still-hop1-a.md",
       "still-hop1-b.md",
       "still-smith-sheet.md",
@@ -176,6 +182,7 @@ describe("export matches template shapes", () => {
     assert.ok(files["edit-list.md"]);
     assert.ok(files["look.md"]);
     assert.ok(files["continuity-log.md"]);
+    assert.ok(files["entity-schedule.md"]);
     assert.ok(files["pack.json"]);
     assert.ok(Object.keys(files).some((name) => name.startsWith("character-")));
     assert.ok(Object.keys(files).some((name) => name.startsWith("prop-")));
@@ -196,6 +203,17 @@ describe("export matches template shapes", () => {
     const files = packToFiles(pack);
     assert.ok(files["character-smith-a-b.md"]);
     assert.ok(files["character-smith-a-b-2.md"]);
+  });
+
+  it("entity-schedule.md matches the template header", () => {
+    const tpl = template("entity-schedule.md");
+    const out = renderEntitySchedule(sigilsSample());
+    assert.match(tpl, /^# Entity schedule — \{TITLE\}/m);
+    assert.match(out, /^# Entity schedule — Sigils in the Steel/m);
+    headerLine(tpl, "Kind \\| Entity \\| Take \\(\\* = all\\) \\| Windows \\| Identity hold");
+    headerLine(out, "Kind \\| Entity \\| Take \\(\\* = all\\) \\| Windows \\| Identity hold");
+    assert.match(out, /\| character \| smith \| A \| all \| yes \|/);
+    assert.match(out, /\| prop \| francisca \| \* \| all \| yes \|/);
   });
 
   it("generate-ready zip README is not a DRAFT", () => {

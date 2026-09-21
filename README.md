@@ -34,7 +34,7 @@ If you are generating a single smoke clip with no continuity, stop. You do not n
 | **3. Storyboard** | Takes (one location + grade) and edit list (`continue` / `cut` / `fadeblack`) | GPU |
 | **4. Video preview** | One hop-1 per take, watched at the planned fades | The rest of the night |
 
-Nine gates still sit under those stages. Details: [docs/PRODUCTION-FLOW.md](docs/PRODUCTION-FLOW.md).
+Nine gates still sit under those stages, plus two Phase 2 consistency gates (`entity-schedule`, `lock-diff`). Details: [docs/PRODUCTION-FLOW.md](docs/PRODUCTION-FLOW.md).
 
 ## How to use this repo on GitHub
 
@@ -65,7 +65,7 @@ Fill every `{TITLE}` / blank. Empty “still” fields must say `none` and why. 
 
 ### 3. Gate (do not queue generate)
 
-Refuse generate until all nine exist:
+Refuse generate until all of these are green:
 
 1. Log line (one sentence)
 2. Map (song clock or narrative beats — **not** shots)
@@ -76,6 +76,8 @@ Refuse generate until all nine exist:
 7. Look card (one style line)
 8. Audio path (exactly one of: `N/A` + mute in the NLE, prompt score, silence)
 9. Hop-1 smoke plan (one hop-1 per take — I2VA if a plate still exists, else T2V — watched, before hopping)
+10. Entity schedule (who/what persists on which takes/windows; identity hold at `cut`/`fadeblack` needs a bound plate)
+11. Lock-diff (same identity keywords every hop — `brown` vs `brunette` is red)
 
 ### 4. Join types (only three)
 
@@ -99,7 +101,7 @@ Default measured window (H3 adapter): 1344×768, 6-step turbo, 10.125 s hop-1. S
 
 ## App
 
-Fill the pack in the browser. The four stages above are the walk; the nine gates are a live checklist. Export is a markdown zip in the same shape as `templates/` — not a generate, and not an MP4.
+Fill the pack in the browser. The four stages above are the walk; the gates (nine README plus entity schedule and lock-diff) are a live checklist. Export is a markdown zip in the same shape as `templates/` — not a generate, and not an MP4.
 
 Live demo: [aigc-production-flow.vercel.app](https://aigc-production-flow.vercel.app) (old slug [h3-longform-capture.vercel.app](https://h3-longform-capture.vercel.app) still points at this build).
 
@@ -111,16 +113,16 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
-## Studio spine (Phase 1) vs pack builder
+## Studio spine (Phase 2) vs pack builder
 
 Two pieces, one contract:
 
 | | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
 |---|---|---|
-| Job | Four-stage / nine-gate walk. Export markdown zip + `pack.json`. | Projects, episodes, pack revisions, review states, comments, sheet/plate store. |
+| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. | Projects, episodes, pack revisions, review states, comments, sheet/plate/costume store, shot readiness, candidate confirm, storyboard canvas. |
 | Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. |
 | Auth | None (browser `localStorage`). | Local-dev API token. **SSO later — not fake multi-tenant SaaS.** |
-| Generate | Refuses export-as-complete until nine green. | Refuses `generate-ok` unless the stored gate snapshot is nine green. |
+| Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless the stored gate snapshot is all green. Shot `ready` ≠ generating. |
 | Not this | NLE, GPU, MP4. | NLE, Celery generate queue, SSO. |
 
 Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/STUDIO.md](docs/STUDIO.md).
@@ -132,7 +134,7 @@ Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/
 # Builder http://localhost:5173
 ```
 
-Create a project → episode → import pack zip → set review state → upload a plate → export pack zip. `generate-ok` stays blocked while any gate is red.
+Create a project → episode → import pack zip → see entity-schedule / lock-diff on the gate list → manage shot readiness and candidates → use the board canvas → export pack zip. `generate-ok` stays blocked while any gate is red.
 
 ## Layout
 
@@ -144,7 +146,7 @@ scripts/dev-studio.sh    local API + studio + builder
 data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 1 studio operator path
+docs/STUDIO.md           Phase 2 studio operator path (shots, canvas, candidates)
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)
 docs/HOW-TO.md           GitHub + local workflow, step by step
