@@ -23,7 +23,11 @@ def test_import_export_pack_zip_round_trip(client, auth):
     body = imported.json()
     assert body["all_gates_green"] is True
     assert body["pack"]["title"] == "Green fixture"
-    assert len(body["gate_snapshot"]["gates"]) == 9
+    assert len(body["gate_snapshot"]["gates"]) == 11
+    assert {gate["id"] for gate in body["gate_snapshot"]["gates"]} >= {
+        "entity-schedule",
+        "lock-diff",
+    }
 
     exported = client.get(f"/api/episodes/{episode['id']}/pack", headers=auth)
     assert exported.status_code == 200

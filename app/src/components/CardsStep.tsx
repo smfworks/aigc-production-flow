@@ -2,10 +2,13 @@ import {
   DEFAULT_LOOK_STYLE,
   DEFAULT_STILL_CANVAS,
   CHARACTER_LOCK_FIELDS,
+  ENTITY_KINDS,
   PROP_FIELDS,
   STILL_ROLES,
   STILL_SOURCES,
   type CapturePack,
+  type EntityKind,
+  type EntityScheduleRow,
   type PropFieldKey,
   type StillCard,
   type StillRole,
@@ -13,11 +16,14 @@ import {
 } from "../types";
 import {
   emptyCharacter,
+  emptyEntitySchedule,
   emptyProp,
   emptyStill,
   stillOk,
 } from "../lib/pack";
 import { propGenerateFlags, type CardsTab, type GateResult } from "../lib/gate";
+import { missingIdentityHoldPlate, scheduleAppliesToRow } from "../lib/entitySchedule";
+import { lockDiffProblems } from "../lib/lockDiff";
 import {
   canvasLooksStretched,
   canvasMatchesHop1,
@@ -45,17 +51,24 @@ export function CardsStep({ pack, onChange, gates, tab, onTab }: Props) {
   return (
     <section>
       <div className="editor-head">
-        <h2>Characters / Props / Look / Stills</h2>
+        <h2>Characters / Props / Look / Stills / Schedule</h2>
         <p>
           Verbatim lock + forbidden + <strong>sheet</strong> path or explicit{" "}
           <code>none</code> and why. Plates (hop-1 / cut / fadeblack first frames)
           live on still cards — do not collapse them into the character/prop
-          sheet. Lyric numbers belong on a prop card before any browser call.
+          sheet. Entity schedule says who persists on which windows. Lyric
+          numbers belong on a prop card before any browser call.
         </p>
       </div>
       <StepIssues
         gates={gates}
-        ids={tab === "stills" ? ["smoke"] : ["characters", "props", "look"]}
+        ids={
+          tab === "stills"
+            ? ["smoke", "lock-diff"]
+            : tab === "schedule"
+              ? ["entity-schedule"]
+              : ["characters", "props", "look", "lock-diff"]
+        }
       />
       <div className="subnav">
         {(
@@ -64,6 +77,7 @@ export function CardsStep({ pack, onChange, gates, tab, onTab }: Props) {
             ["props", "Props"],
             ["look", "Look"],
             ["stills", "Stills"],
+            ["schedule", "Schedule"],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -85,6 +99,7 @@ export function CardsStep({ pack, onChange, gates, tab, onTab }: Props) {
       ) : null}
       {tab === "look" ? <LookEditor pack={pack} onChange={onChange} /> : null}
       {tab === "stills" ? <StillsEditor pack={pack} onChange={onChange} /> : null}
+      {tab === "schedule" ? <ScheduleEditor pack={pack} onChange={onChange} /> : null}
     </section>
   );
 }
@@ -275,6 +290,14 @@ function Characters({ pack, onChange, onOpenStills }: EditorProps) {
               })
             }
           />
+          {lockDiffProblems(pack)
+            .filter((item) => item.entityName.toLowerCase() === card.name.trim().toLowerCase())
+            .slice(0, 2)
+            .map((item) => (
+              <p key={item.detail} className="danger">
+                {item.detail}
+              </p>
+            ))}
           <TextArea
             label="Forbidden"
             value={card.forbidden}
@@ -744,6 +767,12 @@ function StillsEditor({ pack, onChange }: EditorProps) {
             {problems.length ? (
               <p className="danger">{problems.slice(0, 2).join("; ")}</p>
             ) : null}
+            {row.role && row.role !== "sheet" ? (
+              <p className="field-hint">
+                cut / fadeblack identity holds need this plate's <strong>entity</strong> to match
+                the scheduled name (not just "take A hop-1") and conditions to bind the window.
+              </p>
+            ) : null}
           </article>
         );
       })}
@@ -780,5 +809,120 @@ function SheetLockButton({
     <button type="button" className="btn btn-inline" onClick={() => onCopy(sheet.lockFromStill)}>
       Copy lock from sheet still
     </button>
+  );
+}
+
+function ScheduleEditor({ pack, onChange }: EditorProps) {
+  const KIND_OPTIONS = ENTITY_KINDS.map((value) => ({ value, label: value }));
+  function patch(id: string, next: Partial<EntityScheduleRow>) {
+    onChange({
+      ...pack,
+      entitySchedule: pack.entitySchedule.map((item) =>
+        item.id === id ? { ...item, ...next } : item,
+      ),
+    });
+  }
+  return (
+    <>
+      <p className="field-hint">
+        Who/what must persist on which takes/windows. Identity hold at{" "}
+        <code>cut</code> / <code>fadeblack</code> requires a plate still whose
+        entity is this name. <code>continue</code> hop 2+ is the latent.
+      </p>
+      {pack.entitySchedule.map((row) => {
+        const matching = pack.editList
+          .map((_, index) => index)
+          .filter((index) => scheduleAppliesToRow(pack, row, index));
+        const gaps = matching
+          .map((index) => missingIdentityHoldPlate(pack, row, index))
+          .filter(Boolean);
+        return (
+          <article key={row.id} className={gaps.length ? "row-card is-bad" : "row-card"}>
+            <div className="row-top">
+              <span className="row-kicker">
+                {row.entityName || "unnamed"} · take {row.take || "?"}
+              </span>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() =>
+                  onChange({
+                    ...pack,
+                    entitySchedule: pack.entitySchedule.filter((item) => item.id !== row.id),
+                  })
+                }
+              >
+                Remove
+              </button>
+            </div>
+            <div className="grid-3">
+              <SelectField
+                label="Kind"
+                value={row.entityKind}
+                allowEmpty
+                options={KIND_OPTIONS}
+                onChange={(entityKind) =>
+                  patch(row.id, { entityKind: entityKind as EntityKind | "" })
+                }
+              />
+              <TextField
+                label="Entity"
+                value={row.entityName}
+                placeholder="smith / francisca"
+                onChange={(entityName) => patch(row.id, { entityName })}
+              />
+              <TextField
+                label="Take (* = all)"
+                value={row.take}
+                placeholder="A or *"
+                onChange={(take) => patch(row.id, { take })}
+              />
+            </div>
+            <div className="grid-2">
+              <TextField
+                label="Windows"
+                value={row.windows}
+                placeholder="all · hop-1 · 0:18 · #3 · 1-2"
+                hint="all, hop-1, song clocks, or 1-based row numbers."
+                onChange={(windows) => patch(row.id, { windows })}
+              />
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={row.identityHold}
+                  onChange={(event) => patch(row.id, { identityHold: event.target.checked })}
+                />
+                Identity must hold at cut / fadeblack (needs a bound plate)
+              </label>
+            </div>
+            {matching.length ? (
+              <p className="field-hint">
+                Matches edit row{matching.length === 1 ? "" : "s"}{" "}
+                {matching.map((index) => `#${index + 1}`).join(", ")}.
+              </p>
+            ) : (
+              <p className="danger">No edit-list window matches this take/windows pin.</p>
+            )}
+            {gaps.map((gap) => (
+              <p key={gap} className="danger">
+                {gap}
+              </p>
+            ))}
+          </article>
+        );
+      })}
+      <button
+        type="button"
+        className="btn btn-inline"
+        onClick={() =>
+          onChange({
+            ...pack,
+            entitySchedule: [...pack.entitySchedule, emptyEntitySchedule()],
+          })
+        }
+      >
+        Add schedule row
+      </button>
+    </>
   );
 }

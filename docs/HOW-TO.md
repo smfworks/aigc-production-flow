@@ -84,6 +84,8 @@ Public PRs: templates and redacted examples only.
 - [ ] Audio path is one of three
 - [ ] Hop-1 smoke planned per take (I2VA if a plate exists)
 - [ ] Sheet vs plate named; canvas 1344×768 or `none` + why
+- [ ] Entity schedule lists who persists on which windows
+- [ ] Lock paragraphs keep the same identity keywords (no brown/brunette rotation)
 - [ ] No “research X at generate time”
 
 ## After generate
@@ -92,4 +94,4 @@ Fill `continuity-log.md` from `sigils.jsonl` / Comfy history: seed, peak °C, ff
 
 ## Studio spine (optional, local)
 
-The pack builder is enough to fill and zip a bible. If you want projects, review states, comments, and a sheet/plate library around that zip, see [STUDIO.md](STUDIO.md). `generate-ok` cannot be stamped while any of the nine gates is red.
+The pack builder is enough to fill and zip a bible. If you want projects, review states, comments, a sheet/plate/costume library, shot readiness, and a storyboard canvas around that zip, see [STUDIO.md](STUDIO.md). `generate-ok` cannot be stamped while any gate is red.

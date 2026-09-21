@@ -338,3 +338,154 @@ a.btn {
     grid-template-columns: 1fr;
   }
 }
+
+.shot-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.card-btn.is-on {
+  border-color: var(--cyan);
+}
+
+.chip-status {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.chip-status.is-candidates {
+  color: var(--ember);
+  border-color: rgba(234, 88, 12, 0.5);
+}
+
+.chip-status.is-linked {
+  color: var(--cyan);
+  border-color: rgba(0, 212, 255, 0.45);
+}
+
+.chip-status.is-ready {
+  color: var(--go);
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.board-canvas {
+  display: flex;
+  overflow-x: auto;
+  padding: 8px 0 16px;
+  gap: 0;
+}
+
+.board-slot {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.board-join {
+  display: flex;
+  align-items: center;
+  min-width: 72px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.board-join span {
+  display: block;
+  width: 100%;
+  text-align: center;
+  border-top: 2px solid var(--line);
+  padding-top: 2px;
+}
+
+.board-join.join-continue span {
+  border-top-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.board-join.join-cut span {
+  border-top-style: dashed;
+  border-top-color: var(--ember);
+  color: var(--ember);
+}
+
+.board-join.join-fadeblack span {
+  border-top-style: dotted;
+  border-top-color: #94a3b8;
+  color: #94a3b8;
+}
+
+.board-card {
+  width: 220px;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #121a33;
+  color: inherit;
+  cursor: pointer;
+}
+
+.board-card.is-selected,
+.board-card.in-chain {
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.4);
+}
+
+.board-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.board-card em {
+  font-style: normal;
+  font-size: 0.92em;
+}
+
+.join-inspector {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(10, 15, 31, 0.35);
+}
+
+.join-inspector h3,
+.join-inspector h4 {
+  margin: 8px 0;
+  font-family: var(--font-display);
+}
+
+.candidate-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.candidate-list li {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.candidate-list em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.9em;
+}

@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 
 from ..config import get_settings
 from ..deps import DbDep, UserDep, get_episode, touch
-from ..models import MEDIA_KINDS, MediaAsset, utcnow
+from ..models import ENTITY_TYPES, MEDIA_KINDS, MediaAsset, utcnow
 from ..packzip import slugify, write_bytes
 from ..schemas import MediaAssetOut
 
@@ -32,13 +32,22 @@ async def upload_media(
     file: UploadFile = File(...),
     kind: str = Form("other"),
     entity_label: str = Form(""),
+    entity_type: str = Form(""),
     notes: str = Form(""),
 ) -> MediaAssetOut:
     episode = get_episode(db, episode_id)
     if kind not in MEDIA_KINDS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="kind must be sheet, plate, or other.",
+            detail="kind must be sheet, plate, costume, or other.",
+        )
+    entity_kind = entity_type.strip()
+    if kind == "costume" and not entity_kind:
+        entity_kind = "costume"
+    if entity_kind and entity_kind not in ENTITY_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="entity_type must be character, prop, scene, costume, or empty.",
         )
     original = file.filename or "upload.bin"
     suffix = Path(original).suffix.lower()
@@ -63,6 +72,7 @@ async def upload_media(
         content_type=file.content_type or "application/octet-stream",
         path="",
         entity_label=entity_label.strip(),
+        entity_type=entity_kind,
         notes=notes.strip(),
         created_by=user.name,
     )

@@ -268,6 +268,40 @@ export function ensureSheetStill(
   return { ...pack, stills };
 }
 
+/** Bind a named entity's plate to this cut/fadeblack/hop-1 window. */
+export function ensureEntityPlateStill(
+  pack: CapturePack,
+  entityName: string,
+  index: number,
+): CapturePack {
+  const row = pack.editList[index];
+  const name = entityName.trim();
+  if (!row?.join || !name) return pack;
+  const existing = pack.stills.some((card) => {
+    if (card.entity.trim().toLowerCase() !== name.toLowerCase()) return false;
+    if (row.join === "cut") {
+      return card.role === "cut plate" && conditionsMentionsCutRow(card.conditions, index + 1);
+    }
+    return card.role === "hop-1 plate" && conditionsMentionsTake(card.conditions, row.take);
+  });
+  if (existing) return pack;
+  const card: StillCard =
+    row.join === "cut"
+      ? {
+          ...emptyStill(),
+          entity: name,
+          role: "cut plate",
+          conditions: `cut row ${index + 1}`,
+        }
+      : {
+          ...emptyStill(),
+          entity: name,
+          role: "hop-1 plate",
+          conditions: `hop-1 of take ${row.take.trim()}`,
+        };
+  return { ...pack, stills: [...pack.stills.filter((item) => !isBlankStill(item)), card] };
+}
+
 export function ensurePlateStill(pack: CapturePack, index: number): CapturePack {
   const row = pack.editList[index];
   if (!row?.join) return pack;

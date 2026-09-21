@@ -1,4 +1,5 @@
 import type {
+  Board,
   Comment,
   Episode,
   MediaAsset,
@@ -6,6 +7,8 @@ import type {
   Project,
   Review,
   ReviewStateName,
+  Shot,
+  ShotReadiness,
 } from "./types.ts";
 
 const TOKEN_KEY = "smf.aigc-studio.token";
@@ -74,11 +77,19 @@ export const api = {
       body: JSON.stringify({ body }),
     }),
   media: (episodeId: string) => request<MediaAsset[]>(`/api/episodes/${episodeId}/media`),
-  uploadMedia: (episodeId: string, file: File, kind: string, entityLabel: string, notes: string) => {
+  uploadMedia: (
+    episodeId: string,
+    file: File,
+    kind: string,
+    entityLabel: string,
+    notes: string,
+    entityType = "",
+  ) => {
     const data = new FormData();
     data.append("file", file);
     data.append("kind", kind);
     data.append("entity_label", entityLabel);
+    data.append("entity_type", entityType);
     data.append("notes", notes);
     return request<MediaAsset>(`/api/episodes/${episodeId}/media`, { method: "POST", body: data });
   },
@@ -92,6 +103,34 @@ export const api = {
     );
   },
   exportPackUrl: (episodeId: string) => `/api/episodes/${episodeId}/pack`,
+  shots: (episodeId: string) => request<Shot[]>(`/api/episodes/${episodeId}/shots`),
+  board: (episodeId: string) => request<Board>(`/api/episodes/${episodeId}/board`),
+  extractCandidates: (episodeId: string) =>
+    request<Shot[]>(`/api/episodes/${episodeId}/shots/extract-candidates`, { method: "POST" }),
+  setShotReadiness: (episodeId: string, shotId: string, readiness: ShotReadiness) =>
+    request<Shot>(`/api/episodes/${episodeId}/shots/${shotId}/readiness`, {
+      method: "PUT",
+      body: JSON.stringify({ readiness }),
+    }),
+  addCandidate: (
+    episodeId: string,
+    shotId: string,
+    body: { kind: string; label: string; evidence?: string },
+  ) =>
+    request<Shot>(`/api/episodes/${episodeId}/shots/${shotId}/candidates`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }).then(() => request<Shot>(`/api/episodes/${episodeId}/shots/${shotId}`)),
+  updateCandidate: (
+    episodeId: string,
+    shotId: string,
+    candidateId: string,
+    body: { status?: string; linked_asset_id?: string; linked_ref?: string },
+  ) =>
+    request(`/api/episodes/${episodeId}/shots/${shotId}/candidates/${candidateId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }).then(() => request<Shot>(`/api/episodes/${episodeId}/shots/${shotId}`)),
 };
 
 async function saveDownload(response: Response, fallback: string): Promise<void> {

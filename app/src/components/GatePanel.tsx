@@ -25,36 +25,42 @@ export function GatePanel({
   onJump,
 }: Props) {
   const green = gates.filter((gate) => gate.ok).length;
+  const total = gates.length || 1;
   const helpRef = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     if (helpRef.current) helpRef.current.open = helpOpen;
   }, [helpOpen]);
   return (
-    <aside className="gate" aria-label="Nine gates">
+    <aside className="gate" aria-label="Pack gates">
       <div>
         <p className="eyebrow">Do not queue Comfy</p>
         <h2>Gate</h2>
         <p className="gate-lede">
-          Refuse generate until all nine exist. Hop-1 is I2VA if a plate
-          exists, else T2V. Export is the pack zip, not a render.
+          Refuse generate until every gate is green, including entity schedule
+          and lock-diff. Hop-1 is I2VA if a plate exists, else T2V. Export is
+          the pack zip, not a render.
         </p>
       </div>
-      <p className="gate-score">{green} / 9 green</p>
+      <p className="gate-score">
+        {green} / {total} green
+      </p>
       <div
         className={complete ? "gate-meter is-ready" : "gate-meter"}
         role="meter"
-        aria-label={`${green} of 9 gates green`}
+        aria-label={`${green} of ${total} gates green`}
         aria-valuemin={0}
-        aria-valuemax={9}
+        aria-valuemax={total}
         aria-valuenow={green}
       >
-        <span style={{ width: `${Math.round((green / 9) * 100)}%` }} />
+        <span style={{ width: `${Math.round((green / total) * 100)}%` }} />
       </div>
       {complete ? (
-        <p className="ok-note">Ready to queue Comfy? Yes. Nine lights honest. Export is the pack zip, not a render.</p>
+        <p className="ok-note">
+          Ready to queue Comfy? Yes. {total} lights honest. Export is the pack zip, not a render.
+        </p>
       ) : (
         <p className="danger">
-          Ready to queue Comfy? No. {green}/9. Export pack zip stays off until
+          Ready to queue Comfy? No. {green}/{total}. Export pack zip stays off until
           every light is honest.
         </p>
       )}

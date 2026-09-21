@@ -8,6 +8,7 @@ import {
   type CharacterCard,
   type ContinuityRow,
   type EditRow,
+  type EntityScheduleRow,
   type Hop1Mode,
   type LookCard,
   type MapRow,
@@ -100,6 +101,20 @@ function migrateEdit(row: unknown): EditRow {
     action: asString(rec.action),
     hold: asString(rec.hold),
     notes: asString(rec.notes),
+    entities: asString(rec.entities),
+  };
+}
+
+function migrateSchedule(row: unknown): EntityScheduleRow {
+  const rec = asRecord(row) ?? {};
+  const kind = asString(rec.entityKind);
+  return {
+    id: asString(rec.id, uid()),
+    entityKind: kind === "character" || kind === "prop" ? kind : "",
+    entityName: asString(rec.entityName),
+    take: asString(rec.take),
+    windows: asString(rec.windows, "all"),
+    identityHold: asBool(rec.identityHold, true),
   };
 }
 
@@ -234,6 +249,7 @@ export function migratePack(raw: unknown): CapturePack | null {
     props: migrateList(rec.props, blank.props, migrateProp),
     look: migrateLook(look),
     stills: migrateList(rec.stills, blank.stills, migrateStill),
+    entitySchedule: migrateList(rec.entitySchedule, blank.entitySchedule, migrateSchedule),
     smokeNotes: asString(rec.smokeNotes, DEFAULT_SMOKE_NOTES),
     continuityRows: migrateList(rec.continuityRows, blank.continuityRows, migrateContinuity),
     polaroidPath: asString(rec.polaroidPath),

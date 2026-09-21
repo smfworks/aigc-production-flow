@@ -18,12 +18,28 @@ function gate(pack: CapturePack, id: string) {
   return found;
 }
 
-describe("nine README gates", () => {
-  it("exposes nine gates in README order", () => {
-    assert.equal(GATE_DEFS.length, 9);
+describe("README gates (nine + consistency)", () => {
+  it("exposes eleven gates in README order", () => {
+    assert.equal(GATE_DEFS.length, 11);
     assert.deepEqual(
       GATE_DEFS.map((row) => row.n),
-      [1, 2, 3, 4, 5, 6, 7, 8, 9],
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    );
+    assert.deepEqual(
+      GATE_DEFS.map((row) => row.id),
+      [
+        "log-line",
+        "map",
+        "edit-list",
+        "takes",
+        "characters",
+        "props",
+        "look",
+        "audio",
+        "smoke",
+        "entity-schedule",
+        "lock-diff",
+      ],
     );
   });
 
@@ -48,7 +64,7 @@ describe("nine README gates", () => {
     assert.equal(propGenerateFlags(pack.props[0]).overallHaftUnresolved, true);
   });
 
-  it("a numeric-haft stand-in can clear all nine", () => {
+  it("a numeric-haft stand-in can clear all eleven", () => {
     const pack = sigilsGenerateReady();
     const red = evaluateGates(pack).filter((row) => !row.ok);
     assert.deepEqual(red, []);
@@ -327,5 +343,22 @@ describe("gate 9 smoke", () => {
     pack.stills[0].canvas = "1024×1024";
     assert.equal(gate(pack, "smoke").ok, false);
     assert.match(gate(pack, "smoke").detail, /1024/);
+  });
+
+  it("entity-schedule fails when a window drops a scheduled entity", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.editList[0].entities = "";
+    assert.equal(gate(pack, "entity-schedule").ok, false);
+    assert.match(gate(pack, "entity-schedule").detail, /missing from that window/i);
+  });
+
+  it("lock-diff fails rotating brown/brunette", () => {
+    const pack = clonePack(sigilsGenerateReady());
+    pack.characters[0].lockParagraph = "Same face, brown hair, and wardrobe every hop.";
+    const plate = pack.stills.find((card) => card.entity === "smith" && card.role === "hop-1 plate");
+    assert.ok(plate);
+    plate.lockFromStill = "Brunette hair locked from this still.";
+    assert.equal(gate(pack, "lock-diff").ok, false);
+    assert.match(gate(pack, "lock-diff").detail, /brunette/i);
   });
 });

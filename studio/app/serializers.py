@@ -33,6 +33,7 @@ def episode_out(episode: Episode) -> EpisodeOut:
         latest_revision=revision_summary(latest),
         comment_count=len(episode.comments),
         media_count=len(episode.media),
+        shot_count=len(episode.shots),
         created_at=episode.created_at,
         updated_at=episode.updated_at,
     )

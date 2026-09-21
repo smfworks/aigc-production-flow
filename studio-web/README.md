@@ -1,6 +1,6 @@
 # Studio shell (Phase 1)
 
-Thin Vite + React UI around the studio API. The nine-gate builder stays in `../app/`.
+Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 2 adds shot readiness, candidate confirm, costume media, and a storyboard canvas.
 
 ```bash
 # from repo root

@@ -8,8 +8,10 @@ import type {
   Project,
   Review,
   ReviewStateName,
+  Shot,
 } from "./types.ts";
 import { REVIEW_COPY, REVIEW_STATES } from "./types.ts";
+import { ShotBoard } from "./ShotBoard.tsx";
 
 type View =
   | { page: "projects" }
@@ -53,14 +55,15 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 1</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 2</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects and episodes around the pack zip. The nine-gate builder stays in{" "}
-          <code>app/</code> — this shell does not rewrite it, and it does not run a
-          generate queue.
+          Projects and episodes around the pack zip. The builder in{" "}
+          <code>app/</code> still fills gates. This shell adds shot readiness,
+          candidate confirm, and a storyboard canvas. It does not run a generate
+          queue.
         </p>
         <div className="auth-row">
           <label>
@@ -308,8 +311,8 @@ function ProjectView({
                   {episode.review_state}
                   {episode.latest_revision
                     ? episode.latest_revision.all_gates_green
-                      ? " · nine green"
-                      : " · gates red"
+                    ? " · gates green"
+                    : " · gates red"
                     : " · no pack yet"}
                 </span>
               </button>
@@ -340,9 +343,11 @@ function EpisodeView({
   const [review, setReview] = useState<Review | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [media, setMedia] = useState<MediaAsset[]>([]);
+  const [shots, setShots] = useState<Shot[]>([]);
   const [commentBody, setCommentBody] = useState("");
   const [note, setNote] = useState("");
   const [kind, setKind] = useState("plate");
+  const [entityType, setEntityType] = useState("");
   const [entity, setEntity] = useState("");
   const [mediaNotes, setMediaNotes] = useState("");
   const [showBuilder, setShowBuilder] = useState(false);
@@ -351,16 +356,18 @@ function EpisodeView({
 
   const load = useCallback(async () => {
     try {
-      const [nextEpisode, nextReview, nextComments, nextMedia] = await Promise.all([
+      const [nextEpisode, nextReview, nextComments, nextMedia, nextShots] = await Promise.all([
         api.episode(episodeId),
         api.review(episodeId),
         api.comments(episodeId),
         api.media(episodeId),
+        api.shots(episodeId).catch(() => [] as Shot[]),
       ]);
       setEpisode(nextEpisode);
       setReview(nextReview);
       setComments(nextComments);
       setMedia(nextMedia);
+      setShots(nextShots);
     } catch (err) {
       onError(err);
     }
@@ -391,7 +398,7 @@ function EpisodeView({
       const result = await api.importPack(episodeId, file);
       onNotice(
         result.all_gates_green
-          ? `Imported ${result.filename} — nine gates green`
+          ? `Imported ${result.filename} — all gates green`
           : `Imported ${result.filename} — gates still red (generate-ok blocked)`,
       );
       await load();
@@ -423,7 +430,7 @@ function EpisodeView({
 
   async function uploadMedia(file: File) {
     try {
-      await api.uploadMedia(episodeId, file, kind, entity.trim(), mediaNotes.trim());
+      await api.uploadMedia(episodeId, file, kind, entity.trim(), mediaNotes.trim(), entityType);
       setEntity("");
       setMediaNotes("");
       onNotice(`Uploaded ${file.name} (${kind})`);
@@ -442,7 +449,7 @@ function EpisodeView({
         <h2>{episode?.title ?? "Episode"}</h2>
         <p>
           Chapter {episode?.chapter ?? "—"}.{" "}
-          {episode?.synopsis || "Import a pack zip from the builder. generate-ok stays locked until nine green."}
+          {episode?.synopsis || "Import a pack zip from the builder. generate-ok stays locked until every gate is green."}
         </p>
       </div>
 
@@ -475,7 +482,7 @@ function EpisodeView({
         {episode?.latest_revision ? (
           <p className="hint">
             Latest: {episode.latest_revision.filename}
-            {episode.latest_revision.all_gates_green ? " · nine green" : " · not generate-ready"}
+            {episode.latest_revision.all_gates_green ? " · gates green" : " · not generate-ready"}
           </p>
         ) : (
           <p className="hint">No revision yet. Export from the builder at {packBuilderUrl}, then import here.</p>
@@ -484,13 +491,13 @@ function EpisodeView({
           <iframe
             className="builder-frame"
             title="Pack builder"
-            src={packBuilderUrl}
+            src={`${packBuilderUrl}?step=edit`}
           />
         ) : null}
       </section>
 
       <section className="panel">
-        <h3>Nine gates</h3>
+        <h3>Gates</h3>
         {gates.length === 0 ? (
           <p className="empty">Import a pack to snapshot the gates.</p>
         ) : (
@@ -507,6 +514,46 @@ function EpisodeView({
           </ol>
         )}
       </section>
+
+      <ShotBoard
+        shots={shots}
+        media={media}
+        packBuilderUrl={packBuilderUrl}
+        onExtract={() => {
+          void api
+            .extractCandidates(episodeId)
+            .then((next) => {
+              setShots(next);
+              onNotice("Candidates extracted — confirm by hand. generate-ok is unchanged.");
+            })
+            .catch(onError);
+        }}
+        onReadiness={(shotId, readiness) => {
+          void api
+            .setShotReadiness(episodeId, shotId, readiness)
+            .then((next) => {
+              setShots((current) => current.map((shot) => (shot.id === next.id ? next : shot)));
+              onNotice(`Shot → ${readiness} (prepared, not generating)`);
+            })
+            .catch(onError);
+        }}
+        onCandidate={(shotId, candidateId, body) => {
+          void api
+            .updateCandidate(episodeId, shotId, candidateId, body)
+            .then((next) => {
+              setShots((current) => current.map((shot) => (shot.id === next.id ? next : shot)));
+            })
+            .catch(onError);
+        }}
+        onAddCandidate={(shotId, body) => {
+          void api
+            .addCandidate(episodeId, shotId, body)
+            .then((next) => {
+              setShots((current) => current.map((shot) => (shot.id === next.id ? next : shot)));
+            })
+            .catch(onError);
+        }}
+      />
 
       <section className="panel">
         <h3>Review state</h3>
@@ -570,12 +617,20 @@ function EpisodeView({
         </div>
         <div className="panel">
           <h3>Media library</h3>
-          <p className="hint">Sheets and plates only. No engine MP4s. Files land in gitignored data/media/.</p>
+          <p className="hint">Sheets, plates, and costumes. No engine MP4s. Files land in gitignored data/media/.</p>
           <div className="create-row">
             <select value={kind} onChange={(event) => setKind(event.target.value)}>
               <option value="sheet">sheet</option>
               <option value="plate">plate</option>
+              <option value="costume">costume</option>
               <option value="other">other</option>
+            </select>
+            <select value={entityType} onChange={(event) => setEntityType(event.target.value)}>
+              <option value="">entity type</option>
+              <option value="character">character</option>
+              <option value="prop">prop</option>
+              <option value="scene">scene</option>
+              <option value="costume">costume</option>
             </select>
             <input
               placeholder="Entity / take label"
@@ -617,6 +672,7 @@ function EpisodeView({
                   </button>
                   <span>
                     {asset.kind}
+                    {asset.entity_type ? ` · ${asset.entity_type}` : ""}
                     {asset.entity_label ? ` · ${asset.entity_label}` : ""}
                   </span>
                 </li>
@@ -625,7 +681,7 @@ function EpisodeView({
           )}
         </div>
       </section>
-      <p className="hint">Project {projectId}. Builder remains the four-stage / nine-gate walk.</p>
+      <p className="hint">Project {projectId}. Builder remains the four-stage walk. generate-ok still needs every gate green.</p>
     </div>
   );
 }

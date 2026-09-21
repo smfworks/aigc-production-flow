@@ -11,7 +11,12 @@ ReviewStateName = Literal[
     "generate-ok",
 ]
 
-MediaKind = Literal["sheet", "plate", "other"]
+MediaKind = Literal["sheet", "plate", "costume", "other"]
+EntityType = Literal["character", "prop", "scene", "costume", ""]
+ShotReadiness = Literal["draft", "candidates", "linked", "ready"]
+CandidateKind = Literal["character", "prop", "scene", "costume"]
+CandidateStatus = Literal["pending", "accepted", "ignored", "linked"]
+CandidateSource = Literal["stub", "manual"]
 
 
 class UserOut(BaseModel):
@@ -22,7 +27,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 1
+    phase: int = 2
     auth_mode: Literal["local-dev"] = "local-dev"
     sso: str = "not in this phase — do not treat this token as multi-tenant SaaS security"
     pack_builder_url: str
@@ -115,6 +120,7 @@ class EpisodeOut(BaseModel):
     latest_revision: PackRevisionSummary | None = None
     comment_count: int = 0
     media_count: int = 0
+    shot_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -167,8 +173,72 @@ class MediaAssetOut(BaseModel):
     content_type: str
     path: str
     entity_label: str
+    entity_type: str = ""
     notes: str
     created_by: str
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CandidateOut(BaseModel):
+    id: str
+    shot_id: str
+    kind: CandidateKind
+    label: str
+    evidence: str
+    status: CandidateStatus
+    source: CandidateSource
+    linked_asset_id: str | None = None
+    linked_ref: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class CandidateCreate(BaseModel):
+    kind: CandidateKind
+    label: str = Field(min_length=1, max_length=200)
+    evidence: str = ""
+
+
+class CandidateUpdate(BaseModel):
+    status: CandidateStatus | None = None
+    linked_asset_id: str | None = None
+    linked_ref: str | None = None
+    kind: CandidateKind | None = None
+    label: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class ShotOut(BaseModel):
+    id: str
+    episode_id: str
+    pack_revision_id: str | None = None
+    edit_row_id: str
+    sort_index: int
+    song_t: str
+    join: str
+    take: str
+    location_grade: str
+    camera_verb: str
+    action: str
+    entities: str
+    readiness: ShotReadiness
+    candidates: list[CandidateOut] = []
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ShotReadinessSet(BaseModel):
+    readiness: ShotReadiness
+    note: str = ""
+
+
+class BoardOut(BaseModel):
+    shots: list[ShotOut]
+    continue_chains: list[list[str]]
+    boundaries: list[dict[str, str]]
+
