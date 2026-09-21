@@ -101,7 +101,7 @@ Default measured window (H3 adapter): 1344×768, 6-step turbo, 10.125 s hop-1. S
 
 Fill the pack in the browser. The four stages above are the walk; the nine gates are a live checklist. Export is a markdown zip in the same shape as `templates/` — not a generate, and not an MP4.
 
-Live demo: [h3-longform-capture.vercel.app](https://h3-longform-capture.vercel.app) (Vercel project name is historical).
+Live demo: [aigc-production-flow.vercel.app](https://aigc-production-flow.vercel.app) (old slug [h3-longform-capture.vercel.app](https://h3-longform-capture.vercel.app) still points at this build).
 
 ```bash
 cd app && npm i && npm run dev
@@ -120,6 +120,7 @@ docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)
 docs/HOW-TO.md           GitHub + local workflow, step by step
+docs/REVIEW.md           end-to-end review of the pack builder (2026-09-17)
 docs/SOURCES.md          citations
 examples/                Sigils lessons (process only, no MP4s)
 ```
