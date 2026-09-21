@@ -1,4 +1,4 @@
-# Studio spine (Phase 10)
+# Studio spine (Phase 11)
 
 Studio is the primary create surface. Projects, Task Center, Budget, and Audit chrome can start a pack: **New project**, **New blank pack**, **New from template**, or a **brain dump**. The four stages (Script → Assets → Storyboard → Preview) edit inside the episode. **Export for agent** downloads a zip an agent (Hermes, OpenClaw, or a Grok bot) can feed to Comfy MCP — still sheets and plates, then hop-1 clips. Pack zip remains the collaboration/export contract. It is not CapCut and not a generate API that invents MP4s.
 
@@ -129,9 +129,16 @@ Registry: `stub` (default, not live) plus documented slots `comfy-h3` (clip), `c
 |---|---|---|
 | `STUDIO_STILL_ADAPTER` | `stub` | `stub` \| `comfy-qwen` \| `webhook` \| `cli` |
 | `STUDIO_CLIP_ADAPTER` | `stub` | `stub` \| `comfy-h3` \| `webhook` \| `cli` |
-| `STUDIO_ADAPTER_WEBHOOK_URL` | empty | Transport for live slots. Unset → **not live**, stub only |
-| `STUDIO_ADAPTER_CLI` | empty | `{job_id} {job_type} {episode_id} {shot_id}` template; JSON on stdin |
+| `STUDIO_ADAPTER_WEBHOOK_URL` | empty | Fallback transport when native Comfy lanes are unset. Unset → **not live**, stub only |
+| `STUDIO_ADAPTER_CLI` | empty | `{job_id} {job_type} {episode_id} {shot_id}` template; JSON on stdin. Fallback when lanes are unset |
 | `STUDIO_ADAPTER_TIMEOUT_SECONDS` | `60` | Must be > 0 (schema-validated) |
+| `STUDIO_COMFY_STILL_LANES` | empty | Comma-separated ComfyUI base URLs for Qwen-Image. Empty → comfy-qwen is **not live** |
+| `STUDIO_COMFY_CLIP_LANES` | empty | Comma-separated ComfyUI base URLs for MiniMax H3. Empty → comfy-h3 is **not live** |
+| `STUDIO_COMFY_IMAGE_LANES_FOR_FREE` | empty | Sibling still lanes. Studio `POST /free`s them before a clip when they share VRAM |
+| `STUDIO_COMFY_ALLOW_HOSTS` | empty | Extra trusted hostnames. Loopback and private IPs are already allowed |
+| `STUDIO_COMFY_OUT_DIR` | media root `comfy/` | Where the client writes the PNG or mp4 before the media store copies it |
+| `STUDIO_COMFY_H3_STYLES` | empty | Optional JSON `{ "name": {"file", "trigger"} }`. No style LoRA unless you set this |
+| `STUDIO_COMFY_POLL_INTERVAL_SECONDS` | `15` | How often a running clip job checks ComfyUI history |
 
 Measured window metadata (declared on the slot, not a generate):
 
@@ -152,7 +159,40 @@ export STUDIO_ADAPTER_WEBHOOK_URL="http://127.0.0.1:8188/studio-hook"   # or
 export STUDIO_ADAPTER_CLI="/path/to/comfy-hook.sh {job_id} {job_type} {episode_id} {shot_id}"
 ```
 
-Honesty labels in the studio adapter strip: **ok** (stub), **not live** (hook unset), **live**, or **down**. Studio chrome never claims H3/Qwen ran unless a live hook is configured *and* reachable.
+Honesty labels in the studio adapter strip: **ok** (stub), **not live** (hook unset), **live**, or **down**. A **lanes** badge means `STUDIO_COMFY_*_LANES` is set. Studio chrome never claims H3 or Qwen ran unless a live adapter actually ran. Stub receipts keep `called_comfy` off. Export for agent still does not call Comfy.
+
+## Phase 11 — native ComfyUI stills and clips
+
+When the lane env vars are set, `comfy-qwen` and `comfy-h3` talk to ComfyUI directly (Python, no Node plugin). When they are unset, behavior matches earlier phases: **not live**, enqueue resolves to stub.
+
+| | Qwen-Image still (`comfy-qwen`) | MiniMax H3 clip (`comfy-h3`) |
+|---|---|---|
+| Pick | `GET /queue` on each lane. A free lane runs. If every lane is busy or down, the job fails with a clear refusal. Studio does not sit behind a long render. | Same, on the clip lanes |
+| Dispatch | `POST /prompt` with the Qwen graph. Poll `GET /history/<id>`. Download `GET /view`. | Returns `{job_id, eta}` on the Studio job immediately. Poll the job until the mp4 path is stored |
+| Output key | `images` | `images` (a `video` key alone is not done) |
+| Sizes | `square` 1328², `landscape` 1664×928, `portrait` 928×1664, `studio` / `pack` 1344×768 | 960×544. Frame count snaps **down** onto 17n+5 at 24 fps. Max 362 frames (~15.1s). Default hop-1 stays **10.125s / 243f**. The snap is on the job receipt |
+| Quality | 20 steps | `full`: 20 steps, no SigmaShift. `fast` or `turbo`: 8 steps and SigmaShift 12.0 / 3.0. SigmaShift is not applied on full |
+| Files | Checkpoint names from env (`STUDIO_COMFY_QWEN_*`). See `studio/comfy.example.json` | `STUDIO_COMFY_H3_*`. Style LoRA only if `STUDIO_COMFY_H3_STYLES` is set |
+| Result | PNG path text on the job. Bytes live in the media store | mp4 path text after the poll. Bytes live in the media store |
+| Watch | Hop-1 watch stays required | A finished clip does **not** stamp preview-watched |
+
+Edits: a prompt may include `reference: /path/to/file` (up to 10). Those paths are recorded as text. The still graph Studio sends is the published text-to-image graph. Pixels are not copied into the receipt.
+
+Security: lane URLs must be `http`/`https` on loopback, a private address, or a name listed in `STUDIO_COMFY_ALLOW_HOSTS`. Do not point Studio at a public ComfyUI. ComfyUI on these lanes has no auth of its own. Keep it on `127.0.0.1` or a private network.
+
+Honesty: `honesty.called_comfy` on an agent export stays false. Export does not generate. Running live jobs and then exporting is a later option, not this endpoint. A stub job never sets `called_comfy`. A refused busy lane does not either. A prompt ComfyUI accepted does.
+
+Example (override the ports; they are not the only legal values):
+
+```bash
+export STUDIO_STILL_ADAPTER=comfy-qwen
+export STUDIO_CLIP_ADAPTER=comfy-h3
+export STUDIO_COMFY_STILL_LANES="http://127.0.0.1:8190"
+export STUDIO_COMFY_CLIP_LANES="http://127.0.0.1:8188"
+export STUDIO_COMFY_IMAGE_LANES_FOR_FREE="http://127.0.0.1:8190"
+```
+
+Attribution: MIT, Copyright (c) 2026 tonyd2wild, DeepSeek-Harness-Image-Tools and DeepSeek-Harness-Video-Tools. See [NOTICE](../NOTICE) and [THIRD_PARTY.md](../THIRD_PARTY.md). Studio is a rewrite for this stack. No DeepSeek endorsement. We do not own MiniMax, Qwen, or ComfyUI.
 
 ## Visual identity store
 

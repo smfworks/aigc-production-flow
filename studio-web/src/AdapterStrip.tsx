@@ -45,13 +45,14 @@ export function AdapterStrip({
             : row.config_present
               ? " · down"
               : " · not live"}
+          {row.lanes_configured ? <em className="adapter-badge">lanes</em> : null}
         </span>
       ))}
       <span className="hint">
         Defaults still={stillDefault || "stub"} · clip={clipDefault || "stub"}. Stub is the CI
-        default. Unset live hooks are <strong>not live</strong> and stay stub. comfy-h3 window is
-        measured 10.125s / 243f @ 24fps. Health is a dry-run, not a generate. Live adapters never
-        skip hop-1 watch.
+        default. Unset ComfyUI lanes are <strong>not live</strong> and stay stub. A configured
+        lane that cannot be reached is <strong>down</strong>. comfy-h3 window is measured 10.125s
+        / 243f @ 24fps. Health is a dry-run, not a generate. Live adapters never skip hop-1 watch.
       </span>
       {liveUnhealthy.length ? (
         <span className="hint adapter-warn">

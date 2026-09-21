@@ -1,6 +1,8 @@
-# AIGC studio API (Phase 10)
+# AIGC studio API (Phase 11)
 
 FastAPI spine. Create a pack without a zip (`POST /api/studio/start`: blank, template, or brain dump). Edit it with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) that lists still jobs before hop-1 clips and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
+
+Native ComfyUI: set `STUDIO_COMFY_STILL_LANES` (Qwen-Image) and `STUDIO_COMFY_CLIP_LANES` (MiniMax H3) to private URLs. Empty lanes stay stub / not live. Example names: `comfy.example.json`. MIT notice: [../NOTICE](../NOTICE).
 
 Also: ordered episodes, pack revision diff, review sign-off, identity store, media, shots, jobs, adapters, hop-1 preview desk, playlist scrubber, budget, audit, retention, EDL, vertical templates, org members, presence, multi-org lite, notifications, continuity, demo seed, backup, and optional builder handoff. Optional Celery. Optional OIDC.
 

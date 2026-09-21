@@ -12,6 +12,9 @@ from .catalog import (
     job_kind,
     slot_for,
 )
+from .comfy_client import native_ready
+from .comfy_h3 import ComfyH3ClipFactory
+from .comfy_qwen import ComfyQwenStillFactory
 from .live import LiveClipFactory, LiveStillFactory, transport_ready
 from .stub import StubClipFactory, StubStillFactory
 
@@ -57,7 +60,7 @@ def resolve_adapter_name(
         return STUB_NAME
     if not slot.live:
         return STUB_NAME
-    if not transport_ready(cfg, slot.transport):
+    if not transport_ready(cfg, slot.transport, slot.id):
         return STUB_NAME
     return slot.id
 
@@ -70,6 +73,8 @@ def get_still_factory(
 ) -> StillFactory:
     cfg = settings or get_settings()
     name = resolve_adapter_name("still-sheet", cfg, requested=requested, project=project)
+    if name == "comfy-qwen" and native_ready(cfg, "comfy-qwen"):
+        return ComfyQwenStillFactory(cfg)
     if name == STUB_NAME:
         return StubStillFactory()
     return LiveStillFactory(cfg, slot_id=name)
@@ -83,6 +88,8 @@ def get_clip_factory(
 ) -> ClipFactory:
     cfg = settings or get_settings()
     name = resolve_adapter_name("clip-hop1", cfg, requested=requested, project=project)
+    if name == "comfy-h3" and native_ready(cfg, "comfy-h3"):
+        return ComfyH3ClipFactory(cfg)
     if name == STUB_NAME:
         return StubClipFactory()
     return LiveClipFactory(cfg, slot_id=name)

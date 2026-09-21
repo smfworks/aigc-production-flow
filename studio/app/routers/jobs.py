@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from ..audit import JOB_CANCEL, JOB_ENQUEUE, record
 from ..deps import DbDep, get_episode, org_of_job, touch
+from ..jobs.runner import touch_comfy_job, touch_comfy_jobs
 from ..jobs.service import cancel_job, enqueue_job, get_job, job_out, list_jobs, retry_job
 from ..models import utcnow
 from ..rbac import JobsUser, ReadUser
@@ -27,17 +28,16 @@ def list_all_jobs(
     job_type: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[JobOut]:
-    return [
-        job_out(row)
-        for row in list_jobs(
-            db,
-            episode_id=episode_id,
-            status_value=job_status,
-            job_type=job_type,
-            limit=limit,
-            organization_id=user.org_id,
-        )
-    ]
+    rows = list_jobs(
+        db,
+        episode_id=episode_id,
+        status_value=job_status,
+        job_type=job_type,
+        limit=limit,
+        organization_id=user.org_id,
+    )
+    touch_comfy_jobs(db, rows)
+    return [job_out(row) for row in rows]
 
 
 @router.get("/api/episodes/{episode_id}/jobs", response_model=list[JobOut])
@@ -49,10 +49,9 @@ def list_episode_jobs(
     job_type: str | None = None,
 ) -> list[JobOut]:
     get_episode(db, episode_id, user)
-    return [
-        job_out(row)
-        for row in list_jobs(db, episode_id=episode_id, status_value=job_status, job_type=job_type)
-    ]
+    rows = list_jobs(db, episode_id=episode_id, status_value=job_status, job_type=job_type)
+    touch_comfy_jobs(db, rows)
+    return [job_out(row) for row in rows]
 
 
 @router.post("/api/jobs", response_model=JobOut, status_code=status.HTTP_201_CREATED)
@@ -91,7 +90,10 @@ def enqueue(body: JobEnqueue, user: JobsUser, db: DbDep) -> JobOut:
 
 @router.get("/api/jobs/{job_id}", response_model=JobOut)
 def get_one(job_id: str, user: ReadUser, db: DbDep) -> JobOut:
-    return job_out(_job_for_org(db, job_id, user))
+    job = _job_for_org(db, job_id, user)
+    touch_comfy_job(db, job)
+    db.refresh(job)
+    return job_out(job)
 
 
 @router.post("/api/jobs/{job_id}/cancel", response_model=JobOut)

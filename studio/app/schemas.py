@@ -40,7 +40,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 10
+    phase: int = 11
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -551,6 +551,7 @@ class AdapterHealthOut(BaseModel):
     fps: float | None = None
     canvas: str | None = None
     hop1_watch_required: bool = True
+    lanes_configured: bool = False
 
 
 class AdapterSlotOut(BaseModel):
@@ -580,7 +581,10 @@ class AdapterCatalogOut(BaseModel):
         "when the live hook is unset. Stub never claims H3 or Qwen ran. "
         "Health is a dry-run (reachable? config present? schema valid?) — not a generate. "
         "Unset live hooks report not live. comfy-h3 declares hop-1 10.125s / 243f @ 24fps. "
-        "Live adapters never skip the hop-1 watch protocol."
+        "Native ComfyUI lanes (STUDIO_COMFY_STILL_LANES / STUDIO_COMFY_CLIP_LANES) "
+        "run Qwen-Image stills and MiniMax H3 clips on a private network. "
+        "Empty lanes stay stub. Live adapters never skip the hop-1 watch protocol. "
+        "Export for agent does not call Comfy."
     )
 
 

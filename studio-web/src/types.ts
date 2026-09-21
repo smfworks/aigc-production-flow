@@ -177,6 +177,7 @@ export type AdapterHealth = {
   fps?: number | null;
   canvas?: string | null;
   hop1_watch_required?: boolean;
+  lanes_configured?: boolean;
 };
 
 export type MediaAsset = {

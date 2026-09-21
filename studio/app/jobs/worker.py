@@ -89,7 +89,7 @@ class JobWorker:
 
 
 def process_one_queued_job() -> bool:
-    from .runner import execute_job
+    from .runner import due_comfy_job_id, execute_job, resume_due_comfy_job
 
     db = SessionLocal()
     try:
@@ -99,12 +99,20 @@ def process_one_queued_job() -> bool:
             .order_by(Job.created_at.asc())
             .first()
         )
-        if not job:
-            return False
-        job_id = job.id
+        if job:
+            job_id = job.id
+            kind = "execute"
+        else:
+            job_id = due_comfy_job_id(db)
+            kind = "resume"
     finally:
         db.close()
-    execute_job(None, job_id)
+    if not job_id:
+        return False
+    if kind == "execute":
+        execute_job(None, job_id)
+    else:
+        resume_due_comfy_job(job_id)
     return True
 
 

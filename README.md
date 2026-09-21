@@ -113,7 +113,7 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
-## Studio spine (Phase 10) vs pack builder
+## Studio spine (Phase 11) vs pack builder
 
 One app. Open Studio → **New project** → brain dump, blank pack, or template → edit the four stages on the episode → **Export for agent**. The brief lists still jobs, then hop-1 clip jobs. Zip import is optional.
 
@@ -138,7 +138,7 @@ Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/
 # Builder http://localhost:5173
 ```
 
-Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. Assign **writer** and **art** as different roles (script vs identity). Reorder episodes. Scrub the shot playlist against a stub preview. Unapprove or edit identity keywords, then re-approve. Create a second org, switch, confirm the member cannot see it. Seed a demo episode. Approve a sheet, link a plate, open Continuity into identity. Diff two pack revisions before import (shared entity-schedule rows stay distinct). Open in Studio auto-imports after episode pick when configured. Bell on a stub job. `/readyz` green. Download a backup zip (season/sequence kept). A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, sign-off is missing, or approved identity keywords conflict. Unset comfy-* hooks stay stub / not live.
+Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. Assign **writer** and **art** as different roles (script vs identity). Reorder episodes. Scrub the shot playlist against a stub preview. Unapprove or edit identity keywords, then re-approve. Create a second org, switch, confirm the member cannot see it. Seed a demo episode. Approve a sheet, link a plate, open Continuity into identity. Diff two pack revisions before import (shared entity-schedule rows stay distinct). Open in Studio auto-imports after episode pick when configured. Bell on a stub job. `/readyz` green. Download a backup zip (season/sequence kept). A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, sign-off is missing, or approved identity keywords conflict. Unset comfy-* lanes stay stub / not live. With `STUDIO_COMFY_STILL_LANES` and `STUDIO_COMFY_CLIP_LANES` set to a private ComfyUI, Studio runs Qwen-Image stills and MiniMax H3 clips itself (path text, not pixels in the receipt). See [docs/STUDIO.md](docs/STUDIO.md) and [NOTICE](NOTICE).
 
 CI: GitHub Actions runs `studio` pytest, `app` `npm test`, `studio-web` `tsc --noEmit`, and a Playwright smoke (skips with `E2E_SKIP` if Chromium is unavailable) on every pull request and fails the PR on red.
 
@@ -160,7 +160,9 @@ data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 templates/verticals/     education / brand promo / short-drama empty packs
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 10 studio operator path (create in-app, brain dump, agent export)
+docs/STUDIO.md           Phase 11 studio operator path (ComfyUI lanes, create in-app, agent export)
+NOTICE                   MIT notice for the Comfy still/clip behavior port
+THIRD_PARTY.md           upstream attribution; SMF does not own MiniMax, Qwen, or ComfyUI
 docs/AUTH.md             local / forward-header / optional OIDC — multi-org lite, not SaaS or a production IdP
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)

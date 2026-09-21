@@ -1,0 +1,36 @@
+{
+  "comment": "Example only. Studio reads environment variables, not this file. Ports below match a common local layout and are not required. Leave lanes empty to stay on the stub adapter. Use 127.0.0.1 or a private network.",
+  "STUDIO_COMFY_STILL_LANES": "http://127.0.0.1:8190,http://127.0.0.1:8191",
+  "STUDIO_COMFY_CLIP_LANES": "http://127.0.0.1:8188,http://127.0.0.1:8189",
+  "STUDIO_COMFY_IMAGE_LANES_FOR_FREE": "http://127.0.0.1:8190,http://127.0.0.1:8191",
+  "STUDIO_COMFY_ALLOW_HOSTS": "",
+  "STUDIO_COMFY_OUT_DIR": "",
+  "STUDIO_COMFY_QWEN_UNET": "qwen_image_2.1_int8_convrot.safetensors",
+  "STUDIO_COMFY_QWEN_CLIP": "qwen3vl_8b_int8_convrot.safetensors",
+  "STUDIO_COMFY_QWEN_VAE": "qwen_image_2.1_vae_bf16.safetensors",
+  "STUDIO_COMFY_H3_UNET_FULL": "minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+  "STUDIO_COMFY_H3_UNET_TURBO": "minimax_h3_ref2va_pruned_turbo_int8_convrot.safetensors",
+  "STUDIO_COMFY_H3_CLIP": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+  "STUDIO_COMFY_H3_VIDEO_VAE": "minimax_h3_video_vae_fp16.safetensors",
+  "STUDIO_COMFY_H3_AUDIO_VAE": "minimax_h3_audio_vae_fp32.safetensors",
+  "STUDIO_COMFY_H3_STYLES": {},
+  "STUDIO_COMFY_H3_STYLES_example": {
+    "80s_horror": {
+      "file": "1980s_horror_h3_175.safetensors",
+      "trigger": "80s_horror"
+    }
+  },
+  "sizes": {
+    "square": [1328, 1328],
+    "landscape": [1664, 928],
+    "portrait": [928, 1664],
+    "studio": [1344, 768],
+    "pack": [1344, 768]
+  },
+  "hop1": {
+    "seconds": 10.125,
+    "frames": 243,
+    "fps": 24,
+    "max_frames": 362
+  }
+}

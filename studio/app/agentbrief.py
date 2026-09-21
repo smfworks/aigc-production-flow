@@ -29,8 +29,8 @@ This archive is the handoff for Hermes, OpenClaw, or a Grok bot. Studio did **no
 
 ## Honesty
 
-- `honesty.called_comfy` is false. Export does not generate.
-- Adapter labels say **stub** or **live**. Unset `STUDIO_ADAPTER_WEBHOOK_URL` / `STUDIO_ADAPTER_CLI` means the live slot is **not live** and enqueue resolves to stub. Do not tell anyone H3 or Qwen ran.
+- `honesty.called_comfy` is false. Export does not generate. A later option may run live jobs and then export; this zip does not.
+- Adapter labels say **stub** or **live**. Unset `STUDIO_COMFY_STILL_LANES` / `STUDIO_COMFY_CLIP_LANES` (and unset webhook/CLI hooks) means the live slot is **not live** and enqueue resolves to stub. Do not tell anyone H3 or Qwen ran.
 - `generate_ready` is false here. `generate-ok` still needs green gates, hop-1 receipts, and a reviewer/producer sign-off.
 - Approved identity plates are what plate-bind counts. Draft sheets do not.
 - The Hermes plugin `smf-h3-capture` can stay. Studio is the primary place to create the pack.
@@ -236,8 +236,9 @@ def build_agent_brief(episode: Episode, revision: PackRevision) -> dict[str, Any
             "draft": meta.get("status") == "draft" or not revision.all_gates_green,
             "model_ran": bool(meta.get("model_ran")),
             "note": (
-                "Export does not call Comfy. An agent feeds Comfy MCP stills then hop-1 clips. "
-                "Stub labels mean the live hook is unset or this project is on the stub adapter."
+                "Export does not call Comfy. An agent feeds ComfyUI stills (Qwen-Image) then "
+                "hop-1 clips (MiniMax H3). Optional later: run live Studio jobs, then export. "
+                "This export does not. Stub labels mean lanes are unset or this project is on the stub adapter."
             ),
         },
     }
