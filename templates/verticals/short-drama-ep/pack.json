@@ -1,0 +1,199 @@
+{
+  "v": 2,
+  "pack": {
+    "title": "Short drama ep (template)",
+    "logLine": "",
+    "durationTarget": "",
+    "songNarrativeClock": "episode clock \u2014 verse / turn / button (not shots)",
+    "audioPath": "",
+    "speech": "",
+    "forbiddenGlobal": "no on-screen lettering, no modern clothing unless locked",
+    "map": [
+      {
+        "id": "m1",
+        "clock": "",
+        "beat": "verse",
+        "energy": "verse"
+      },
+      {
+        "id": "m2",
+        "clock": "",
+        "beat": "turn",
+        "energy": "chorus"
+      },
+      {
+        "id": "m3",
+        "clock": "",
+        "beat": "button",
+        "energy": "outro"
+      }
+    ],
+    "takes": [
+      {
+        "id": "t1",
+        "take": "A",
+        "location": "",
+        "grade": "",
+        "windows": "",
+        "prefix": "",
+        "hop1Seed": "",
+        "hop1Mode": "",
+        "hop1Plate": "",
+        "hop1Planned": false,
+        "watched": false
+      },
+      {
+        "id": "t2",
+        "take": "B",
+        "location": "",
+        "grade": "",
+        "windows": "",
+        "prefix": "",
+        "hop1Seed": "",
+        "hop1Mode": "",
+        "hop1Plate": "",
+        "hop1Planned": false,
+        "watched": false
+      }
+    ],
+    "editList": [
+      {
+        "id": "e1",
+        "songT": "",
+        "durS": "10.125",
+        "join": "",
+        "take": "A",
+        "locationGrade": "",
+        "cameraVerb": "",
+        "cameraAmplitude": "",
+        "cameraSpeed": "",
+        "action": "",
+        "hold": "",
+        "notes": "",
+        "entities": "lead, token"
+      },
+      {
+        "id": "e2",
+        "songT": "",
+        "durS": "10.125",
+        "join": "",
+        "take": "A",
+        "locationGrade": "",
+        "cameraVerb": "",
+        "cameraAmplitude": "",
+        "cameraSpeed": "",
+        "action": "",
+        "hold": "",
+        "notes": "",
+        "entities": "lead"
+      },
+      {
+        "id": "e3",
+        "songT": "",
+        "durS": "10.125",
+        "join": "",
+        "take": "B",
+        "locationGrade": "",
+        "cameraVerb": "",
+        "cameraAmplitude": "",
+        "cameraSpeed": "",
+        "action": "",
+        "hold": "",
+        "notes": "",
+        "entities": "lead, token"
+      }
+    ],
+    "characters": [
+      {
+        "id": "c1",
+        "name": "lead",
+        "stillFile": "",
+        "stillSource": "",
+        "stillCanvas": "1344\u00d7768",
+        "lockParagraph": "",
+        "forbidden": ""
+      }
+    ],
+    "props": [
+      {
+        "id": "p1",
+        "name": "token",
+        "stillFile": "",
+        "stillSource": "",
+        "stillCanvas": "1344\u00d7768",
+        "fields": {
+          "overallLength": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "haftLength": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "headMass": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "edgeWidth": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "headShape": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "poll": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "eye": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "socket": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "haftWoodColor": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "bindings": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "decoration": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          },
+          "wearFinish": {
+            "value": "",
+            "unit": "cm",
+            "source": ""
+          }
+        },
+        "lockParagraph": "",
+        "forbidden": ""
+      }
+    ],
+    "look": {
+      "styleLine": ""
+    },
+    "stills": [],
+    "entitySchedule": [],
+    "smokeNotes": "One hop-1 per take after gates are green. This template does not fake generate.",
+    "continuityRows": [],
+    "polaroidPath": ""
+  }
+}

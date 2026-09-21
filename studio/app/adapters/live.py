@@ -13,6 +13,7 @@ import httpx
 from ..config import Settings
 from .base import AdapterResult, JobContext
 from .stub import StubClipFactory, StubStillFactory
+from .catalog import STUB_NAME
 
 _ALLOWED_WEBHOOK_SCHEMES = {"http", "https"}
 
@@ -26,13 +27,18 @@ def _stub_clip() -> StubClipFactory:
 
 
 def live_configured(settings: Settings) -> bool:
-    mode = (settings.still_adapter or "stub").strip().lower()
-    clip = (settings.clip_adapter or "stub").strip().lower()
-    if mode in {"webhook", "cli"} or clip in {"webhook", "cli"}:
-        if mode == "webhook" or clip == "webhook":
-            return bool((settings.adapter_webhook_url or "").strip())
-        if mode == "cli" or clip == "cli":
-            return bool((settings.adapter_cli or "").strip())
+    return transport_ready(settings, "webhook-or-cli")
+
+
+def transport_ready(settings: Settings, transport: str) -> bool:
+    webhook = bool((settings.adapter_webhook_url or "").strip())
+    cli = bool((settings.adapter_cli or "").strip())
+    if transport == "webhook":
+        return webhook
+    if transport == "cli":
+        return cli
+    if transport == "webhook-or-cli":
+        return webhook or cli
     return False
 
 
@@ -82,9 +88,9 @@ def _from_hook_body(body: dict[str, Any], fallback_name: str) -> AdapterResult:
 
 
 class LiveStillFactory:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, slot_id: str | None = None):
         self.settings = settings
-        self.name = (settings.still_adapter or "stub").strip() or "stub"
+        self.name = (slot_id or settings.still_adapter or STUB_NAME).strip() or STUB_NAME
 
     def generate_sheet(self, ctx: JobContext) -> AdapterResult:
         return run_live(self.settings, ctx, wanted=self.name)
@@ -94,9 +100,9 @@ class LiveStillFactory:
 
 
 class LiveClipFactory:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, slot_id: str | None = None):
         self.settings = settings
-        self.name = (settings.clip_adapter or "stub").strip() or "stub"
+        self.name = (slot_id or settings.clip_adapter or STUB_NAME).strip() or STUB_NAME
 
     def hop1(self, ctx: JobContext) -> AdapterResult:
         return run_live(self.settings, ctx, wanted=self.name)
@@ -105,22 +111,41 @@ class LiveClipFactory:
         return run_live(self.settings, ctx, wanted=self.name)
 
 
-def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
-    mode = (wanted or "stub").strip().lower()
-    if mode in {"", "stub"}:
-        return _fallback(ctx, "stub")
-    if ctx.cancel_requested():
-        return AdapterResult(ok=False, adapter="stub", error="cancelled")
-    ctx.set_progress(20)
+def _transport_for(wanted: str, settings: Settings) -> str:
+    mode = (wanted or STUB_NAME).strip().lower()
+    if mode in {"", STUB_NAME}:
+        return STUB_NAME
     if mode == "webhook":
+        return "webhook" if (settings.adapter_webhook_url or "").strip() else STUB_NAME
+    if mode == "cli":
+        return "cli" if (settings.adapter_cli or "").strip() else STUB_NAME
+    # Documented slots (comfy-h3, comfy-qwen): prefer webhook, else CLI.
+    if (settings.adapter_webhook_url or "").strip():
+        return "webhook"
+    if (settings.adapter_cli or "").strip():
+        return "cli"
+    return STUB_NAME
+
+
+def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
+    slot = (wanted or STUB_NAME).strip().lower() or STUB_NAME
+    if slot in {"", STUB_NAME}:
+        return _fallback(ctx, STUB_NAME)
+    if ctx.cancel_requested():
+        return AdapterResult(ok=False, adapter=STUB_NAME, error="cancelled")
+    ctx.set_progress(20)
+    transport = _transport_for(slot, settings)
+    if transport == STUB_NAME:
+        return _fallback(ctx, slot)
+    if transport == "webhook":
         url = (settings.adapter_webhook_url or "").strip()
         if not url:
-            return _fallback(ctx, "webhook")
+            return _fallback(ctx, slot)
         parsed = urlparse(url)
         if parsed.scheme not in _ALLOWED_WEBHOOK_SCHEMES or not parsed.netloc:
             return AdapterResult(
                 ok=False,
-                adapter="stub",
+                adapter=STUB_NAME,
                 error="adapter webhook URL must be http(s) with a host.",
             )
         try:
@@ -132,15 +157,21 @@ def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
             response.raise_for_status()
             body = response.json()
         except Exception as exc:  # noqa: BLE001 — surface hook failure on the job row
-            return AdapterResult(ok=False, adapter=mode, error=f"webhook adapter failed: {exc}")
+            return AdapterResult(ok=False, adapter=slot, error=f"webhook adapter failed: {exc}")
         if not isinstance(body, dict):
-            return AdapterResult(ok=False, adapter=mode, error="webhook adapter returned non-JSON object.")
+            return AdapterResult(ok=False, adapter=slot, error="webhook adapter returned non-JSON object.")
         ctx.set_progress(85)
-        return _from_hook_body(body, mode)
-    if mode == "cli":
+        result = _from_hook_body(body, slot)
+        result.receipt = {
+            **(result.receipt or {}),
+            "requested_slot": slot,
+            "transport": "webhook",
+        }
+        return result
+    if transport == "cli":
         command = (settings.adapter_cli or "").strip()
         if not command:
-            return _fallback(ctx, "cli")
+            return _fallback(ctx, slot)
         try:
             filled = command.format(
                 job_id=ctx.job_id,
@@ -161,16 +192,22 @@ def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
                 check=False,
             )
         except Exception as exc:  # noqa: BLE001
-            return AdapterResult(ok=False, adapter="cli", error=f"CLI adapter failed: {exc}")
+            return AdapterResult(ok=False, adapter=slot, error=f"CLI adapter failed: {exc}")
         if completed.returncode != 0:
             err = (completed.stderr or completed.stdout or "").strip() or f"exit {completed.returncode}"
-            return AdapterResult(ok=False, adapter="cli", error=f"CLI adapter failed: {err}")
+            return AdapterResult(ok=False, adapter=slot, error=f"CLI adapter failed: {err}")
         try:
             body = json.loads(completed.stdout or "{}")
         except json.JSONDecodeError as exc:
-            return AdapterResult(ok=False, adapter="cli", error=f"CLI adapter stdout is not JSON: {exc}")
+            return AdapterResult(ok=False, adapter=slot, error=f"CLI adapter stdout is not JSON: {exc}")
         if not isinstance(body, dict):
-            return AdapterResult(ok=False, adapter="cli", error="CLI adapter returned non-JSON object.")
+            return AdapterResult(ok=False, adapter=slot, error="CLI adapter returned non-JSON object.")
         ctx.set_progress(85)
-        return _from_hook_body(body, "cli")
-    return _fallback(ctx, mode)
+        result = _from_hook_body(body, slot)
+        result.receipt = {
+            **(result.receipt or {}),
+            "requested_slot": slot,
+            "transport": "cli",
+        }
+        return result
+    return _fallback(ctx, slot)

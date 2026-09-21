@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aigc-studio"
 version = "0.1.0"
-description = "Phase 3 studio spine for the AIGC production flow (jobs, adapters, hop-1 preview)."
+description = "Phase 4 studio spine for the AIGC production flow (budget, audit, EDL, templates)."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

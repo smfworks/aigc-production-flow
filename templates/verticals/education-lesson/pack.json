@@ -1,0 +1,99 @@
+{
+  "v": 2,
+  "pack": {
+    "title": "Education lesson (template)",
+    "logLine": "",
+    "durationTarget": "",
+    "songNarrativeClock": "lesson clock \u2014 hook / teach / check (not shots)",
+    "audioPath": "",
+    "speech": "",
+    "forbiddenGlobal": "no on-screen lettering, no modern clothing unless locked",
+    "map": [
+      {
+        "id": "m1",
+        "clock": "",
+        "beat": "hook",
+        "energy": "title"
+      },
+      {
+        "id": "m2",
+        "clock": "",
+        "beat": "teach",
+        "energy": "verse"
+      },
+      {
+        "id": "m3",
+        "clock": "",
+        "beat": "check",
+        "energy": "outro"
+      }
+    ],
+    "takes": [
+      {
+        "id": "t1",
+        "take": "A",
+        "location": "",
+        "grade": "",
+        "windows": "",
+        "prefix": "",
+        "hop1Seed": "",
+        "hop1Mode": "",
+        "hop1Plate": "",
+        "hop1Planned": false,
+        "watched": false
+      }
+    ],
+    "editList": [
+      {
+        "id": "e1",
+        "songT": "",
+        "durS": "10.125",
+        "join": "",
+        "take": "A",
+        "locationGrade": "",
+        "cameraVerb": "",
+        "cameraAmplitude": "",
+        "cameraSpeed": "",
+        "action": "",
+        "hold": "",
+        "notes": "",
+        "entities": ""
+      },
+      {
+        "id": "e2",
+        "songT": "",
+        "durS": "10.125",
+        "join": "",
+        "take": "A",
+        "locationGrade": "",
+        "cameraVerb": "",
+        "cameraAmplitude": "",
+        "cameraSpeed": "",
+        "action": "",
+        "hold": "",
+        "notes": "",
+        "entities": ""
+      }
+    ],
+    "characters": [
+      {
+        "id": "c1",
+        "name": "presenter",
+        "stillFile": "",
+        "stillSource": "",
+        "stillCanvas": "1344\u00d7768",
+        "lockParagraph": "",
+        "forbidden": ""
+      }
+    ],
+    "props": [],
+    "look": {
+      "styleLine": ""
+    },
+    "stills": [],
+    "entitySchedule": [],
+    "smokeNotes": "One hop-1 per take after gates are green. This template does not fake generate.",
+    "continuityRows": [],
+    "polaroidPath": ""
+  }
+}

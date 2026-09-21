@@ -41,6 +41,9 @@ export function JobTable({
                 {job.shot_take ? ` · take ${job.shot_take}` : ""}
                 {" · "}
                 {formatElapsed(job.elapsed_ms)}
+                {typeof job.estimated_cost_units === "number"
+                  ? ` · ${job.actual_cost_units ?? job.estimated_cost_units} ${job.cost_currency || "credits"}`
+                  : ""}
               </span>
               <em>
                 {job.project_name || "project"} / {job.episode_title || "episode"}

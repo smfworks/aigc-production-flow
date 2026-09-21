@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
+from ..audit import PACK_EXPORT, PACK_IMPORT, record
 from ..config import get_settings
 from ..deps import DbDep, UserDep, get_episode, latest_revision, touch
 from ..gates import gate_snapshot
@@ -95,13 +96,26 @@ async def import_pack(
     sync_shots_from_pack(db, episode, revision)
     episode.updated_at = utcnow()
     touch(episode.project)
+    record(
+        db,
+        actor=user.name,
+        action=PACK_IMPORT,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="pack",
+        entity_id=revision.id,
+        detail={
+            "filename": revision.filename,
+            "all_gates_green": revision.all_gates_green,
+        },
+    )
     db.commit()
     db.refresh(revision)
     return _revision_out(revision)
 
 
 @router.get("/api/episodes/{episode_id}/pack")
-def export_pack(episode_id: str, _user: UserDep, db: DbDep) -> FileResponse:
+def export_pack(episode_id: str, user: UserDep, db: DbDep) -> FileResponse:
     episode = get_episode(db, episode_id)
     revision = latest_revision(episode)
     if not revision:
@@ -116,6 +130,17 @@ def export_pack(episode_id: str, _user: UserDep, db: DbDep) -> FileResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Stored pack zip is missing from the media store.",
         )
+    record(
+        db,
+        actor=user.name,
+        action=PACK_EXPORT,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="pack",
+        entity_id=revision.id,
+        detail={"filename": revision.filename},
+    )
+    db.commit()
     return FileResponse(
         path,
         media_type="application/zip",

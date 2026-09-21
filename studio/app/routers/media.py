@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 
+from ..audit import MEDIA_UPLOAD, record
 from ..config import get_settings
 from ..deps import DbDep, UserDep, get_episode, touch
 from ..models import ContinuityReceipt, ENTITY_TYPES, Job, MEDIA_KINDS, MediaAsset, utcnow
@@ -94,6 +95,16 @@ async def upload_media(
     asset.path = str(rel)
     episode.updated_at = utcnow()
     touch(episode.project)
+    record(
+        db,
+        actor=user.name,
+        action=MEDIA_UPLOAD,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="media",
+        entity_id=asset.id,
+        detail={"kind": kind, "original_name": original},
+    )
     db.commit()
     db.refresh(asset)
     return MediaAssetOut.model_validate(asset)

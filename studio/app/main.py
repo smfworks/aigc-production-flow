@@ -4,13 +4,32 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import database as database_module
-from .adapters import resolve_adapter_name
+from .adapters.catalog import CATALOG
+from .adapters.registry import resolve_adapter_name
+from .auth import _mode
+from .budget import DISCLAIMER
 from .config import get_settings
 from .database import Base, get_db
 from .deps import DbDep, UserDep
 from .jobs.worker import start_worker, stop_worker
 from .models import Organization
-from .routers import comments, episodes, jobs, media, packs, preview, projects, review, shots
+from .routers import (
+    adapters,
+    audit,
+    budget,
+    comments,
+    episodes,
+    export,
+    jobs,
+    media,
+    packs,
+    preview,
+    projects,
+    retention,
+    review,
+    shots,
+    templates,
+)
 from .schemas import MetaOut, OrganizationOut, UserOut
 from .seed import seed_default_org
 
@@ -38,14 +57,15 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.3.0",
+        version="0.4.0",
         description=(
-            "Phase 3 studio spine for the AIGC production flow. "
+            "Phase 4 studio spine for the AIGC production flow. "
             "Pack zip remains the collaboration contract. "
-            "Auth is a local-dev API token — SSO is not in this phase. "
+            "Auth is a local-dev API token plus an optional X-Forwarded-User hook — SSO/OIDC is not implemented. "
             "This is not multi-tenant SaaS security. "
             "Jobs run in-process (thread worker). Celery is the documented upgrade path, not this process. "
-            "The default adapter is stub — it never claims H3 or Qwen ran."
+            "Adapter catalog: stub plus documented slots (comfy-h3, comfy-qwen, webhook, cli). "
+            "Budget units come from an operator rate table — not a cloud invoice."
         ),
         license_info={"name": "MIT", "identifier": "MIT"},
         lifespan=lifespan,
@@ -66,18 +86,25 @@ def create_app() -> FastAPI:
     application.include_router(shots.router)
     application.include_router(jobs.router)
     application.include_router(preview.router)
+    application.include_router(adapters.router)
+    application.include_router(budget.router)
+    application.include_router(audit.router)
+    application.include_router(retention.router)
+    application.include_router(export.router)
+    application.include_router(templates.router)
 
     @application.get("/", tags=["meta"])
     def root() -> dict:
         return {
             "name": "AIGC Studio Spine",
-            "phase": 3,
+            "phase": 4,
             "docs": "/docs",
             "openapi": "/openapi.json",
-            "auth": "local-dev Bearer token",
-            "sso": "later",
+            "auth": "local Bearer token; optional forward-header identity",
+            "sso": "not implemented — see docs/AUTH.md",
             "job_worker": "in-process thread (Celery later)",
-            "adapter": "stub unless STUDIO_*_ADAPTER live hook is set",
+            "adapters": [slot.id for slot in CATALOG],
+            "budget": DISCLAIMER,
         }
 
     @application.get("/health", tags=["meta"])
@@ -93,6 +120,10 @@ def create_app() -> FastAPI:
             job_worker=cfg.job_worker,
             still_adapter=resolve_adapter_name("still-sheet", cfg),
             clip_adapter=resolve_adapter_name("clip-hop1", cfg),
+            auth_mode=_mode(cfg.auth_mode),
+            cost_currency=cfg.cost_currency or "credits",
+            retention_days=int(cfg.retention_days or 0),
+            budget_hard_stop=bool(cfg.budget_hard_stop),
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])

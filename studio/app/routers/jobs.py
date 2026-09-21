@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query, status
 
+from ..audit import JOB_CANCEL, JOB_ENQUEUE, record
 from ..deps import DbDep, UserDep, get_episode, touch
 from ..jobs.service import cancel_job, enqueue_job, get_job, job_out, list_jobs, retry_job
 from ..models import utcnow
@@ -48,6 +49,22 @@ def enqueue(body: JobEnqueue, user: UserDep, db: DbDep) -> JobOut:
         job_type=body.job_type,
         shot_id=body.shot_id,
         payload=body.payload,
+        adapter=body.adapter,
+    )
+    record(
+        db,
+        actor=user.name,
+        action=JOB_ENQUEUE,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="job",
+        entity_id=job.id,
+        detail={
+            "job_type": job.job_type,
+            "adapter": job.adapter,
+            "estimated_cost_units": job.estimated_cost_units,
+            "status": job.status,
+        },
     )
     episode.updated_at = utcnow()
     touch(episode.project)
@@ -62,12 +79,37 @@ def get_one(job_id: str, _user: UserDep, db: DbDep) -> JobOut:
 
 
 @router.post("/api/jobs/{job_id}/cancel", response_model=JobOut)
-def cancel(job_id: str, _user: UserDep, db: DbDep) -> JobOut:
+def cancel(job_id: str, user: UserDep, db: DbDep) -> JobOut:
     job = cancel_job(db, get_job(db, job_id))
+    record(
+        db,
+        actor=user.name,
+        action=JOB_CANCEL,
+        project_id=job.episode.project_id if job.episode else None,
+        episode_id=job.episode_id,
+        entity_type="job",
+        entity_id=job.id,
+        detail={"job_type": job.job_type, "status": job.status},
+    )
+    db.commit()
+    db.refresh(job)
     return job_out(job)
 
 
 @router.post("/api/jobs/{job_id}/retry", response_model=JobOut, status_code=status.HTTP_201_CREATED)
 def retry(job_id: str, user: UserDep, db: DbDep) -> JobOut:
-    job = retry_job(db, get_job(db, job_id), user.name)
+    original = get_job(db, job_id)
+    job = retry_job(db, original, user.name)
+    record(
+        db,
+        actor=user.name,
+        action=JOB_ENQUEUE,
+        project_id=job.episode.project_id if job.episode else None,
+        episode_id=job.episode_id,
+        entity_type="job",
+        entity_id=job.id,
+        detail={"job_type": job.job_type, "adapter": job.adapter, "retry_of": original.id},
+    )
+    db.commit()
+    db.refresh(job)
     return job_out(job)

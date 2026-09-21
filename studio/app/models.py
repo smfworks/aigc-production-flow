@@ -24,6 +24,7 @@ CANDIDATE_SOURCES = ("stub", "manual")
 JOB_TYPES = ("still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck")
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
 RECEIPT_SOURCES = ("manual", "parsed")
+ADAPTER_IDS = ("stub", "comfy-h3", "comfy-qwen", "webhook", "cli")
 
 
 def utcnow() -> datetime:
@@ -56,6 +57,11 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(80), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="")
+    still_adapter: Mapped[str] = mapped_column(String(80), default="stub")
+    clip_adapter: Mapped[str] = mapped_column(String(80), default="stub")
+    budget_cap_units: Mapped[float | None] = mapped_column(Float, nullable=True)
+    budget_hard_stop: Mapped[bool] = mapped_column(Boolean, default=False)
+    retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -262,6 +268,10 @@ class Job(Base):
     adapter: Mapped[str] = mapped_column(String(80), default="stub")
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     result: Mapped[dict] = mapped_column(JSON, default=dict)
+    estimated_cost_units: Mapped[float] = mapped_column(Float, default=0.0)
+    actual_cost_units: Mapped[float | None] = mapped_column(Float, nullable=True)
+    cost_currency: Mapped[str] = mapped_column(String(32), default="credits")
+    cost_note: Mapped[str] = mapped_column(Text, default="")
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -305,4 +315,27 @@ class ContinuityReceipt(Base):
     episode: Mapped[Episode] = relationship(back_populates="receipts")
     shot: Mapped[Shot] = relationship(back_populates="receipt")
     media: Mapped[MediaAsset | None] = relationship(foreign_keys=[media_id])
+
+
+class AuditEvent(Base):
+    """Who / what / when. Local-dev user ids are fine. Not a SIEM."""
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    actor: Mapped[str] = mapped_column(String(120), default="local-dev")
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(40), default="")
+    entity_id: Mapped[str] = mapped_column(String(36), default="")
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    episode_id: Mapped[str | None] = mapped_column(
+        ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True
+    )
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    project: Mapped[Project | None] = relationship(foreign_keys=[project_id])
+    episode: Mapped[Episode | None] = relationship(foreign_keys=[episode_id])
 

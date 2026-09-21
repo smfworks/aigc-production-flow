@@ -1,8 +1,8 @@
-# AIGC studio API (Phase 3)
+# AIGC studio API (Phase 4)
 
-FastAPI spine for projects, episodes, pack zip revisions, review states, comments, media (including costume and hop-1 preview), shots, candidate confirm, jobs, adapters, and the hop-1 preview desk.
+FastAPI spine for projects, episodes, pack zip revisions, review states, comments, media, shots, jobs, adapters, hop-1 preview desk, budget, audit, retention, EDL export, and vertical templates.
 
-Operator docs: [../docs/STUDIO.md](../docs/STUDIO.md).
+Operator docs: [../docs/STUDIO.md](../docs/STUDIO.md). Auth: [../docs/AUTH.md](../docs/AUTH.md).
 
 ```bash
 # from repo root
@@ -12,6 +12,6 @@ Operator docs: [../docs/STUDIO.md](../docs/STUDIO.md).
 
 OpenAPI: http://localhost:8000/docs
 
-Auth is **local-dev only** (`Authorization: Bearer $STUDIO_API_TOKEN`). SSO is not in this phase.
+Auth is **local-dev** (`Authorization: Bearer $STUDIO_API_TOKEN`) plus optional `STUDIO_AUTH_MODE=forward-header`. OIDC is not implemented.
 
-Default adapter is `stub`. It writes fixture receipts and never claims H3 or Qwen ran. Celery is a documented upgrade path, not this process.
+Default adapter is `stub`. It writes fixture receipts and never claims H3 or Qwen ran. Budget units are an operator rate table, not a cloud invoice. Celery is a documented upgrade path, not this process.

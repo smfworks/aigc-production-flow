@@ -62,7 +62,25 @@ def test_cli_unset_falls_back_to_stub(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_webhook_hook_uses_httpx(monkeypatch):
+def test_comfy_slot_unset_falls_back_to_stub(monkeypatch):
+    monkeypatch.setenv("STUDIO_CLIP_ADAPTER", "comfy-h3")
+    monkeypatch.setenv("STUDIO_STILL_ADAPTER", "comfy-qwen")
+    monkeypatch.setenv("STUDIO_ADAPTER_WEBHOOK_URL", "")
+    monkeypatch.setenv("STUDIO_ADAPTER_CLI", "")
+    get_settings.cache_clear()
+    settings = get_settings()
+    assert resolve_adapter_name("clip-hop1", settings) == "stub"
+    assert resolve_adapter_name("still-sheet", settings) == "stub"
+    get_settings.cache_clear()
+
+
+def test_comfy_slot_with_webhook_keeps_slot_id(monkeypatch):
+    monkeypatch.setenv("STUDIO_CLIP_ADAPTER", "comfy-h3")
+    monkeypatch.setenv("STUDIO_ADAPTER_WEBHOOK_URL", "http://127.0.0.1:9/hook")
+    get_settings.cache_clear()
+    settings = get_settings()
+    assert resolve_adapter_name("clip-hop1", settings) == "comfy-h3"
+    get_settings.cache_clear()
     monkeypatch.setenv("STUDIO_CLIP_ADAPTER", "webhook")
     monkeypatch.setenv("STUDIO_ADAPTER_WEBHOOK_URL", "http://127.0.0.1:9/hook")
     get_settings.cache_clear()

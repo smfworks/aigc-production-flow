@@ -1,6 +1,6 @@
-# Studio shell (Phase 3)
+# Studio shell (Phase 4)
 
-Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 3 adds a Task Center, hop-1 preview desk, and stub job enqueue/cancel/retry.
+Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 4 adds a Budget dashboard, audit log, EDL / shot-playlist export, project adapter/budget settings, and New from template.
 
 ```bash
 # from repo root

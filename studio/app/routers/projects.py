@@ -1,5 +1,8 @@
 from fastapi import APIRouter
 
+from ..adapters.catalog import require_slot
+from ..audit import PROJECT_CREATE, record
+from ..config import get_settings
 from ..deps import DbDep, UserDep, get_default_org, get_project
 from ..models import Project, utcnow
 from ..packzip import slugify
@@ -23,6 +26,12 @@ def _unique_slug(db, org_id: str, raw: str, exclude_id: str | None = None) -> st
         n += 1
 
 
+def _adapter_or_default(value: str | None, kind: str, fallback: str) -> str:
+    if not (value or "").strip():
+        return fallback
+    return require_slot(value, kind)  # type: ignore[arg-type]
+
+
 @router.get("", response_model=list[ProjectOut])
 def list_projects(_user: UserDep, db: DbDep) -> list[ProjectOut]:
     projects = db.query(Project).order_by(Project.updated_at.desc()).all()
@@ -31,16 +40,31 @@ def list_projects(_user: UserDep, db: DbDep) -> list[ProjectOut]:
 
 @router.post("", response_model=ProjectOut, status_code=201)
 def create_project(body: ProjectCreate, user: UserDep, db: DbDep) -> ProjectOut:
-    del user
     org = get_default_org(db)
+    cfg = get_settings()
     slug = _unique_slug(db, org.id, body.slug or body.name)
     project = Project(
         organization_id=org.id,
         name=body.name.strip(),
         slug=slug,
         description=body.description.strip(),
+        still_adapter=_adapter_or_default(body.still_adapter, "still", cfg.still_adapter or "stub"),
+        clip_adapter=_adapter_or_default(body.clip_adapter, "clip", cfg.clip_adapter or "stub"),
+        budget_cap_units=body.budget_cap_units,
+        budget_hard_stop=bool(body.budget_hard_stop) if body.budget_hard_stop is not None else False,
+        retention_days=body.retention_days,
     )
     db.add(project)
+    db.flush()
+    record(
+        db,
+        actor=user.name,
+        action=PROJECT_CREATE,
+        project_id=project.id,
+        entity_type="project",
+        entity_id=project.id,
+        detail={"name": project.name, "still_adapter": project.still_adapter, "clip_adapter": project.clip_adapter},
+    )
     db.commit()
     db.refresh(project)
     return project_out(project)
@@ -60,6 +84,20 @@ def update_project(project_id: str, body: ProjectUpdate, _user: UserDep, db: DbD
         project.description = body.description.strip()
     if body.slug is not None:
         project.slug = _unique_slug(db, project.organization_id, body.slug, exclude_id=project.id)
+    if body.still_adapter is not None:
+        project.still_adapter = require_slot(body.still_adapter, "still")
+    if body.clip_adapter is not None:
+        project.clip_adapter = require_slot(body.clip_adapter, "clip")
+    if body.clear_budget_cap:
+        project.budget_cap_units = None
+    elif body.budget_cap_units is not None:
+        project.budget_cap_units = body.budget_cap_units
+    if body.budget_hard_stop is not None:
+        project.budget_hard_stop = body.budget_hard_stop
+    if body.clear_retention_days:
+        project.retention_days = None
+    elif body.retention_days is not None:
+        project.retention_days = body.retention_days
     project.updated_at = utcnow()
     db.commit()
     db.refresh(project)

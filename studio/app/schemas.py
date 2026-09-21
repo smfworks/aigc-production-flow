@@ -24,21 +24,24 @@ CandidateSource = Literal["stub", "manual"]
 
 class UserOut(BaseModel):
     name: str
-    auth_mode: Literal["local-dev"] = "local-dev"
-    sso: Literal["later"] = "later"
+    auth_mode: Literal["local", "forward-header"] = "local"
+    sso: str = "not implemented — see docs/AUTH.md"
 
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 3
-    auth_mode: Literal["local-dev"] = "local-dev"
-    sso: str = "not in this phase — do not treat this token as multi-tenant SaaS security"
+    phase: int = 4
+    auth_mode: Literal["local", "forward-header"] = "local"
+    sso: str = "not implemented — see docs/AUTH.md"
     pack_builder_url: str
     docs: str = "/docs"
     default_user: str
     job_worker: str = "thread"
     still_adapter: str = "stub"
     clip_adapter: str = "stub"
+    cost_currency: str = "credits"
+    retention_days: int = 30
+    budget_hard_stop: bool = False
 
 
 class OrganizationOut(BaseModel):
@@ -53,12 +56,24 @@ class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     slug: str | None = Field(default=None, max_length=80)
     description: str = ""
+    still_adapter: str | None = Field(default=None, max_length=80)
+    clip_adapter: str | None = Field(default=None, max_length=80)
+    budget_cap_units: float | None = Field(default=None, ge=0)
+    budget_hard_stop: bool | None = None
+    retention_days: int | None = Field(default=None, ge=0)
 
 
 class ProjectUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     slug: str | None = Field(default=None, max_length=80)
     description: str | None = None
+    still_adapter: str | None = Field(default=None, max_length=80)
+    clip_adapter: str | None = Field(default=None, max_length=80)
+    budget_cap_units: float | None = Field(default=None, ge=0)
+    budget_hard_stop: bool | None = None
+    retention_days: int | None = Field(default=None, ge=0)
+    clear_budget_cap: bool = False
+    clear_retention_days: bool = False
 
 
 class ProjectOut(BaseModel):
@@ -67,6 +82,11 @@ class ProjectOut(BaseModel):
     name: str
     slug: str
     description: str
+    still_adapter: str = "stub"
+    clip_adapter: str = "stub"
+    budget_cap_units: float | None = None
+    budget_hard_stop: bool = False
+    retention_days: int | None = None
     episode_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -299,6 +319,7 @@ class JobEnqueue(BaseModel):
     shot_id: str | None = None
     job_type: JobType
     payload: dict[str, Any] = Field(default_factory=dict)
+    adapter: str | None = None
 
 
 class JobOut(BaseModel):
@@ -315,6 +336,10 @@ class JobOut(BaseModel):
     adapter: str = "stub"
     payload: dict[str, Any] = Field(default_factory=dict)
     result: dict[str, Any] = Field(default_factory=dict)
+    estimated_cost_units: float = 0
+    actual_cost_units: float | None = None
+    cost_currency: str = "credits"
+    cost_note: str = ""
     cancel_requested: bool = False
     created_by: str
     created_at: datetime
@@ -351,4 +376,108 @@ class PrecheckProblem(BaseModel):
     code: str
     message: str
     shot_id: str | None = None
+
+
+class AdapterSlotOut(BaseModel):
+    id: str
+    label: str
+    kinds: list[str]
+    live: bool
+    transport: str
+    note: str
+
+
+class AdapterCatalogOut(BaseModel):
+    adapters: list[AdapterSlotOut]
+    still_default: str
+    clip_default: str
+    note: str = (
+        "Documented slots (comfy-h3, comfy-qwen, webhook, cli) fall back to stub "
+        "when the live hook is unset. Stub never claims H3 or Qwen ran."
+    )
+
+
+class BudgetEpisodeRow(BaseModel):
+    episode_id: str
+    title: str
+    chapter: int
+    spent_units: float
+    pending_units: float
+    job_count: int
+    succeeded: int
+    failed: int
+    cancelled: int
+    adapter_mix: dict[str, int]
+
+
+class BudgetProjectRow(BaseModel):
+    project_id: str
+    name: str
+    slug: str = ""
+    spent_units: float
+    pending_units: float
+    cap_units: float | None = None
+    hard_stop: bool = False
+    over_cap: bool = False
+    job_count: int
+    adapter_mix: dict[str, int]
+    still_adapter: str = "stub"
+    clip_adapter: str = "stub"
+    usd_estimate: float | None = None
+    episodes: list[BudgetEpisodeRow] = []
+
+
+class BudgetDashboardOut(BaseModel):
+    currency: str
+    usd_per_unit: float = 0
+    rates: dict[str, float]
+    disclaimer: str
+    spent_units: float
+    pending_units: float
+    usd_estimate: float | None = None
+    cap_units: float | None = None
+    hard_stop: bool = False
+    job_counts: dict[str, int]
+    adapter_mix: dict[str, int]
+    projects: list[BudgetProjectRow]
+
+
+class AuditEventOut(BaseModel):
+    id: str
+    actor: str
+    action: str
+    entity_type: str = ""
+    entity_id: str = ""
+    project_id: str | None = None
+    episode_id: str | None = None
+    project_name: str = ""
+    episode_title: str = ""
+    detail: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class RetentionApply(BaseModel):
+    project_id: str | None = None
+    episode_id: str | None = None
+    dry_run: bool = True
+    confirm: str = ""
+
+
+class VerticalTemplateOut(BaseModel):
+    id: str
+    name: str
+    blurb: str
+    still_adapter: str = "stub"
+    clip_adapter: str = "stub"
+    stages: list[str]
+    gates_green: bool = False
+    fake_generate: bool = False
+
+
+class ProjectFromTemplate(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = None
+    still_adapter: str | None = None
+    clip_adapter: str | None = None
+
 
