@@ -111,12 +111,40 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
+## Studio spine (Phase 1) vs pack builder
+
+Two pieces, one contract:
+
+| | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
+|---|---|---|
+| Job | Four-stage / nine-gate walk. Export markdown zip + `pack.json`. | Projects, episodes, pack revisions, review states, comments, sheet/plate store. |
+| Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. |
+| Auth | None (browser `localStorage`). | Local-dev API token. **SSO later — not fake multi-tenant SaaS.** |
+| Generate | Refuses export-as-complete until nine green. | Refuses `generate-ok` unless the stored gate snapshot is nine green. |
+| Not this | NLE, GPU, MP4. | NLE, Celery generate queue, SSO. |
+
+Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/STUDIO.md](docs/STUDIO.md).
+
+```bash
+./scripts/dev-studio.sh all
+# API     http://localhost:8000/docs
+# Studio  http://localhost:5174
+# Builder http://localhost:5173
+```
+
+Create a project → episode → import pack zip → set review state → upload a plate → export pack zip. `generate-ok` stays blocked while any gate is red.
+
 ## Layout
 
 ```
-app/                     client-side pack builder (Vite + React)
+app/                     client-side pack builder (Vite + React) — do not rewrite
+studio/                  FastAPI spine (SQLite default, Postgres-ready URL)
+studio-web/              thin studio shell (lists, review, comments, media, zip)
+scripts/dev-studio.sh    local API + studio + builder
+data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
+docs/STUDIO.md           Phase 1 studio operator path
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)
 docs/HOW-TO.md           GitHub + local workflow, step by step

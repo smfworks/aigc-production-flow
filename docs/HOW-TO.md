@@ -89,3 +89,7 @@ Public PRs: templates and redacted examples only.
 ## After generate
 
 Fill `continuity-log.md` from `sigils.jsonl` / Comfy history: seed, peak °C, ffprobe, NG reason. The shot list is intent. The log is what the editor gets.
+
+## Studio spine (optional, local)
+
+The pack builder is enough to fill and zip a bible. If you want projects, review states, comments, and a sheet/plate library around that zip, see [STUDIO.md](STUDIO.md). `generate-ok` cannot be stamped while any of the nine gates is red.

@@ -1,0 +1,30 @@
+{
+  "name": "aigc-studio-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Thin studio shell for the AIGC production flow. Reuses app/ for the nine-gate builder.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "typescript": "^5.9.2",
+    "vite": "^8.3.0"
+  }
+}

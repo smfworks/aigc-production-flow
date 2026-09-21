@@ -6,3 +6,11 @@ packs/**
 !packs/.gitkeep
 app/node_modules/
 app/dist/
+studio/.venv/
+studio/**/__pycache__/
+studio/*.egg-info/
+studio-web/node_modules/
+studio-web/dist/
+data/
+*.db
+.env
