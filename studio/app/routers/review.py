@@ -34,14 +34,14 @@ def _review_out(episode) -> ReviewOut:
 
 
 @router.get("/api/episodes/{episode_id}/review", response_model=ReviewOut)
-def get_review(episode_id: str, _user: ReadUser, db: DbDep) -> ReviewOut:
-    episode = get_episode(db, episode_id)
+def get_review(episode_id: str, user: ReadUser, db: DbDep) -> ReviewOut:
+    episode = get_episode(db, episode_id, user)
     return _review_out(episode)
 
 
 @router.get("/api/episodes/{episode_id}/review/signoffs", response_model=list[ReviewSignoffOut])
-def get_signoffs(episode_id: str, _user: ReadUser, db: DbDep) -> list[ReviewSignoffOut]:
-    episode = get_episode(db, episode_id)
+def get_signoffs(episode_id: str, user: ReadUser, db: DbDep) -> list[ReviewSignoffOut]:
+    episode = get_episode(db, episode_id, user)
     return [signoff_out(row) for row in list_signoffs(episode)]
 
 
@@ -53,7 +53,7 @@ def get_signoffs(episode_id: str, _user: ReadUser, db: DbDep) -> list[ReviewSign
 def create_signoff(
     episode_id: str, body: ReviewSignoffCreate, user: SignoffUser, db: DbDep
 ) -> ReviewOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     from ..notify import blocker_codes, notify_blockers_cleared
 
     before = blocker_codes(episode)
@@ -84,7 +84,7 @@ def create_signoff(
 
 @router.put("/api/episodes/{episode_id}/review", response_model=ReviewOut)
 def set_review(episode_id: str, body: ReviewSet, user: ReviewUser, db: DbDep) -> ReviewOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     override = bool(body.override)
     if body.state == "generate-ok":
         blocked = generate_ok_blockers(episode)

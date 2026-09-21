@@ -43,8 +43,8 @@ PREVIEW_SUFFIXES = {
 }
 
 
-def _get_shot(db, episode_id: str, shot_id: str) -> Shot:
-    episode = get_episode(db, episode_id)
+def _get_shot(db, episode_id: str, shot_id: str, user=None) -> Shot:
+    episode = get_episode(db, episode_id, user)
     shot = db.get(Shot, shot_id)
     if not shot or shot.episode_id != episode.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shot not found.")
@@ -52,8 +52,8 @@ def _get_shot(db, episode_id: str, shot_id: str) -> Shot:
 
 
 @router.get("/api/episodes/{episode_id}/preview-desk", response_model=PreviewDeskOut)
-def get_preview_desk(episode_id: str, _user: ReadUser, db: DbDep) -> PreviewDeskOut:
-    episode = get_episode(db, episode_id)
+def get_preview_desk(episode_id: str, user: ReadUser, db: DbDep) -> PreviewDeskOut:
+    episode = get_episode(db, episode_id, user)
     pack = pack_of(episode)
     required = hop1_required_shots(episode, pack)
     required_ids = {row.id for row in required}
@@ -99,8 +99,8 @@ def get_preview_desk(episode_id: str, _user: ReadUser, db: DbDep) -> PreviewDesk
     "/api/episodes/{episode_id}/shots/{shot_id}/receipt",
     response_model=ContinuityReceiptOut | None,
 )
-def get_receipt(episode_id: str, shot_id: str, _user: ReadUser, db: DbDep) -> ContinuityReceiptOut | None:
-    shot = _get_shot(db, episode_id, shot_id)
+def get_receipt(episode_id: str, shot_id: str, user: ReadUser, db: DbDep) -> ContinuityReceiptOut | None:
+    shot = _get_shot(db, episode_id, shot_id, user)
     return receipt_out(shot.receipt)
 
 
@@ -111,7 +111,7 @@ def get_receipt(episode_id: str, shot_id: str, _user: ReadUser, db: DbDep) -> Co
 def set_receipt(
     episode_id: str, shot_id: str, body: ReceiptSet, user: MutateUser, db: DbDep
 ) -> ContinuityReceiptOut:
-    shot = _get_shot(db, episode_id, shot_id)
+    shot = _get_shot(db, episode_id, shot_id, user)
     from ..notify import blocker_codes, notify_blockers_cleared
 
     before = blocker_codes(shot.episode)
@@ -146,7 +146,7 @@ def set_receipt(
 def set_preview_watched(
     episode_id: str, shot_id: str, body: PreviewWatchedSet, user: MutateUser, db: DbDep
 ) -> ContinuityReceiptOut:
-    shot = _get_shot(db, episode_id, shot_id)
+    shot = _get_shot(db, episode_id, shot_id, user)
     if shot.receipt is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -192,7 +192,7 @@ async def attach_preview(
 ) -> ContinuityReceiptOut:
     from ..models import MediaAsset
 
-    shot = _get_shot(db, episode_id, shot_id)
+    shot = _get_shot(db, episode_id, shot_id, user)
     episode = shot.episode
     attached_id = media_id.strip() or None
     parsed: dict = {}

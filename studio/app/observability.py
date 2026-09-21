@@ -11,12 +11,9 @@ import logging
 import re
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from threading import Lock
 from typing import Any
-
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
 
 log = logging.getLogger("studio.http")
 
@@ -61,22 +58,39 @@ def request_count_snapshot() -> list[tuple[str, str, str, int]]:
         return [(method, path, status, count) for (method, path, status), count in _request_counts.items()]
 
 
-class StructuredLogMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next) -> Response:
+class StructuredLogMiddleware:
+    """Pure ASGI middleware so request ContextVars (active org) stay intact.
+
+    BaseHTTPMiddleware would spawn a task and drop ``active_org_id``.
+    """
+
+    def __init__(self, app: Callable) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive, send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
         started = time.perf_counter()
-        response: Response | None = None
         status_code = 500
+
+        async def send_wrapper(message: dict[str, Any]) -> None:
+            nonlocal status_code
+            if message.get("type") == "http.response.start":
+                status_code = int(message.get("status") or 500)
+            await send(message)
+
         try:
-            response = await call_next(request)
-            status_code = response.status_code
-            return response
+            await self.app(scope, receive, send_wrapper)
         finally:
             ms = int((time.perf_counter() - started) * 1000)
-            path = request.url.path
-            method = request.method
+            path = scope.get("path") or "/"
+            method = (scope.get("method") or "GET").upper()
             observe_request(method, path, status_code)
-            user = request.headers.get("x-user-name") or ""
-            org = request.headers.get("x-org-id") or ""
+            headers = {
+                k.decode("latin-1").lower(): v.decode("latin-1")
+                for k, v in (scope.get("headers") or [])
+            }
             payload: dict[str, Any] = {
                 "msg": "request",
                 "method": method,
@@ -84,6 +98,8 @@ class StructuredLogMiddleware(BaseHTTPMiddleware):
                 "status": status_code,
                 "ms": ms,
             }
+            user = headers.get("x-user-name") or ""
+            org = headers.get("x-org-id") or ""
             if user:
                 payload["user"] = user
             if org:

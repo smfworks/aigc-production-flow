@@ -29,7 +29,7 @@ def beat(
     db: DbDep,
     body: PresenceBeat | None = None,
 ) -> list[PresenceOut]:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     prune(db)
     payload = body or PresenceBeat()
     heartbeat(
@@ -46,10 +46,10 @@ def beat(
 @router.get("/api/episodes/{episode_id}/presence", response_model=list[PresenceOut])
 def who(
     episode_id: str,
-    _user: ReadUser,
+    user: ReadUser,
     db: DbDep,
 ) -> list[PresenceOut]:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     prune(db)
     ttl = ttl_seconds()
     return [_out(row, ttl) for row in list_active(db, episode.id)]
@@ -63,7 +63,7 @@ async def stream_presence(
     shot_id: str | None = Query(default=None),
 ):
     """Optional SSE of who's on the episode. Poll GET if EventSource is awkward."""
-    get_episode(db, episode_id)
+    get_episode(db, episode_id, user)
     ttl = ttl_seconds()
 
     async def events():

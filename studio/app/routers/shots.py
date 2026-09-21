@@ -15,8 +15,8 @@ def _shot_out(shot: Shot) -> ShotOut:
     return shot_out(shot)
 
 
-def _get_shot(db, episode_id: str, shot_id: str) -> Shot:
-    episode = get_episode(db, episode_id)
+def _get_shot(db, episode_id: str, shot_id: str, user=None) -> Shot:
+    episode = get_episode(db, episode_id, user)
     shot = db.get(Shot, shot_id)
     if not shot or shot.episode_id != episode.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shot not found.")
@@ -24,14 +24,14 @@ def _get_shot(db, episode_id: str, shot_id: str) -> Shot:
 
 
 @router.get("/api/episodes/{episode_id}/shots", response_model=list[ShotOut])
-def list_shots(episode_id: str, _user: ReadUser, db: DbDep) -> list[ShotOut]:
-    episode = get_episode(db, episode_id)
+def list_shots(episode_id: str, user: ReadUser, db: DbDep) -> list[ShotOut]:
+    episode = get_episode(db, episode_id, user)
     return [_shot_out(row) for row in episode.shots]
 
 
 @router.get("/api/episodes/{episode_id}/board", response_model=BoardOut)
-def get_board(episode_id: str, _user: ReadUser, db: DbDep) -> BoardOut:
-    episode = get_episode(db, episode_id)
+def get_board(episode_id: str, user: ReadUser, db: DbDep) -> BoardOut:
+    episode = get_episode(db, episode_id, user)
     shots = list(episode.shots)
     chains, boundaries = continue_chains(shots)
     return BoardOut(
@@ -45,8 +45,8 @@ def get_board(episode_id: str, _user: ReadUser, db: DbDep) -> BoardOut:
     "/api/episodes/{episode_id}/shots/extract-candidates",
     response_model=list[ShotOut],
 )
-def extract_candidates(episode_id: str, _user: MutateUser, db: DbDep) -> list[ShotOut]:
-    episode = get_episode(db, episode_id)
+def extract_candidates(episode_id: str, user: MutateUser, db: DbDep) -> list[ShotOut]:
+    episode = get_episode(db, episode_id, user)
     revision = latest_revision(episode)
     if not revision:
         raise HTTPException(
@@ -65,15 +65,15 @@ def extract_candidates(episode_id: str, _user: MutateUser, db: DbDep) -> list[Sh
 
 
 @router.get("/api/episodes/{episode_id}/shots/{shot_id}", response_model=ShotOut)
-def get_shot(episode_id: str, shot_id: str, _user: ReadUser, db: DbDep) -> ShotOut:
-    return _shot_out(_get_shot(db, episode_id, shot_id))
+def get_shot(episode_id: str, shot_id: str, user: ReadUser, db: DbDep) -> ShotOut:
+    return _shot_out(_get_shot(db, episode_id, shot_id, user))
 
 
 @router.put("/api/episodes/{episode_id}/shots/{shot_id}/readiness", response_model=ShotOut)
 def set_shot_readiness(
-    episode_id: str, shot_id: str, body: ShotReadinessSet, _user: MutateUser, db: DbDep
+    episode_id: str, shot_id: str, body: ShotReadinessSet, user: MutateUser, db: DbDep
 ) -> ShotOut:
-    shot = _get_shot(db, episode_id, shot_id)
+    shot = _get_shot(db, episode_id, shot_id, user)
     shot_ops.set_readiness(shot, body.readiness)
     shot.episode.updated_at = utcnow()
     db.commit()
@@ -87,9 +87,9 @@ def set_shot_readiness(
     status_code=status.HTTP_201_CREATED,
 )
 def add_candidate(
-    episode_id: str, shot_id: str, body: CandidateCreate, _user: MutateUser, db: DbDep
+    episode_id: str, shot_id: str, body: CandidateCreate, user: MutateUser, db: DbDep
 ) -> CandidateOut:
-    shot = _get_shot(db, episode_id, shot_id)
+    shot = _get_shot(db, episode_id, shot_id, user)
     candidate = ShotCandidate(
         shot_id=shot.id,
         kind=body.kind,
@@ -115,10 +115,10 @@ def update_candidate(
     shot_id: str,
     candidate_id: str,
     body: CandidateUpdate,
-    _user: MutateUser,
+    user: MutateUser,
     db: DbDep,
 ) -> CandidateOut:
-    shot = _get_shot(db, episode_id, shot_id)
+    shot = _get_shot(db, episode_id, shot_id, user)
     candidate = db.get(ShotCandidate, candidate_id)
     if not candidate or candidate.shot_id != shot.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate not found.")

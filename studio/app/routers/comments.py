@@ -16,13 +16,13 @@ def _comment_out(row: Comment) -> CommentOut:
 @router.get("/api/episodes/{episode_id}/comments", response_model=list[CommentOut])
 def list_comments(
     episode_id: str,
-    _user: ReadUser,
+    user: ReadUser,
     db: DbDep,
     shot_id: str | None = None,
     board_node_id: str | None = None,
     include_resolved: bool = Query(default=True),
 ) -> list[CommentOut]:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     query = db.query(Comment).filter(Comment.episode_id == episode.id)
     if shot_id:
         query = query.filter(Comment.shot_id == shot_id)
@@ -42,7 +42,7 @@ def list_comments(
 def add_comment(
     episode_id: str, body: CommentCreate, user: CommentUser, db: DbDep
 ) -> CommentOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     author = (body.author or user.name).strip() or user.name
     shot_id = (body.shot_id or "").strip() or None
     if shot_id:
@@ -90,7 +90,7 @@ def resolve_comment(comment_id: str, user: CommentUser, db: DbDep) -> CommentOut
     comment = db.get(Comment, comment_id)
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found.")
-    get_episode(db, comment.episode_id)
+    get_episode(db, comment.episode_id, user)
     if not comment.resolved:
         comment.resolved = True
         comment.resolved_by = user.name

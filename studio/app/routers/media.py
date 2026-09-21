@@ -18,8 +18,8 @@ PREVIEW_SUFFIXES = IMAGE_SUFFIXES | {".json", ".mp4", ".webm", ".mov"}
 
 
 @router.get("/api/episodes/{episode_id}/media", response_model=list[MediaAssetOut])
-def list_media(episode_id: str, _user: ReadUser, db: DbDep) -> list[MediaAssetOut]:
-    episode = get_episode(db, episode_id)
+def list_media(episode_id: str, user: ReadUser, db: DbDep) -> list[MediaAssetOut]:
+    episode = get_episode(db, episode_id, user)
     return [MediaAssetOut.model_validate(row) for row in episode.media]
 
 
@@ -38,7 +38,7 @@ async def upload_media(
     entity_type: str = Form(""),
     notes: str = Form(""),
 ) -> MediaAssetOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     if kind not in MEDIA_KINDS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -111,11 +111,11 @@ async def upload_media(
 
 
 @router.get("/api/media/{asset_id}")
-def download_media(asset_id: str, _user: ReadUser, db: DbDep):
+def download_media(asset_id: str, user: ReadUser, db: DbDep):
     asset = db.get(MediaAsset, asset_id)
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
-    get_episode(db, asset.episode_id)
+    get_episode(db, asset.episode_id, user)
     store = get_store()
     local = store.local_path(asset.path)
     if local is not None:
@@ -131,11 +131,11 @@ def download_media(asset_id: str, _user: ReadUser, db: DbDep):
 
 
 @router.delete("/api/media/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_media(asset_id: str, _user: MediaUser, db: DbDep) -> None:
+def delete_media(asset_id: str, user: MediaUser, db: DbDep) -> None:
     asset = db.get(MediaAsset, asset_id)
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
-    get_episode(db, asset.episode_id)
+    get_episode(db, asset.episode_id, user)
     rel = asset.path
     episode = asset.episode
     for job in db.query(Job).filter(Job.media_id == asset.id).all():

@@ -43,12 +43,12 @@ def list_all_jobs(
 @router.get("/api/episodes/{episode_id}/jobs", response_model=list[JobOut])
 def list_episode_jobs(
     episode_id: str,
-    _user: ReadUser,
+    user: ReadUser,
     db: DbDep,
     job_status: str | None = Query(default=None, alias="status"),
     job_type: str | None = None,
 ) -> list[JobOut]:
-    get_episode(db, episode_id)
+    get_episode(db, episode_id, user)
     return [
         job_out(row)
         for row in list_jobs(db, episode_id=episode_id, status_value=job_status, job_type=job_type)
@@ -57,7 +57,7 @@ def list_episode_jobs(
 
 @router.post("/api/jobs", response_model=JobOut, status_code=status.HTTP_201_CREATED)
 def enqueue(body: JobEnqueue, user: JobsUser, db: DbDep) -> JobOut:
-    episode = get_episode(db, body.episode_id)
+    episode = get_episode(db, body.episode_id, user)
     job = enqueue_job(
         db,
         episode=episode,

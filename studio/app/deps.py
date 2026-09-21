@@ -60,7 +60,7 @@ def get_project(db: Session, project_id: str, user: UserOut | None = None) -> Pr
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
     org_id = (user.org_id if user else None) or current_org_id()
-    if org_id and project.organization_id != org_id:
+    if not org_id or project.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found.")
     if user:
         refuse_cross_org(user, project.organization_id)
@@ -73,9 +73,9 @@ def get_episode(db: Session, episode_id: str, user: UserOut | None = None) -> Ep
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found.")
     project = episode.project
     org_id = (user.org_id if user else None) or current_org_id()
-    if project is not None and org_id and project.organization_id != org_id:
+    if project is None or not org_id or project.organization_id != org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Episode not found.")
-    if user and project is not None:
+    if user:
         refuse_cross_org(user, project.organization_id)
     return episode
 

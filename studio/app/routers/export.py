@@ -17,8 +17,8 @@ def _require_shots(episode) -> None:
 
 
 @router.get("/api/episodes/{episode_id}/export/edl")
-def export_edl(episode_id: str, _user: ReadUser, db: DbDep) -> PlainTextResponse:
-    episode = get_episode(db, episode_id)
+def export_edl(episode_id: str, user: ReadUser, db: DbDep) -> PlainTextResponse:
+    episode = get_episode(db, episode_id, user)
     _require_shots(episode)
     body = render_edl(episode)
     filename = f"{episode.title or 'episode'}.edl"
@@ -30,8 +30,8 @@ def export_edl(episode_id: str, _user: ReadUser, db: DbDep) -> PlainTextResponse
 
 
 @router.get("/api/episodes/{episode_id}/export/fcpxml")
-def export_fcpxml(episode_id: str, _user: ReadUser, db: DbDep) -> Response:
-    episode = get_episode(db, episode_id)
+def export_fcpxml(episode_id: str, user: ReadUser, db: DbDep) -> Response:
+    episode = get_episode(db, episode_id, user)
     _require_shots(episode)
     body = render_fcpxml(episode)
     filename = f"{episode.title or 'episode'}.xml"
@@ -43,8 +43,8 @@ def export_fcpxml(episode_id: str, _user: ReadUser, db: DbDep) -> Response:
 
 
 @router.get("/api/episodes/{episode_id}/export/playlist")
-def export_playlist(episode_id: str, _user: ReadUser, db: DbDep) -> JSONResponse:
-    episode = get_episode(db, episode_id)
+def export_playlist(episode_id: str, user: ReadUser, db: DbDep) -> JSONResponse:
+    episode = get_episode(db, episode_id, user)
     _require_shots(episode)
     filename = f"{episode.title or 'episode'}-playlist.json"
     return JSONResponse(
@@ -54,8 +54,8 @@ def export_playlist(episode_id: str, _user: ReadUser, db: DbDep) -> JSONResponse
 
 
 @router.get("/api/episodes/{episode_id}/export/playlist.txt")
-def export_playlist_download(episode_id: str, _user: ReadUser, db: DbDep) -> PlainTextResponse:
-    episode = get_episode(db, episode_id)
+def export_playlist_download(episode_id: str, user: ReadUser, db: DbDep) -> PlainTextResponse:
+    episode = get_episode(db, episode_id, user)
     _require_shots(episode)
     filename = f"{episode.title or 'episode'}-playlist.json"
     return PlainTextResponse(

@@ -17,9 +17,9 @@ def retention_preview(
     episode_id: str | None = None,
 ) -> dict:
     if project_id:
-        get_project(db, project_id)
+        get_project(db, project_id, user)
     if episode_id:
-        get_episode(db, episode_id)
+        get_episode(db, episode_id, user)
     body = candidates(db, project_id=project_id, episode_id=episode_id, organization_id=user.org_id)
     body["applied"] = False
     body["dry_run"] = True
@@ -29,9 +29,9 @@ def retention_preview(
 @router.post("/api/retention")
 def retention_run(body: RetentionApply, user: ReadUser, db: DbDep) -> dict:
     if body.project_id:
-        get_project(db, body.project_id)
+        get_project(db, body.project_id, user)
     if body.episode_id:
-        get_episode(db, body.episode_id)
+        get_episode(db, body.episode_id, user)
     if body.dry_run:
         preview = candidates(
             db,
@@ -80,9 +80,9 @@ def retention_dry_run_alias(
     episode_id: str | None = Query(default=None),
 ) -> dict:
     if project_id:
-        get_project(db, project_id)
+        get_project(db, project_id, user)
     if episode_id:
-        get_episode(db, episode_id)
+        get_episode(db, episode_id, user)
     body = candidates(db, project_id=project_id, episode_id=episode_id, organization_id=user.org_id)
     body["applied"] = False
     body["dry_run"] = True

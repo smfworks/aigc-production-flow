@@ -30,16 +30,16 @@ def _revision_out(revision: PackRevision) -> PackRevisionOut:
 
 
 @router.get("/api/episodes/{episode_id}/revisions", response_model=list[PackRevisionSummary])
-def list_revisions(episode_id: str, _user: ReadUser, db: DbDep) -> list[PackRevisionSummary]:
-    episode = get_episode(db, episode_id)
+def list_revisions(episode_id: str, user: ReadUser, db: DbDep) -> list[PackRevisionSummary]:
+    episode = get_episode(db, episode_id, user)
     return [PackRevisionSummary.model_validate(row) for row in episode.revisions]
 
 
 @router.get("/api/episodes/{episode_id}/revisions/{revision_id}", response_model=PackRevisionOut)
 def get_revision(
-    episode_id: str, revision_id: str, _user: ReadUser, db: DbDep
+    episode_id: str, revision_id: str, user: ReadUser, db: DbDep
 ) -> PackRevisionOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     revision = db.get(PackRevision, revision_id)
     if not revision or revision.episode_id != episode.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Revision not found.")
@@ -47,8 +47,8 @@ def get_revision(
 
 
 @router.get("/api/episodes/{episode_id}/gates", response_model=GateSnapshotOut)
-def get_gates(episode_id: str, _user: ReadUser, db: DbDep) -> GateSnapshotOut:
-    episode = get_episode(db, episode_id)
+def get_gates(episode_id: str, user: ReadUser, db: DbDep) -> GateSnapshotOut:
+    episode = get_episode(db, episode_id, user)
     revision = latest_revision(episode)
     if not revision:
         raise HTTPException(
@@ -69,7 +69,7 @@ async def import_pack(
     db: DbDep,
     file: UploadFile = File(..., description="Pack zip exported from the builder (must include pack.json)."),
 ) -> PackRevisionOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     from ..notify import blocker_codes
 
     before = blocker_codes(episode)
@@ -123,7 +123,7 @@ async def import_pack(
 
 @router.get("/api/episodes/{episode_id}/pack")
 def export_pack(episode_id: str, user: ReadUser, db: DbDep):
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     revision = latest_revision(episode)
     if not revision:
         raise HTTPException(
