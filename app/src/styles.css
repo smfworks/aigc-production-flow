@@ -760,6 +760,45 @@ table.data td select {
   transform: none;
 }
 
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(7, 11, 22, 0.72);
+}
+
+.confirm-dialog {
+  width: min(440px, 100%);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.confirm-dialog h2 {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: -0.03em;
+}
+
+.confirm-dialog p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -909,6 +948,7 @@ a:focus-visible {
   .actions,
   .kbd-hint,
   .toast,
+  .confirm-backdrop,
   .sr-only,
   .subnav {
     display: none !important;

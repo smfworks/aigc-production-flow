@@ -109,7 +109,7 @@ Live demo: [aigc-production-flow.vercel.app](https://aigc-production-flow.vercel
 cd app && npm i && npm run dev
 ```
 
-Open the Vite URL (default http://localhost:5173). First visit loads the Sigils **lessons** sample so the clocks and lyric numbers are visible; it is not a generate pack until overall vs haft is a real measurement (gate 6 stays red while haft is `none`). **New pack** starts blank, including Look. The current pack autosaves in `localStorage`; New pack and Load sample ask before they wipe it.
+Open the Vite URL (default http://localhost:5173). First visit loads the Sigils **lessons** sample so the clocks and lyric numbers are visible; it is not a generate pack until overall vs haft is a real measurement (gate 6 stays red while haft is `none`). **New pack** starts blank, including Look. The current pack autosaves in `localStorage`; New pack, Load sample, and Import zip ask in the page before they wipe it. The ask is an in-app dialog so it still appears when the builder is iframed without `allow-modals`.
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
