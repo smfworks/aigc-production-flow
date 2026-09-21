@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from .audit import IDENTITY_APPROVE, IDENTITY_LINK, record
+from .audit import IDENTITY_APPROVE, IDENTITY_KEYWORDS, IDENTITY_LINK, IDENTITY_UNAPPROVE, record
 from .consistency import lock_diff_problems
 from .models import (
     APPROVAL_APPROVED,
@@ -154,8 +154,99 @@ def approve_asset(
                 "entity_label": asset.entity_label,
                 "entity_type": asset.entity_type,
                 "approved_by": user_name,
+                "reapproved": not newly_approved and keywords_changed,
+                "lock_keywords": asset.lock_keywords or "",
             },
         )
+    return asset
+
+
+def unapprove_asset(
+    db: Session,
+    episode: Episode,
+    asset: MediaAsset,
+    *,
+    user_name: str,
+    note: str = "",
+) -> MediaAsset:
+    if not is_identity_kind(asset.kind):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only sheets and plates leave the approved identity set.",
+        )
+    if not is_approved(asset):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Identity asset is already a draft. Draft keywords do not count.",
+        )
+    previous_by = asset.approved_by or ""
+    previous_keywords = asset.lock_keywords or ""
+    asset.approval_status = APPROVAL_DRAFT
+    asset.approved_by = ""
+    asset.approved_at = None
+    if note.strip():
+        extra = f"unapproved: {note.strip()}"
+        asset.notes = f"{asset.notes}\n{extra}".strip() if asset.notes else extra
+    record(
+        db,
+        actor=user_name,
+        action=IDENTITY_UNAPPROVE,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="media",
+        entity_id=asset.id,
+        detail={
+            "kind": asset.kind,
+            "entity_label": asset.entity_label,
+            "previous_approved_by": previous_by,
+            "lock_keywords": previous_keywords,
+            "note": note.strip(),
+        },
+    )
+    return asset
+
+
+def set_lock_keywords(
+    db: Session,
+    episode: Episode,
+    asset: MediaAsset,
+    *,
+    user_name: str,
+    lock_keywords: str,
+    note: str = "",
+) -> MediaAsset:
+    """Store keywords. An approved asset returns to draft so the edit does not count yet."""
+    if not is_identity_kind(asset.kind):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only sheets and plates carry identity lock keywords.",
+        )
+    previous = asset.lock_keywords or ""
+    was_approved = is_approved(asset)
+    asset.lock_keywords = lock_keywords.strip()
+    if was_approved:
+        asset.approval_status = APPROVAL_DRAFT
+        asset.approved_by = ""
+        asset.approved_at = None
+    if note.strip():
+        extra = f"keywords: {note.strip()}"
+        asset.notes = f"{asset.notes}\n{extra}".strip() if asset.notes else extra
+    record(
+        db,
+        actor=user_name,
+        action=IDENTITY_KEYWORDS,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="media",
+        entity_id=asset.id,
+        detail={
+            "kind": asset.kind,
+            "demoted": was_approved,
+            "previous": previous,
+            "lock_keywords": asset.lock_keywords,
+            "note": note.strip(),
+        },
+    )
     return asset
 
 

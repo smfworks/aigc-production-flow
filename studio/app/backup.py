@@ -36,7 +36,8 @@ KEEP_REVISIONS_NOTE = (
     "PackRevision row. Missing revisions are added. Media files are restored "
     "from the zip when present. A manifest path is not rebound — that would "
     "point at another org's store object. Ids that already belong to another "
-    "org are refused."
+    "org are refused. Episode season/sequence order is metadata in this manifest "
+    "and is restored with the episode. Retention does not reorder or delete episodes."
 )
 HONESTY = (
     "Metadata + media manifest backup. Not a CapCut project, not an NLE, not a "
@@ -50,6 +51,24 @@ def _iso(value: datetime | None) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.isoformat()
+
+
+def _apply_episode_order(episode: Episode, row: dict[str, Any]) -> None:
+    """Keep season/sequence (and writer script fields) when a backup names them."""
+    if "season" in row:
+        episode.season = int(row.get("season") or 1)
+    if "sequence" in row:
+        episode.sequence_index = int(row.get("sequence") or episode.chapter or 1)
+    elif "chapter" in row and "sequence" not in row:
+        episode.sequence_index = int(row.get("chapter") or episode.sequence_index or 1)
+    if "chapter" in row:
+        episode.chapter = int(row.get("chapter") or episode.chapter or 1)
+    if "log_line" in row:
+        episode.log_line = str(row.get("log_line") or "")
+    if "map_notes" in row:
+        episode.map_notes = str(row.get("map_notes") or "")
+    if "dialogue" in row:
+        episode.dialogue = str(row.get("dialogue") or "")
 
 
 def _sha256(data: bytes) -> str:
@@ -108,7 +127,12 @@ def export_org_backup(db: Session, org: Organization) -> bytes:
                     "project_id": project.id,
                     "title": episode.title,
                     "chapter": episode.chapter,
+                    "season": episode.season or 1,
+                    "sequence": episode.sequence_index or episode.chapter or 1,
                     "synopsis": episode.synopsis,
+                    "log_line": episode.log_line or "",
+                    "map_notes": episode.map_notes or "",
+                    "dialogue": episode.dialogue or "",
                     "review_state": episode.review_state,
                     "created_at": _iso(episode.created_at),
                 }
@@ -404,16 +428,23 @@ def restore_backup(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Backup episode id belongs to another org. Cross-org restore is refused.",
                 )
+            _apply_episode_order(existing, row)
             id_map_episodes[old_id] = existing.id
             continue
         project_id = id_map_projects.get(str(row.get("project_id") or ""))
         if not project_id:
             continue
+        chapter = int(row.get("chapter") or 1)
         episode = Episode(
             project_id=project_id,
             title=str(row.get("title") or "Restored episode"),
-            chapter=int(row.get("chapter") or 1),
+            chapter=chapter,
+            season=int(row.get("season") or 1),
+            sequence_index=int(row.get("sequence") or chapter),
             synopsis=str(row.get("synopsis") or ""),
+            log_line=str(row.get("log_line") or ""),
+            map_notes=str(row.get("map_notes") or ""),
+            dialogue=str(row.get("dialogue") or ""),
             review_state=str(row.get("review_state") or "draft"),
         )
         if old_id:

@@ -46,7 +46,7 @@ def _gate_map(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
     return out
 
 
-def _schedule_key(row: dict[str, Any]) -> str:
+def _schedule_natural(row: dict[str, Any]) -> str:
     return "|".join(
         [
             str(row.get("entityKind") or "").strip().lower(),
@@ -55,6 +55,45 @@ def _schedule_key(row: dict[str, Any]) -> str:
             str(row.get("windows") or "").strip().lower(),
         ]
     )
+
+
+def index_schedule_rows(rows: list[dict[str, Any]]) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    """Index entity-schedule rows without collapsing distinct lines.
+
+    Unique ``id`` values are the match key. Rows that share kind/name/take/windows
+    stay separate. Missing ids use occurrence order (``natural~n``) and are marked
+    ambiguous so the diff does not pretend they were one row.
+    """
+    counts: dict[str, int] = {}
+    prepared: list[tuple[str, str, dict[str, Any]]] = []
+    for row in rows:
+        natural = _schedule_natural(row)
+        counts[natural] = counts.get(natural, 0) + 1
+        prepared.append((natural, str(row.get("id") or "").strip(), row))
+
+    indexed: dict[str, dict[str, Any]] = {}
+    ambiguous: list[dict[str, Any]] = []
+    seen: dict[str, int] = {}
+    reported: set[str] = set()
+    for natural, row_id, row in prepared:
+        occurrence = seen.get(natural, 0)
+        seen[natural] = occurrence + 1
+        duplicate = counts[natural] > 1
+        if duplicate and natural not in reported:
+            reported.add(natural)
+            ambiguous.append(
+                {
+                    "natural": natural,
+                    "count": counts[natural],
+                    "matched_by": "id" if row_id else "occurrence",
+                }
+            )
+        if row_id:
+            key = row_id if row_id not in indexed else f"{row_id}~{occurrence}"
+        else:
+            key = f"{natural}~{occurrence}"
+        indexed[key] = row
+    return indexed, ambiguous
 
 
 def _edit_key(row: dict[str, Any], index: int) -> str:
@@ -93,15 +132,12 @@ def identity_keywords(pack: dict[str, Any]) -> dict[str, list[str]]:
     return {key: sorted(values) for key, values in sorted(grouped.items())}
 
 
-def _list_diff(
-    left_rows: list[dict[str, Any]],
-    right_rows: list[dict[str, Any]],
+def _list_diff_maps(
+    left_map: dict[str, dict[str, Any]],
+    right_map: dict[str, dict[str, Any]],
     *,
-    key_fn,
     fields: tuple[str, ...],
 ) -> dict[str, Any]:
-    left_map = {key_fn(row, i): row for i, row in enumerate(left_rows)}
-    right_map = {key_fn(row, i): row for i, row in enumerate(right_rows)}
     added: list[dict[str, Any]] = []
     removed: list[dict[str, Any]] = []
     changed: list[dict[str, Any]] = []
@@ -118,6 +154,18 @@ def _list_diff(
             if delta:
                 changed.append({"key": key, "fields": delta})
     return {"added": added, "removed": removed, "changed": changed}
+
+
+def _list_diff(
+    left_rows: list[dict[str, Any]],
+    right_rows: list[dict[str, Any]],
+    *,
+    key_fn,
+    fields: tuple[str, ...],
+) -> dict[str, Any]:
+    left_map = {key_fn(row, i): row for i, row in enumerate(left_rows)}
+    right_map = {key_fn(row, i): row for i, row in enumerate(right_rows)}
+    return _list_diff_maps(left_map, right_map, fields=fields)
 
 
 def pack_payload(revision: PackRevision | None) -> dict[str, Any]:
@@ -158,13 +206,34 @@ def diff_packs(
             }
         )
 
-    schedule_fields = ("entityKind", "entityName", "take", "windows", "identityHold")
-    entity_schedule = _list_diff(
-        [as_record(row) for row in as_list(left.get("entitySchedule"))],
-        [as_record(row) for row in as_list(right.get("entitySchedule"))],
-        key_fn=lambda row, _i: _schedule_key(row),
-        fields=schedule_fields,
-    )
+    schedule_fields = ("entityKind", "entityName", "take", "windows", "identityHold", "id")
+    left_schedule = [as_record(row) for row in as_list(left.get("entitySchedule"))]
+    right_schedule = [as_record(row) for row in as_list(right.get("entitySchedule"))]
+    left_sched_map, left_amb = index_schedule_rows(left_schedule)
+    right_sched_map, right_amb = index_schedule_rows(right_schedule)
+    entity_schedule = _list_diff_maps(left_sched_map, right_sched_map, fields=schedule_fields)
+    ambiguous = []
+    seen_natural: set[str] = set()
+    for row in left_amb + right_amb:
+        natural = str(row.get("natural") or "")
+        if natural in seen_natural:
+            continue
+        seen_natural.add(natural)
+        ambiguous.append(
+            {
+                "natural": natural,
+                "left": sum(1 for item in left_schedule if _schedule_natural(item) == natural),
+                "right": sum(1 for item in right_schedule if _schedule_natural(item) == natural),
+                "matched_by": "id"
+                if any(str(item.get("id") or "").strip() for item in left_schedule + right_schedule if _schedule_natural(item) == natural)
+                else "occurrence",
+                "note": (
+                    "These rows share kind/name/take/windows. They are matched by id "
+                    "(or occurrence order when id is missing) and are not collapsed into one row."
+                ),
+            }
+        )
+    entity_schedule["ambiguous"] = ambiguous
 
     edit_fields = (
         "songT",
@@ -220,8 +289,9 @@ def diff_packs(
     return {
         "honesty": (
             "Structured pack revision diff (gates, entity-schedule, edit-list, "
-            "identity keywords). Not embeddings. Confirm to apply an import. "
-            "Never auto-generate."
+            "identity keywords). Distinct entity-schedule rows are not collapsed "
+            "when they share kind/name/take/windows. Not embeddings. Confirm to "
+            "apply an import. Never auto-generate."
         ),
         "gates": gates,
         "entity_schedule": entity_schedule,

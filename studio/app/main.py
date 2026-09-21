@@ -20,6 +20,7 @@ from .models import Job
 from .notify import webhook_configured
 from .observability import StructuredLogMiddleware, prometheus_text
 from .oidc import oidc_configured
+from .rbac import role_matrix
 from .routers import (
     adapters,
     audit,
@@ -74,17 +75,20 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.8.0",
+        version="0.9.0",
         description=(
-            "Phase 8 studio spine for the AIGC production flow. "
+            "Phase 9 studio spine for the AIGC production flow. "
             "Pack zip remains the collaboration contract. "
+            "App-level roles add writer and art beside the Phase 5 producer / editor / "
+            "reviewer / viewer bundle. Episode season/sequence order, a soft playlist "
+            "scrubber, and identity unapprove/keyword edit. "
             "Visual identity store (approved sheets + per-window plates). "
-            "Pack revision diff before import overwrite. "
+            "Pack revision diff before import overwrite. Distinct entity-schedule rows "
+            "are not collapsed. "
             "Builder Open in Studio can stage a zip for auto-import after episode pick. "
             "comfy-h3 / comfy-qwen declare measured window metadata; unset hooks are not live. "
             "Multi-org lite: membership isolation, not SaaS billing, not SSO org mapping. "
-            "App-level org roles (producer / editor / reviewer / viewer) sit on top of "
-            "local-dev Bearer, optional X-Forwarded-User, or optional OIDC JWKS. "
+            "Roles stay app-level unless STUDIO_OIDC_APPLY_ROLE_CLAIM is set. "
             "OIDC and Celery are opt-in and off by default. This is not a production IdP. "
             "Default jobs run in-process (thread worker). "
             "Adapter catalog: stub plus documented slots (comfy-h3, comfy-qwen, webhook, cli). "
@@ -136,7 +140,7 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 8,
+            "phase": 9,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",
@@ -226,6 +230,7 @@ def create_app() -> FastAPI:
             oidc_apply_role_claim=bool(cfg.oidc_apply_role_claim),
             notify_webhook_configured=webhook_configured(cfg),
             multi_org=True,
+            role_matrix=role_matrix(),
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])

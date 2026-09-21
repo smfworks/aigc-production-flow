@@ -146,6 +146,98 @@ def test_unknown_user_is_not_a_member(client, auth):
     assert projects.status_code == 403
 
 
+def test_writer_and_art_are_distinct_from_legacy_editor(client, auth):
+    project, episode, shots = green_ready_episode(client, auth, "Matrix")
+    add_member(client, auth, "wren", "writer")
+    add_member(client, auth, "ada", "art")
+    add_member(client, auth, "ed", "editor")
+    writer = as_user(auth, "wren")
+    art = as_user(auth, "ada")
+    editor = as_user(auth, "ed")
+
+    script = client.patch(
+        f"/api/episodes/{episode['id']}",
+        headers=writer,
+        json={"log_line": "One sentence.", "map_notes": "0:00 verse", "dialogue": "Hold."},
+    )
+    assert script.status_code == 200, script.text
+    assert script.json()["log_line"] == "One sentence."
+
+    blocked_script = client.patch(
+        f"/api/episodes/{episode['id']}",
+        headers=art,
+        json={"dialogue": "art should not write this"},
+    )
+    assert blocked_script.status_code == 403
+
+    sheet = client.post(
+        f"/api/episodes/{episode['id']}/media",
+        headers=art,
+        data={"kind": "sheet", "entity_label": "lead", "entity_type": "character"},
+        files={"file": ("lead.fixture.json", b'{"claim":"fixture only"}', "application/json")},
+    )
+    assert sheet.status_code == 201, sheet.text
+    approved = client.post(
+        f"/api/episodes/{episode['id']}/identity/{sheet.json()['id']}/approve",
+        headers=art,
+        json={"lock_keywords": "lead face"},
+    )
+    assert approved.status_code == 200, approved.text
+
+    writer_sheet = client.post(
+        f"/api/episodes/{episode['id']}/media",
+        headers=writer,
+        data={"kind": "sheet", "entity_label": "lead"},
+        files={"file": ("nope.json", b"{}", "application/json")},
+    )
+    assert writer_sheet.status_code == 403
+
+    for headers in (writer, art):
+        job = client.post(
+            "/api/jobs",
+            headers=headers,
+            json={"episode_id": episode["id"], "job_type": "batch-precheck"},
+        )
+        assert job.status_code == 403
+
+    join_blocked = client.patch(
+        f"/api/episodes/{episode['id']}/shots/{shots[0]['id']}",
+        headers=writer,
+        json={"join": "cut", "action": "writer should not edit the join"},
+    )
+    assert join_blocked.status_code == 403
+    join_ok = client.patch(
+        f"/api/episodes/{episode['id']}/shots/{shots[0]['id']}",
+        headers=editor,
+        json={"join": "cut", "camera_verb": "push", "action": "editor join"},
+    )
+    assert join_ok.status_code == 200, join_ok.text
+    assert join_ok.json()["join"] == "cut"
+
+    still_enqueue = client.post(
+        "/api/jobs",
+        headers=editor,
+        json={"episode_id": episode["id"], "job_type": "batch-precheck"},
+    )
+    assert still_enqueue.status_code == 201, still_enqueue.text
+
+    me_writer = client.get("/api/me", headers=writer).json()
+    me_art = client.get("/api/me", headers=art).json()
+    assert "script" in me_writer["permissions"]
+    assert "identity" not in me_writer["permissions"]
+    assert "identity" in me_art["permissions"]
+    assert "script" not in me_art["permissions"]
+    assert "jobs" not in me_writer["permissions"]
+    matrix = client.get("/api/meta").json()["role_matrix"]
+    by_role = {row["role"]: row for row in matrix}
+    assert "writer" in by_role and "art" in by_role
+    assert "script" in by_role["writer"]["permissions"]
+    assert "identity" in by_role["art"]["permissions"]
+    assert "jobs" in by_role["editor"]["permissions"]
+    assert "budget" in by_role["producer"]["permissions"]
+    assert project["id"]
+
+
 def test_viewer_cannot_manage_members(client, auth):
     add_member(client, auth, "view-only", "viewer")
     oid = org_id(client, auth)

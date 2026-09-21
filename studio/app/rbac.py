@@ -15,17 +15,20 @@ from sqlalchemy.orm import Session
 
 from .auth import get_current_user
 from .database import get_db
-from .models import Organization, OrgMember
+from .models import (
+    ORG_ROLES,
+    ROLE_ART,
+    ROLE_EDITOR,
+    ROLE_PRODUCER,
+    ROLE_REVIEWER,
+    ROLE_VIEWER,
+    ROLE_WRITER,
+    Organization,
+    OrgMember,
+)
 from .schemas import OrgMembershipOut, UserOut
 
 active_org_id: ContextVar[str | None] = ContextVar("studio_active_org_id", default=None)
-
-ROLE_PRODUCER = "producer"
-ROLE_EDITOR = "editor"
-ROLE_REVIEWER = "reviewer"
-ROLE_VIEWER = "viewer"
-
-ORG_ROLES = frozenset({ROLE_PRODUCER, ROLE_EDITOR, ROLE_REVIEWER, ROLE_VIEWER})
 
 PERM_READ = "read"
 PERM_COMMENT = "comment"
@@ -38,22 +41,16 @@ PERM_BUDGET = "budget"
 PERM_RETENTION = "retention"
 PERM_MEMBERS = "members"
 PERM_SIGNOFF = "signoff"
+# Pack-convention capabilities. Legacy editor/producer keep the Phase 5 bundle.
+PERM_SCRIPT = "script"
+PERM_IDENTITY = "identity"
+PERM_EDIT = "edit"
 
-_PRODUCER_PERMS = frozenset(
-    {
-        PERM_READ,
-        PERM_COMMENT,
-        PERM_REVIEW,
-        PERM_JOBS,
-        PERM_PACK,
-        PERM_MEDIA,
-        PERM_MUTATE,
-        PERM_BUDGET,
-        PERM_RETENTION,
-        PERM_MEMBERS,
-        PERM_SIGNOFF,
-    }
-)
+_BASE_READ = frozenset({PERM_READ})
+_REVIEWER_PERMS = frozenset({PERM_READ, PERM_COMMENT, PERM_REVIEW, PERM_SIGNOFF})
+_WRITER_PERMS = frozenset({PERM_READ, PERM_COMMENT, PERM_SCRIPT})
+_ART_PERMS = frozenset({PERM_READ, PERM_COMMENT, PERM_IDENTITY})
+# Phase 5 editor stays the craft bundle: script + identity + edit-list + jobs/pack/media.
 _EDITOR_PERMS = frozenset(
     {
         PERM_READ,
@@ -63,17 +60,69 @@ _EDITOR_PERMS = frozenset(
         PERM_PACK,
         PERM_MEDIA,
         PERM_MUTATE,
+        PERM_SCRIPT,
+        PERM_IDENTITY,
+        PERM_EDIT,
     }
 )
-_REVIEWER_PERMS = frozenset({PERM_READ, PERM_COMMENT, PERM_REVIEW, PERM_SIGNOFF})
-_VIEWER_PERMS = frozenset({PERM_READ})
+_PRODUCER_PERMS = _EDITOR_PERMS | frozenset(
+    {PERM_BUDGET, PERM_RETENTION, PERM_MEMBERS, PERM_SIGNOFF}
+)
 
 ROLE_PERMISSIONS = {
     ROLE_PRODUCER: _PRODUCER_PERMS,
     ROLE_EDITOR: _EDITOR_PERMS,
     ROLE_REVIEWER: _REVIEWER_PERMS,
-    ROLE_VIEWER: _VIEWER_PERMS,
+    ROLE_VIEWER: _BASE_READ,
+    ROLE_WRITER: _WRITER_PERMS,
+    ROLE_ART: _ART_PERMS,
 }
+
+# Shown in studio-web. App-level only — not IdP groups unless the OIDC claim map is on.
+ROLE_MATRIX = (
+    {
+        "role": ROLE_VIEWER,
+        "label": "viewer",
+        "legacy": True,
+        "note": "Read-only. Phase 5 role, unchanged. Presence heartbeat only.",
+    },
+    {
+        "role": ROLE_REVIEWER,
+        "label": "reviewer",
+        "legacy": True,
+        "note": "Comments, review set, and sign-off. Cannot enqueue or edit the pack.",
+    },
+    {
+        "role": ROLE_WRITER,
+        "label": "writer",
+        "legacy": False,
+        "note": "Script, map, dialogue, and episode/season order. Not sheets, joins, or GPU.",
+    },
+    {
+        "role": ROLE_ART,
+        "label": "art",
+        "legacy": False,
+        "note": "Sheets, plates, and identity approve/unapprove. Not script fields or GPU spend.",
+    },
+    {
+        "role": ROLE_EDITOR,
+        "label": "editor",
+        "legacy": True,
+        "note": (
+            "Legacy craft bundle (writer + art + edit-list + jobs + pack import). "
+            "Not budget, retention, members, or sign-off. Existing editors keep these powers."
+        ),
+    },
+    {
+        "role": ROLE_PRODUCER,
+        "label": "producer",
+        "legacy": True,
+        "note": (
+            "Gates governance, GPU budget hard-stop, retention, members, generate-ok override, "
+            "sign-off, plus the editor bundle."
+        ),
+    },
+)
 
 
 def normalize_role(raw: str | None) -> str:
@@ -81,7 +130,7 @@ def normalize_role(raw: str | None) -> str:
     if value not in ORG_ROLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="role must be producer, editor, reviewer, or viewer.",
+            detail="role must be producer, editor, writer, art, reviewer, or viewer.",
         )
     return value
 
@@ -94,6 +143,18 @@ def permissions_for(role: str | None) -> frozenset[str]:
 
 def has_perm(role: str | None, perm: str) -> bool:
     return perm in permissions_for(role)
+
+
+def role_matrix() -> list[dict]:
+    rows = []
+    for row in ROLE_MATRIX:
+        rows.append(
+            {
+                **row,
+                "permissions": sorted(permissions_for(row["role"])),
+            }
+        )
+    return rows
 
 
 def default_org(db: Session) -> Organization | None:
@@ -255,9 +316,10 @@ def attach_role(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
                     f"{user.name} is not a member of this organization. A producer must add "
-                    "this user (viewer / reviewer / editor / producer). Multi-org lite is "
-                    "membership isolation only — not SaaS billing. Roles are app-level — "
-                    "see docs/AUTH.md. OIDC claims do not map orgs."
+                    "this user (viewer / reviewer / writer / art / editor / producer). "
+                    "Multi-org lite is membership isolation only — not SaaS billing. "
+                    "Roles are app-level — see docs/AUTH.md. OIDC claims do not map orgs "
+                    "unless STUDIO_OIDC_APPLY_ROLE_CLAIM is set."
                 ),
             )
         return user.model_copy(
@@ -283,6 +345,34 @@ def attach_role(
     )
 
 
+def require_any(*perms: str):
+    """Allow the request when the role has at least one of the named permissions."""
+    needed = frozenset(perms)
+
+    def _dep(
+        user: Annotated[UserOut, Depends(get_current_user)],
+        db: Annotated[Session, Depends(get_db)],
+        x_org_id: Annotated[str | None, Header()] = None,
+    ) -> UserOut:
+        actor = attach_role(user, db, required=True, org_id=x_org_id)
+        if any(perm in permissions_for(actor.role) for perm in needed):
+            return actor
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "forbidden_role",
+                "message": (
+                    f"Role {actor.role} needs one of {', '.join(sorted(needed))}. "
+                    "Art can upload sheets/plates. Editor/producer can upload preview media."
+                ),
+                "role": actor.role,
+                "required_any": sorted(needed),
+            },
+        )
+
+    return _dep
+
+
 def require_perm(*perms: str):
     needed = frozenset(perms)
 
@@ -300,8 +390,9 @@ def require_perm(*perms: str):
                     "code": "forbidden_role",
                     "message": (
                         f"Role {actor.role} cannot {', '.join(missing)}. "
-                        "Viewers are read-only. Reviewer/producer sign-off is required "
-                        "before generate-ok. Promote the member to the needed role."
+                        "Viewers are read-only. Writer edits script/map/dialogue and episode order. "
+                        "Art approves sheets/plates. Legacy editor keeps the craft bundle. "
+                        "Reviewer/producer sign-off is required before generate-ok."
                     ),
                     "role": actor.role,
                     "required": sorted(needed),
@@ -332,7 +423,7 @@ def refuse_unless(user: UserOut, perm: str, *, field: str | None = None) -> None
             "message": (
                 f"Role {user.role or 'none'} cannot {perm}{extra}. "
                 "Budget hard-stop, retention apply, and member admin are producer-only. "
-                "Sign-off is reviewer or producer."
+                "Sign-off is reviewer or producer. Writer and art are narrower than editor."
             ),
             "role": user.role,
             "required": [perm],
@@ -351,3 +442,7 @@ BudgetUser = Annotated[UserOut, Depends(require_perm(PERM_BUDGET))]
 RetentionUser = Annotated[UserOut, Depends(require_perm(PERM_RETENTION))]
 MembersUser = Annotated[UserOut, Depends(require_perm(PERM_MEMBERS))]
 SignoffUser = Annotated[UserOut, Depends(require_perm(PERM_SIGNOFF))]
+ScriptUser = Annotated[UserOut, Depends(require_perm(PERM_SCRIPT))]
+IdentityUser = Annotated[UserOut, Depends(require_perm(PERM_IDENTITY))]
+EditUser = Annotated[UserOut, Depends(require_perm(PERM_EDIT))]
+MediaOrIdentityUser = Annotated[UserOut, Depends(require_any(PERM_MEDIA, PERM_IDENTITY))]

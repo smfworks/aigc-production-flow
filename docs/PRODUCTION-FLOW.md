@@ -118,12 +118,20 @@ OIDC and Celery are **optional in Phase 6** and **off by default**. They are not
 - **Builder → studio auto-import** — Open in Studio stages the zip (`POST /api/handoffs`) when `VITE_STUDIO_URL` is set (CORS/token documented). Pick project/episode → import uses the handed-off zip (no re-choose file). Failure modes: studio down, auth. Never auto-generate
 - **Measured live Comfy hooks** — `comfy-h3` declares hop-1 **10.125 s / 243 f @ 24 fps**; `comfy-qwen` declares canvas **1344×768**. Health/dry-run include config schema validation. Unset env is **not live** and still resolves to stub. Hop-1 watch protocol remains required; live adapters must not skip it. Stub remains default. No Hailuo/Veo/Kling in this phase
 
+**Phase 9 (this repo, roles, order, scrub, identity edit):**
+
+- **Role matrix** — pack-convention `writer` (script/map/dialogue, episode order) and `art` (sheets/plates/identity approve) sit beside the Phase 5 roles. Legacy `editor` stays the craft bundle (those writes plus joins/board/edit-list, jobs, pack). `producer` keeps gates governance, GPU budget, retention, members, and generate-ok override. Reviewers still sign off. Viewers stay read-only. App-level only — not IdP groups unless the OIDC claim map is on
+- **Episode order** — `season` + `sequence` on each episode, reorder API, studio-web up/down. Backup and retention preserve that order; retention does not delete or reorder episodes
+- **Soft playlist scrubber** — studio-web steps through the shot playlist and plays a local/stub `kind=preview` file when one is stored. Metadata otherwise. Not an NLE. No invented MP4s
+- **Identity unapprove + keyword edit** — audited unapprove; saving keywords on an approved asset returns it to draft. Only the approved set counts for generate-ok. Synonym lock-diff rules unchanged
+- **Pack diff** — distinct entity-schedule rows that share kind/name/take/windows are not collapsed (matched by id, or by occurrence when id is missing, and marked ambiguous)
+- **Playwright smoke** — headless demo seed → continuity/identity signals → API-assisted sign-off and stub precheck. Skips with `E2E_SKIP` when browsers are unavailable. No live Comfy/S3/OIDC
+
 v2 leftover (platform, do not pretend we have it):
 
 - GPU queue / one engine adapter at a time per GPU (ops pin)
 - multi-tenant SaaS billing / SSO org mapping
-- full writer/art/editor/producer matrix
-- episode/season order, soft playlist scrubber, Hermes Desktop pane, Playwright E2E
+- Hermes Desktop studio pane (separate plugin)
 
 **Phase 6 (this repo, production readiness):**
 
@@ -158,17 +166,16 @@ Phase 5 (this repo): org **members** with app-level roles. Pack zip is still the
 
 Phase 7 (this repo): **multi-org lite** — a producer can create a second org and switch. Members of org A cannot read org B. Still not SaaS billing.
 
-v2 leftover (build, do not pretend we have it):
+Phase 9 maps that convention onto org members. It is still app-level, not IdP groups.
 
 | Role | Writes | Reviews |
 |---|---|---|
-| Writer | log line, map, dialogue finish-by | retention hooks, episode order |
-| Art | sheets, plates, look | identity vs lock |
-| Editor | takes, edit list, joins | one verb, fade vs cut |
-| Producer | audio path, generate-ok | GPU budget, license |
-| Reviewer | comments only | preview watch, NG reason |
-
-Studio Phase 5 maps a **lite** subset onto org members (`producer` / `editor` / `reviewer` / `viewer`) for mutating HTTP routes. It is not the full writer/art matrix above and not IdP groups.
+| Writer | log line, map, dialogue finish-by, episode season/sequence | retention hooks stay producer-only; order is the writer reorder API |
+| Art | sheets, plates, identity approve / unapprove / keywords | identity vs lock (approved set only) |
+| Editor | takes, edit list, joins — and, for the **legacy editor role**, the writer + art bundle plus jobs and pack import | one verb, fade vs cut |
+| Producer | audio path, generate-ok override, budget, retention, members | GPU budget, license |
+| Reviewer | comments, review set | preview watch, NG reason, **sign-off** |
+| Viewer | none | read-only |
 
 Do not stand a multi-tenant SaaS until the zip round-trip and the four-stage gate order are boring. Phase 7 multi-org lite stops at membership 404s.
 

@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-OrgRole = Literal["producer", "editor", "reviewer", "viewer"]
+OrgRole = Literal["producer", "editor", "reviewer", "viewer", "writer", "art"]
 
 ReviewStateName = Literal[
     "draft",
@@ -40,7 +40,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 8
+    phase: int = 9
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -56,7 +56,10 @@ class MetaOut(BaseModel):
     media_s3_configured: bool = False
     media_note: str = "Local disk. S3/MinIO is not live until backend=s3 and a bucket are set."
     presence_ttl_seconds: int = 60
-    roles: list[str] = Field(default_factory=lambda: ["producer", "editor", "reviewer", "viewer"])
+    roles: list[str] = Field(
+        default_factory=lambda: ["producer", "editor", "writer", "art", "reviewer", "viewer"]
+    )
+    role_matrix: list["RoleMatrixRow"] = Field(default_factory=list)
     celery_enabled: bool = False
     oidc_configured: bool = False
     oidc_apply_role_claim: bool = False
@@ -65,6 +68,14 @@ class MetaOut(BaseModel):
     multi_org_note: str = (
         "Multi-org lite: membership isolation only. Not SaaS billing, not SSO org mapping."
     )
+
+
+class RoleMatrixRow(BaseModel):
+    role: str
+    label: str
+    legacy: bool = False
+    permissions: list[str] = Field(default_factory=list)
+    note: str = ""
 
 
 class OrganizationOut(BaseModel):
@@ -134,14 +145,34 @@ class ProjectOut(BaseModel):
 
 class EpisodeCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
-    chapter: int = Field(default=1, ge=1)
+    chapter: int | None = Field(default=None, ge=1)
+    season: int | None = Field(default=None, ge=1)
+    sequence: int | None = Field(default=None, ge=1)
     synopsis: str = ""
+    log_line: str = ""
+    map_notes: str = ""
+    dialogue: str = ""
 
 
 class EpisodeUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     chapter: int | None = Field(default=None, ge=1)
+    season: int | None = Field(default=None, ge=1)
+    sequence: int | None = Field(default=None, ge=1)
     synopsis: str | None = None
+    log_line: str | None = None
+    map_notes: str | None = None
+    dialogue: str | None = None
+
+
+class EpisodeOrderItem(BaseModel):
+    id: str
+    season: int = Field(ge=1)
+    sequence: int = Field(ge=1)
+
+
+class EpisodeReorder(BaseModel):
+    items: list[EpisodeOrderItem] = Field(min_length=1)
 
 
 class GateResultOut(BaseModel):
@@ -179,7 +210,12 @@ class EpisodeOut(BaseModel):
     project_id: str
     title: str
     chapter: int
+    season: int = 1
+    sequence: int = 1
     synopsis: str
+    log_line: str = ""
+    map_notes: str = ""
+    dialogue: str = ""
     review_state: ReviewStateName
     latest_revision: PackRevisionSummary | None = None
     comment_count: int = 0
@@ -410,6 +446,14 @@ class ShotOut(BaseModel):
 class ShotReadinessSet(BaseModel):
     readiness: ShotReadiness
     note: str = ""
+
+
+class ShotUpdate(BaseModel):
+    """Edit-list craft fields. Not an NLE. Writer script fields live on the episode."""
+
+    join: str | None = Field(default=None, max_length=20)
+    camera_verb: str | None = Field(default=None, max_length=40)
+    action: str | None = None
 
 
 class BoardOut(BaseModel):
@@ -692,6 +736,45 @@ class IdentityApprove(BaseModel):
     entity_type: str | None = None
 
 
+class IdentityUnapprove(BaseModel):
+    note: str = ""
+
+
+class IdentityKeywords(BaseModel):
+    lock_keywords: str = ""
+    note: str = ""
+
+
+class PlaylistScrubShot(BaseModel):
+    shot_id: str
+    sort_index: int = 0
+    edit_row_id: str = ""
+    take: str = ""
+    join: str = ""
+    action: str = ""
+    song_t: str = ""
+    camera_verb: str = ""
+    duration_s: float | None = None
+    frames: int | None = None
+    preview_watched: bool = False
+    media_id: str | None = None
+    content_type: str = ""
+    original_name: str = ""
+    playable: bool = False
+    image: bool = False
+    stub: bool = False
+    empty: bool = True
+    note: str = ""
+
+
+class PlaylistScrubOut(BaseModel):
+    episode_id: str
+    honesty: str
+    nle: bool = False
+    shot_count: int = 0
+    shots: list[PlaylistScrubShot] = Field(default_factory=list)
+
+
 class IdentityLink(BaseModel):
     shot_id: str | None = None
     edit_row_id: str | None = None
@@ -766,5 +849,6 @@ class PackHandoffOut(BaseModel):
 
 
 UserOut.model_rebuild()
+MetaOut.model_rebuild()
 
 

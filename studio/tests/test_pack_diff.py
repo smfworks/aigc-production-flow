@@ -1,3 +1,4 @@
+from app.packdiff import diff_packs
 from tests.fixtures import green_pack, pack_zip_bytes, red_haft_pack
 from tests.helpers import create_episode, import_green
 
@@ -69,3 +70,73 @@ def test_preview_candidate_import_diff_then_apply(client, auth):
     actions = [row["action"] for row in audit.json()]
     assert "pack.diff" in actions
     assert "pack.import" in actions
+
+
+def _schedule_row(row_id: str, hold: bool) -> dict:
+    return {
+        "id": row_id,
+        "entityKind": "character",
+        "entityName": "smith",
+        "take": "A",
+        "windows": "all",
+        "identityHold": hold,
+    }
+
+
+def test_entity_schedule_rows_with_shared_natural_key_do_not_collapse():
+    """Known collapse: two rows share kind/name/take/windows and used to become one."""
+    left = {
+        "entitySchedule": [
+            _schedule_row("row-a", True),
+            _schedule_row("row-b", False),
+        ]
+    }
+    right = {
+        "entitySchedule": [
+            _schedule_row("row-a", False),
+            _schedule_row("row-b", False),
+        ]
+    }
+    diff = diff_packs(left, right)
+    changed = diff["entity_schedule"]["changed"]
+    assert diff["summary"]["schedule_changed"] is True
+    assert [row["key"] for row in changed] == ["row-a"]
+    assert changed[0]["fields"]["identityHold"]["from"] in {"True", "true"}
+    assert "row-b" not in {row["key"] for row in changed}
+    assert diff["entity_schedule"]["removed"] == []
+    assert diff["entity_schedule"]["added"] == []
+    assert diff["entity_schedule"]["ambiguous"]
+    assert "not collapsed" in diff["entity_schedule"]["ambiguous"][0]["note"]
+
+    dropped = diff_packs(
+        left,
+        {"entitySchedule": [_schedule_row("row-b", False)]},
+    )
+    removed_keys = {row["key"] for row in dropped["entity_schedule"]["removed"]}
+    assert removed_keys == {"row-a"}
+    assert dropped["summary"]["schedule_changed"] is True
+
+
+def test_idless_duplicate_schedule_rows_stay_distinct_and_ambiguous():
+    natural = {
+        "entityKind": "prop",
+        "entityName": "francisca",
+        "take": "*",
+        "windows": "all",
+    }
+    left = {
+        "entitySchedule": [
+            {**natural, "identityHold": True},
+            {**natural, "identityHold": False},
+        ]
+    }
+    right = {"entitySchedule": [{**natural, "identityHold": True}]}
+    diff = diff_packs(left, right)
+    schedule = diff["entity_schedule"]
+    assert schedule["ambiguous"]
+    assert schedule["ambiguous"][0]["matched_by"] == "occurrence"
+    assert schedule["removed"]
+    assert diff["summary"]["schedule_changed"] is True
+    tracked = len(schedule["added"]) + len(schedule["removed"]) + len(schedule["changed"])
+    assert tracked >= 1
+    assert len(schedule["removed"]) + len(schedule["changed"]) >= 1

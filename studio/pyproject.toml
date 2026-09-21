@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aigc-studio"
-version = "0.8.0"
-description = "Phase 8 studio spine for the AIGC production flow (identity store, pack diff, builder auto-import, measured Comfy hooks)."
+version = "0.9.0"
+description = "Phase 9 studio spine for the AIGC production flow (role matrix, episode order, playlist scrubber, identity unapprove)."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

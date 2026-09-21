@@ -312,3 +312,101 @@ def test_i2va_plate_match_is_exact_and_blocks_generate_ok(client, auth):
         json={"state": "generate-ok", "note": "exact smith plate"},
     )
     assert allowed.status_code == 200, allowed.text
+
+
+def test_unapprove_and_keyword_edit_drop_out_of_generate_ok(client, auth):
+    _, episode, shots = green_ready_episode(client, auth, "Unapprove")
+    sheet = client.post(
+        f"/api/episodes/{episode['id']}/media",
+        headers=auth,
+        data={"kind": "sheet", "entity_label": "smith", "entity_type": "character"},
+        files={"file": ("sheet.fixture.json", b'{"claim":"fixture only"}', "application/json")},
+    )
+    assert sheet.status_code == 201, sheet.text
+    asset_id = sheet.json()["id"]
+    approved = client.post(
+        f"/api/episodes/{episode['id']}/identity/{asset_id}/approve",
+        headers=auth,
+        json={"lock_keywords": "brown hair"},
+    )
+    assert approved.status_code == 200
+    plate = client.post(
+        f"/api/episodes/{episode['id']}/media",
+        headers=auth,
+        data={"kind": "plate", "entity_label": "smith", "entity_type": "character"},
+        files={"file": ("plate.fixture.json", b'{"claim":"fixture only"}', "application/json")},
+    )
+    plate_id = plate.json()["id"]
+    client.post(
+        f"/api/episodes/{episode['id']}/identity/{plate_id}/link",
+        headers=auth,
+        json={"shot_id": shots[0]["id"]},
+    )
+    client.post(
+        f"/api/episodes/{episode['id']}/identity/{plate_id}/approve",
+        headers=auth,
+        json={"lock_keywords": "brunette hair"},
+    )
+    blocked = client.put(
+        f"/api/episodes/{episode['id']}/review",
+        headers=auth,
+        json={"state": "generate-ok"},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["detail"]["code"] == "identity_lock_diff"
+
+    edited = client.post(
+        f"/api/episodes/{episode['id']}/identity/{asset_id}/keywords",
+        headers=auth,
+        json={"lock_keywords": "auburn hair", "note": "edit before re-approve"},
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["approved"] is False
+    assert edited.json()["lock_keywords"] == "auburn hair"
+
+    still_blocked = client.put(
+        f"/api/episodes/{episode['id']}/review",
+        headers=auth,
+        json={"state": "generate-ok"},
+    )
+    assert still_blocked.status_code == 409
+
+    dropped = client.post(
+        f"/api/episodes/{episode['id']}/identity/{plate_id}/unapprove",
+        headers=auth,
+        json={"note": "plate no longer locked"},
+    )
+    assert dropped.status_code == 200, dropped.text
+    assert dropped.json()["approved"] is False
+    again = client.post(
+        f"/api/episodes/{episode['id']}/identity/{plate_id}/unapprove",
+        headers=auth,
+        json={"note": "twice"},
+    )
+    assert again.status_code == 409
+
+    attach_watched_receipt(client, auth, episode["id"], shots[0]["id"])
+    sign_off(client, auth, episode["id"])
+    cleared = client.put(
+        f"/api/episodes/{episode['id']}/review",
+        headers=auth,
+        json={"state": "generate-ok", "note": "drafts do not count"},
+    )
+    assert cleared.status_code == 200, cleared.text
+
+    reapproved = client.post(
+        f"/api/episodes/{episode['id']}/identity/{asset_id}/approve",
+        headers=auth,
+        json={"lock_keywords": "brown hair", "note": "re-approve"},
+    )
+    assert reapproved.status_code == 200
+    assert reapproved.json()["approved"] is True
+    audit = client.get(
+        "/api/audit",
+        headers=auth,
+        params={"episode_id": episode["id"]},
+    )
+    actions = [row["action"] for row in audit.json()]
+    assert "identity.unapprove" in actions
+    assert "identity.keywords" in actions
+    assert "identity.approve" in actions

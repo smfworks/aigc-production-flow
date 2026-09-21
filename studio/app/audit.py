@@ -18,7 +18,10 @@ PACK_EXPORT = "pack.export"
 PACK_DIFF = "pack.diff"
 MEDIA_UPLOAD = "media.upload"
 IDENTITY_APPROVE = "identity.approve"
+IDENTITY_UNAPPROVE = "identity.unapprove"
+IDENTITY_KEYWORDS = "identity.keywords"
 IDENTITY_LINK = "identity.link"
+EPISODE_REORDER = "episode.reorder"
 PROJECT_CREATE = "project.create"
 RETENTION_APPLY = "retention.apply"
 COMMENT_CREATE = "comment.create"
@@ -41,7 +44,10 @@ ACTIONS = (
     PACK_DIFF,
     MEDIA_UPLOAD,
     IDENTITY_APPROVE,
+    IDENTITY_UNAPPROVE,
+    IDENTITY_KEYWORDS,
     IDENTITY_LINK,
+    EPISODE_REORDER,
     PROJECT_CREATE,
     RETENTION_APPLY,
     COMMENT_CREATE,

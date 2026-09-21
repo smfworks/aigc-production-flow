@@ -32,7 +32,7 @@ export function ContinuityPanel({
   const red = summary.red_gates || [];
 
   return (
-    <section className="panel">
+    <section className="panel" data-testid="continuity-panel">
       <div className="panel-head">
         <h3>Continuity</h3>
         <p>{summary.honesty}</p>
@@ -43,7 +43,7 @@ export function ContinuityPanel({
         or an identity link for the sheet/plate. This is not an NLE.
       </p>
       {red.length ? (
-        <ol className="gates">
+        <ol className="gates" data-testid="continuity-signal" data-state="red">
           {red.map((gate) => (
             <li key={gate.id} className="gate-bad">
               <span className="gate-n">{gate.n}</span>
@@ -55,7 +55,9 @@ export function ContinuityPanel({
           ))}
         </ol>
       ) : (
-        <p className="hint">{summary.all_green ? "Continuity gates green on the latest pack." : "No pack snapshot yet."}</p>
+        <p className="hint" data-testid="continuity-signal" data-state={summary.all_green ? "green" : "empty"}>
+          {summary.all_green ? "Continuity gates green on the latest pack." : "No pack snapshot yet."}
+        </p>
       )}
       {mismatches.length ? (
         <ul className="mismatch-list">

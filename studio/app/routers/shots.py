@@ -2,8 +2,16 @@ from fastapi import APIRouter, HTTPException, status
 
 from ..deps import DbDep, get_episode, latest_revision
 from ..models import Shot, ShotCandidate, utcnow
-from ..rbac import MutateUser, ReadUser
-from ..schemas import BoardOut, CandidateCreate, CandidateOut, CandidateUpdate, ShotOut, ShotReadinessSet
+from ..rbac import EditUser, ReadUser
+from ..schemas import (
+    BoardOut,
+    CandidateCreate,
+    CandidateOut,
+    CandidateUpdate,
+    ShotOut,
+    ShotReadinessSet,
+    ShotUpdate,
+)
 from ..serializers import shot_out
 from .. import shots as shot_ops
 from ..shots import continue_chains
@@ -45,7 +53,7 @@ def get_board(episode_id: str, user: ReadUser, db: DbDep) -> BoardOut:
     "/api/episodes/{episode_id}/shots/extract-candidates",
     response_model=list[ShotOut],
 )
-def extract_candidates(episode_id: str, user: MutateUser, db: DbDep) -> list[ShotOut]:
+def extract_candidates(episode_id: str, user: EditUser, db: DbDep) -> list[ShotOut]:
     episode = get_episode(db, episode_id, user)
     revision = latest_revision(episode)
     if not revision:
@@ -71,7 +79,7 @@ def get_shot(episode_id: str, shot_id: str, user: ReadUser, db: DbDep) -> ShotOu
 
 @router.put("/api/episodes/{episode_id}/shots/{shot_id}/readiness", response_model=ShotOut)
 def set_shot_readiness(
-    episode_id: str, shot_id: str, body: ShotReadinessSet, user: MutateUser, db: DbDep
+    episode_id: str, shot_id: str, body: ShotReadinessSet, user: EditUser, db: DbDep
 ) -> ShotOut:
     shot = _get_shot(db, episode_id, shot_id, user)
     shot_ops.set_readiness(shot, body.readiness)
@@ -87,7 +95,7 @@ def set_shot_readiness(
     status_code=status.HTTP_201_CREATED,
 )
 def add_candidate(
-    episode_id: str, shot_id: str, body: CandidateCreate, user: MutateUser, db: DbDep
+    episode_id: str, shot_id: str, body: CandidateCreate, user: EditUser, db: DbDep
 ) -> CandidateOut:
     shot = _get_shot(db, episode_id, shot_id, user)
     candidate = ShotCandidate(
@@ -115,7 +123,7 @@ def update_candidate(
     shot_id: str,
     candidate_id: str,
     body: CandidateUpdate,
-    user: MutateUser,
+    user: EditUser,
     db: DbDep,
 ) -> CandidateOut:
     shot = _get_shot(db, episode_id, shot_id, user)
@@ -131,3 +139,22 @@ def update_candidate(
     db.commit()
     db.refresh(candidate)
     return CandidateOut.model_validate(candidate)
+
+
+@router.patch("/api/episodes/{episode_id}/shots/{shot_id}", response_model=ShotOut)
+def update_shot(
+    episode_id: str, shot_id: str, body: ShotUpdate, user: EditUser, db: DbDep
+) -> ShotOut:
+    """Joins, camera verb, and action. Metadata only — not an NLE timeline."""
+    shot = _get_shot(db, episode_id, shot_id, user)
+    if body.join is not None:
+        shot.join = body.join.strip()
+    if body.camera_verb is not None:
+        shot.camera_verb = body.camera_verb.strip()
+    if body.action is not None:
+        shot.action = body.action.strip()
+    shot.updated_at = utcnow()
+    shot.episode.updated_at = utcnow()
+    db.commit()
+    db.refresh(shot)
+    return _shot_out(shot)

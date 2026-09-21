@@ -18,6 +18,7 @@ import type {
   OrgMember,
   PackDiff,
   PackHandoff,
+  PlaylistScrub,
   PackRevisionSummary,
   PresenceUser,
   PreviewDesk,
@@ -119,6 +120,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ note, lock_keywords: lockKeywords }),
     }),
+  unapproveIdentity: (episodeId: string, assetId: string, note = "") =>
+    request<MediaAsset>(`/api/episodes/${episodeId}/identity/${assetId}/unapprove`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
+    }),
+  saveIdentityKeywords: (episodeId: string, assetId: string, lockKeywords: string, note = "") =>
+    request<MediaAsset>(`/api/episodes/${episodeId}/identity/${assetId}/keywords`, {
+      method: "POST",
+      body: JSON.stringify({ lock_keywords: lockKeywords, note }),
+    }),
+  playlistScrub: (episodeId: string) =>
+    request<PlaylistScrub>(`/api/episodes/${episodeId}/playlist-scrub`),
   linkIdentityPlate: (episodeId: string, assetId: string, shotId: string) =>
     request<MediaAsset>(`/api/episodes/${episodeId}/identity/${assetId}/link`, {
       method: "POST",
@@ -183,10 +196,25 @@ export const api = {
     },
   ) => request<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   episodes: (projectId: string) => request<Episode[]>(`/api/projects/${projectId}/episodes`),
-  createEpisode: (projectId: string, body: { title: string; synopsis?: string }) =>
+  createEpisode: (
+    projectId: string,
+    body: { title: string; synopsis?: string; log_line?: string; season?: number },
+  ) =>
     request<Episode>(`/api/projects/${projectId}/episodes`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+  updateEpisode: (
+    episodeId: string,
+    body: { title?: string; synopsis?: string; log_line?: string; map_notes?: string; dialogue?: string },
+  ) => request<Episode>(`/api/episodes/${episodeId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  reorderEpisodes: (
+    projectId: string,
+    items: { id: string; season: number; sequence: number }[],
+  ) =>
+    request<Episode[]>(`/api/projects/${projectId}/episodes/reorder`, {
+      method: "POST",
+      body: JSON.stringify({ items }),
     }),
   episode: (id: string) => request<Episode>(`/api/episodes/${id}`),
   review: (episodeId: string) => request<Review>(`/api/episodes/${episodeId}/review`),
@@ -415,6 +443,12 @@ export async function downloadBackup(): Promise<void> {
   const response = await fetch("/api/backup", { headers: authHeaders() });
   if (!response.ok) throw new Error(await parseError(response));
   await saveDownload(response, "studio-backup.zip");
+}
+
+export async function fetchMediaBlob(assetId: string): Promise<Blob> {
+  const response = await fetch(api.mediaUrl(assetId), { headers: authHeaders() });
+  if (!response.ok) throw new Error(await parseError(response));
+  return response.blob();
 }
 
 export async function downloadMedia(assetId: string, filename: string): Promise<void> {
