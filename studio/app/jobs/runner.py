@@ -71,6 +71,10 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
             job.finished_at = utcnow()
             job.updated_at = utcnow()
             session.commit()
+            from ..notify import notify_job_finished
+
+            notify_job_finished(session, job)
+            session.commit()
             return job
 
         session.refresh(job)
@@ -84,6 +88,10 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
             job.error = "Adapter returned no result."
             job.actual_cost_units = 0.0
             job.finished_at = utcnow()
+            session.commit()
+            from ..notify import notify_job_finished
+
+            notify_job_finished(session, job)
             session.commit()
             return job
 
@@ -116,6 +124,11 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
         episode.updated_at = utcnow()
         touch(episode.project)
         session.commit()
+        if job.status in {"succeeded", "failed"}:
+            from ..notify import notify_job_finished
+
+            notify_job_finished(session, job)
+            session.commit()
         return job
     finally:
         if owned:

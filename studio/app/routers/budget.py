@@ -9,17 +9,17 @@ router = APIRouter(tags=["budget"])
 
 
 @router.get("/api/budget", response_model=BudgetDashboardOut)
-def org_budget(_user: ReadUser, db: DbDep) -> BudgetDashboardOut:
-    return BudgetDashboardOut.model_validate(summarize(db))
+def org_budget(user: ReadUser, db: DbDep) -> BudgetDashboardOut:
+    return BudgetDashboardOut.model_validate(summarize(db, organization_id=user.org_id))
 
 
 @router.get("/api/projects/{project_id}/budget", response_model=BudgetDashboardOut)
-def project_budget(project_id: str, _user: ReadUser, db: DbDep) -> BudgetDashboardOut:
-    get_project(db, project_id)
+def project_budget(project_id: str, user: ReadUser, db: DbDep) -> BudgetDashboardOut:
+    get_project(db, project_id, user)
     return BudgetDashboardOut.model_validate(summarize(db, project_id=project_id))
 
 
 @router.get("/api/episodes/{episode_id}/budget", response_model=BudgetDashboardOut)
-def episode_budget(episode_id: str, _user: ReadUser, db: DbDep) -> BudgetDashboardOut:
-    get_episode(db, episode_id)
+def episode_budget(episode_id: str, user: ReadUser, db: DbDep) -> BudgetDashboardOut:
+    get_episode(db, episode_id, user)
     return BudgetDashboardOut.model_validate(summarize(db, episode_id=episode_id))

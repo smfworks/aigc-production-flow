@@ -59,8 +59,9 @@ export function MembersPanel({
       <div className="panel-head">
         <h2>Org members</h2>
         <p>
-          App-level roles on the default org. Identity is still the local-dev token / X-User-Name
-          (or X-Forwarded-User / optional OIDC). App roles stay on the org. docs/AUTH.md.
+          App-level roles on the <strong>active org</strong>. Identity is still the local-dev token /
+          X-User-Name (or X-Forwarded-User / optional OIDC). Multi-org lite is membership isolation
+          — not SaaS billing or SSO org mapping. docs/AUTH.md.
         </p>
       </div>
       <ul className="member-list">

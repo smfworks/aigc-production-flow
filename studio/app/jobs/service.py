@@ -259,9 +259,18 @@ def list_jobs(
     episode_id: str | None = None,
     status_value: str | None = None,
     job_type: str | None = None,
+    organization_id: str | None = None,
     limit: int = 100,
 ) -> list[Job]:
     query = db.query(Job).order_by(Job.created_at.desc())
+    if organization_id:
+        from ..models import Episode, Project
+
+        query = (
+            query.join(Episode, Job.episode_id == Episode.id)
+            .join(Project, Episode.project_id == Project.id)
+            .filter(Project.organization_id == organization_id)
+        )
     if episode_id:
         query = query.filter(Job.episode_id == episode_id)
     if status_value:

@@ -55,6 +55,7 @@ def candidates(
     *,
     project_id: str | None = None,
     episode_id: str | None = None,
+    organization_id: str | None = None,
     settings: Settings | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -70,6 +71,12 @@ def candidates(
             Episode.project_id == project_id
         )
         project = db.get(Project, project_id)
+    elif organization_id:
+        query = (
+            query.join(Episode, MediaAsset.episode_id == Episode.id)
+            .join(Project, Episode.project_id == Project.id)
+            .filter(Project.organization_id == organization_id)
+        )
     days = effective_days(project, cfg)
     limit = cutoff_for(days, now)
     rows: list[dict[str, Any]] = []
@@ -83,6 +90,14 @@ def candidates(
         )
     elif episode_id:
         kept_revisions = db.query(PackRevision).filter(PackRevision.episode_id == episode_id).count()
+    elif organization_id:
+        kept_revisions = (
+            db.query(PackRevision)
+            .join(Episode, PackRevision.episode_id == Episode.id)
+            .join(Project, Episode.project_id == Project.id)
+            .filter(Project.organization_id == organization_id)
+            .count()
+        )
     else:
         kept_revisions = db.query(PackRevision).count()
 
@@ -132,6 +147,7 @@ def apply(
     *,
     project_id: str | None = None,
     episode_id: str | None = None,
+    organization_id: str | None = None,
     settings: Settings | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -139,6 +155,7 @@ def apply(
         db,
         project_id=project_id,
         episode_id=episode_id,
+        organization_id=organization_id,
         settings=settings,
         now=now,
     )

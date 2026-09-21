@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from ..audit import JOB_CANCEL, JOB_ENQUEUE, record
-from ..deps import DbDep, get_episode, touch
+from ..deps import DbDep, get_episode, org_of_job, touch
 from ..jobs.service import cancel_job, enqueue_job, get_job, job_out, list_jobs, retry_job
 from ..models import utcnow
 from ..rbac import JobsUser, ReadUser
@@ -10,9 +10,17 @@ from ..schemas import JobEnqueue, JobOut
 router = APIRouter(tags=["jobs"])
 
 
+def _job_for_org(db, job_id: str, user):
+    job = get_job(db, job_id)
+    org_id = org_of_job(job)
+    if user.org_id and org_id and org_id != user.org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+    return job
+
+
 @router.get("/api/jobs", response_model=list[JobOut])
 def list_all_jobs(
-    _user: ReadUser,
+    user: ReadUser,
     db: DbDep,
     episode_id: str | None = None,
     job_status: str | None = Query(default=None, alias="status"),
@@ -21,19 +29,26 @@ def list_all_jobs(
 ) -> list[JobOut]:
     return [
         job_out(row)
-        for row in list_jobs(db, episode_id=episode_id, status_value=job_status, job_type=job_type, limit=limit)
+        for row in list_jobs(
+            db,
+            episode_id=episode_id,
+            status_value=job_status,
+            job_type=job_type,
+            limit=limit,
+            organization_id=user.org_id,
+        )
     ]
 
 
 @router.get("/api/episodes/{episode_id}/jobs", response_model=list[JobOut])
 def list_episode_jobs(
     episode_id: str,
-    _user: ReadUser,
+    user: ReadUser,
     db: DbDep,
     job_status: str | None = Query(default=None, alias="status"),
     job_type: str | None = None,
 ) -> list[JobOut]:
-    get_episode(db, episode_id)
+    get_episode(db, episode_id, user)
     return [
         job_out(row)
         for row in list_jobs(db, episode_id=episode_id, status_value=job_status, job_type=job_type)
@@ -42,7 +57,7 @@ def list_episode_jobs(
 
 @router.post("/api/jobs", response_model=JobOut, status_code=status.HTTP_201_CREATED)
 def enqueue(body: JobEnqueue, user: JobsUser, db: DbDep) -> JobOut:
-    episode = get_episode(db, body.episode_id)
+    episode = get_episode(db, body.episode_id, user)
     job = enqueue_job(
         db,
         episode=episode,
@@ -75,13 +90,13 @@ def enqueue(body: JobEnqueue, user: JobsUser, db: DbDep) -> JobOut:
 
 
 @router.get("/api/jobs/{job_id}", response_model=JobOut)
-def get_one(job_id: str, _user: ReadUser, db: DbDep) -> JobOut:
-    return job_out(get_job(db, job_id))
+def get_one(job_id: str, user: ReadUser, db: DbDep) -> JobOut:
+    return job_out(_job_for_org(db, job_id, user))
 
 
 @router.post("/api/jobs/{job_id}/cancel", response_model=JobOut)
 def cancel(job_id: str, user: JobsUser, db: DbDep) -> JobOut:
-    job = cancel_job(db, get_job(db, job_id))
+    job = cancel_job(db, _job_for_org(db, job_id, user))
     record(
         db,
         actor=user.name,
@@ -99,7 +114,7 @@ def cancel(job_id: str, user: JobsUser, db: DbDep) -> JobOut:
 
 @router.post("/api/jobs/{job_id}/retry", response_model=JobOut, status_code=status.HTTP_201_CREATED)
 def retry(job_id: str, user: JobsUser, db: DbDep) -> JobOut:
-    original = get_job(db, job_id)
+    original = _job_for_org(db, job_id, user)
     job = retry_job(db, original, user.name)
     record(
         db,

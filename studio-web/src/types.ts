@@ -108,8 +108,28 @@ export type StudioUser = {
   sso: string;
   role: OrgRole | null;
   org_id: string | null;
+  org_name?: string | null;
   permissions: string[];
   oidc_role?: OrgRole | null;
+  orgs?: StudioOrgMembership[];
+  multi_org?: boolean;
+};
+
+export type StudioOrgMembership = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  role: OrgRole;
+  created_at: string;
+};
+
+export type StudioOrg = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  role: OrgRole | null;
+  created_at: string;
+  note?: string;
 };
 
 export type OrgMember = {
@@ -176,6 +196,9 @@ export type Meta = {
   celery_enabled?: boolean;
   oidc_configured?: boolean;
   oidc_apply_role_claim?: boolean;
+  notify_webhook_configured?: boolean;
+  multi_org?: boolean;
+  multi_org_note?: string;
 };
 
 export const REVIEW_COPY: Record<ReviewStateName, string> = {
@@ -414,4 +437,79 @@ export type RetentionPreview = {
   dry_run?: boolean;
   applied?: boolean;
   deleted_count?: number;
+};
+
+export type StudioNotification = {
+  id: string;
+  organization_id: string;
+  user_name: string;
+  kind: string;
+  title: string;
+  body: string;
+  project_id: string | null;
+  episode_id: string | null;
+  shot_id: string | null;
+  job_id: string | null;
+  comment_id: string | null;
+  payload: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
+  href: string;
+};
+
+export type NotificationList = {
+  items: StudioNotification[];
+  unread_count: number;
+};
+
+export type ContinuityShot = {
+  shot_id: string;
+  edit_row_id: string;
+  sort_index: number;
+  take: string;
+  join: string;
+  entities: string;
+  issues: string[];
+  href: string;
+};
+
+export type ContinuitySummary = {
+  episode_id: string;
+  project_id: string;
+  honesty: string;
+  all_green: boolean;
+  red_gates: GateResult[];
+  entity_schedule: Record<string, unknown>[];
+  entity_schedule_problems: string[];
+  lock_diff_problems: string[];
+  mismatches: string[];
+  shots: ContinuityShot[];
+};
+
+export type DemoSeed = {
+  project: Project;
+  episode: Episode;
+  template_id: string;
+  honesty: string;
+  fixture_media: number;
+  fake_generate: boolean;
+  likeness: boolean;
+  engine_mp4: boolean;
+};
+
+export type BackupRestoreResult = {
+  honesty?: string;
+  keep_pack_revisions: boolean;
+  keep_note?: string;
+  dry_run: boolean;
+  applied: boolean;
+  would_create_projects?: string[];
+  would_skip_projects?: string[];
+  would_create_episodes?: string[];
+  would_add_revisions?: string[];
+  would_keep_revisions?: string[];
+  created_projects?: number;
+  created_episodes?: number;
+  added_revisions?: number;
+  created_media?: number;
 };

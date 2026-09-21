@@ -2,14 +2,18 @@ import type {
   AdapterCatalog,
   AdapterHealth,
   AuditEvent,
+  BackupRestoreResult,
   Board,
   BudgetDashboard,
   Comment,
   ContinuityReceipt,
+  ContinuitySummary,
+  DemoSeed,
   Episode,
   Job,
   MediaAsset,
   Meta,
+  NotificationList,
   OrgMember,
   PresenceUser,
   PreviewDesk,
@@ -20,12 +24,15 @@ import type {
   ReviewStateName,
   Shot,
   ShotReadiness,
+  StudioNotification,
+  StudioOrg,
   StudioUser,
   VerticalTemplate,
 } from "./types.ts";
 
 const TOKEN_KEY = "smf.aigc-studio.token";
 const USER_KEY = "smf.aigc-studio.user";
+const ORG_KEY = "smf.aigc-studio.org";
 
 export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || import.meta.env.VITE_API_TOKEN || "local-dev-token";
@@ -41,6 +48,15 @@ export function getUserName(): string {
 
 export function setUserName(name: string): void {
   localStorage.setItem(USER_KEY, name);
+}
+
+export function getOrgId(): string {
+  return localStorage.getItem(ORG_KEY) || "";
+}
+
+export function setOrgId(orgId: string): void {
+  if (orgId) localStorage.setItem(ORG_KEY, orgId);
+  else localStorage.removeItem(ORG_KEY);
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -66,6 +82,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (userName && !headers.has("X-User-Name")) {
     headers.set("X-User-Name", userName);
   }
+  const orgId = getOrgId().trim();
+  if (orgId && !headers.has("X-Org-Id")) {
+    headers.set("X-Org-Id", orgId);
+  }
   if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -80,6 +100,23 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   meta: () => request<Meta>("/api/meta"),
   me: () => request<StudioUser>("/api/me"),
+  orgs: () => request<StudioOrg[]>("/api/orgs"),
+  createOrg: (name: string) =>
+    request<StudioOrg>("/api/orgs", { method: "POST", body: JSON.stringify({ name }) }),
+  notifications: (unread = false) =>
+    request<NotificationList>(`/api/notifications${unread ? "?unread=true" : ""}`),
+  markNotificationRead: (id: string) =>
+    request<StudioNotification>(`/api/notifications/${id}/read`, { method: "POST" }),
+  markNotificationsRead: () => request<{ ok: boolean; marked: number }>("/api/notifications/read-all", { method: "POST" }),
+  continuity: (episodeId: string) => request<ContinuitySummary>(`/api/episodes/${episodeId}/continuity`),
+  seedDemo: () => request<DemoSeed>("/api/demo/seed", { method: "POST" }),
+  restoreBackup: (file: File, dryRun: boolean) => {
+    const data = new FormData();
+    data.append("file", file);
+    data.append("dry_run", dryRun ? "true" : "false");
+    if (!dryRun) data.append("confirm", "restore");
+    return request<BackupRestoreResult>("/api/backup/restore", { method: "POST", body: data });
+  },
   members: (orgId: string) => request<OrgMember[]>(`/api/orgs/${orgId}/members`),
   addMember: (orgId: string, body: { user_name: string; role: string }) =>
     request<OrgMember>(`/api/orgs/${orgId}/members`, { method: "POST", body: JSON.stringify(body) }),
@@ -326,6 +363,8 @@ function authHeaders(): HeadersInit {
   const headers: Record<string, string> = { Authorization: `Bearer ${getToken()}` };
   const userName = getUserName().trim();
   if (userName) headers["X-User-Name"] = userName;
+  const orgId = getOrgId().trim();
+  if (orgId) headers["X-Org-Id"] = orgId;
   return headers;
 }
 
@@ -344,6 +383,12 @@ export async function downloadExport(episodeId: string, kind: "edl" | "playlist"
   });
   if (!response.ok) throw new Error(await parseError(response));
   await saveDownload(response, fallback);
+}
+
+export async function downloadBackup(): Promise<void> {
+  const response = await fetch("/api/backup", { headers: authHeaders() });
+  if (!response.ok) throw new Error(await parseError(response));
+  await saveDownload(response, "studio-backup.zip");
 }
 
 export async function downloadMedia(assetId: string, filename: string): Promise<void> {

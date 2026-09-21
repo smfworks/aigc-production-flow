@@ -102,11 +102,20 @@ OIDC and Celery are **optional in Phase 6** and **off by default**. They are not
 - Adapter **health / dry-run** (reachable? config present?) plus a studio status strip. Unhealthy live slots 409 on enqueue. Stub remains default
 - Compose pack: `docker compose -f docker-compose.studio.yml up` (API + studio-web; optional worker / Postgres / MinIO profiles)
 
+**Phase 7 (this repo, scale the team & see the system):**
+
+- **Multi-org lite** — create orgs, list memberships, switch active org. Members/projects scoped; cross-org 404. Not SaaS billing, not SSO org mapping. Default org remains for local-dev / existing DBs
+- **In-app notifications** (job succeeded/failed, comment mention / watched-shot comment, sign-off requested, generate-ok blocker cleared) plus optional `STUDIO_NOTIFY_WEBHOOK_URL` (unset = no outbound delivery)
+- **Ops visibility:** `/healthz`, `/readyz` (DB + worker mode), structured JSON request logs, `/metrics` Prometheus text (optional scrape, not APM)
+- **Continuity panel** — entity-schedule + lock-diff summary, red gates, deep-link to the shot board. Read/visualize + navigate only. Not an NLE
+- **Demo seed** (`POST /api/demo/seed`) from a vertical template with fixture media metadata (no likeness, no MP4 claims)
+- **Backup/restore** — org/project/episode metadata + media manifest (paths/hashes). Restore dry-run then apply. Pack revisions are never deleted
+
 v2 leftover (platform, do not pretend we have it):
 
 - visual identity store (approved sheet + per-window plates), not a pasted wardrobe paragraph
 - GPU queue / one engine adapter at a time per GPU (ops pin)
-- multi-tenant SaaS
+- multi-tenant SaaS billing / SSO org mapping
 
 **Phase 6 (this repo, production readiness):**
 
@@ -139,6 +148,8 @@ Phase 1 (this repo): a **studio spine** holds projects / episodes, comments, rev
 
 Phase 5 (this repo): org **members** with app-level roles. Pack zip is still the collaboration object. Identity is still not OIDC.
 
+Phase 7 (this repo): **multi-org lite** — a producer can create a second org and switch. Members of org A cannot read org B. Still not SaaS billing.
+
 v2 leftover (build, do not pretend we have it):
 
 | Role | Writes | Reviews |
@@ -151,7 +162,7 @@ v2 leftover (build, do not pretend we have it):
 
 Studio Phase 5 maps a **lite** subset onto org members (`producer` / `editor` / `reviewer` / `viewer`) for mutating HTTP routes. It is not the full writer/art matrix above and not IdP groups.
 
-Do not stand a multi-tenant SaaS until the zip round-trip and the four-stage gate order are boring.
+Do not stand a multi-tenant SaaS until the zip round-trip and the four-stage gate order are boring. Phase 7 multi-org lite stops at membership 404s.
 
 ## Engine adapters (H3 is one)
 

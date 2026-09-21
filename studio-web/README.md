@@ -1,6 +1,8 @@
-# Studio shell (Phase 6)
+# Studio shell (Phase 7)
 
-Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 6 adds reviewer/producer **sign-off**, shareable deep links, and a pack-builder import handoff (`?import=`) on top of members, presence, shot comments, adapter health, budget, audit, EDL, and templates.
+Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 7 adds **org switch**, an in-app **bell**, a **continuity** panel, **demo seed**, and **backup** on top of sign-off, members, presence, shot comments, adapter health, budget, audit, EDL, and templates.
+
+Docs: [../docs/STUDIO.md](../docs/STUDIO.md)
 
 ```bash
 # from repo root

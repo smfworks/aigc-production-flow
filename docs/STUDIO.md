@@ -1,8 +1,8 @@
-# Studio spine (Phase 6)
+# Studio spine (Phase 7)
 
-The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, review, **reviewer/producer sign-off**, comments, sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC**, **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, and optional **OIDC**.
+The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, review, **reviewer/producer sign-off**, comments, sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC**, **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, optional **OIDC**, **multi-org lite**, **in-app notifications**, **ops probes**, a **continuity panel**, **demo seed**, and **backup/restore**.
 
-It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is opt-in and off by default.** Celery is opt-in and off by default (`STUDIO_JOB_WORKER=thread`).
+It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is opt-in and off by default.** Celery is opt-in and off by default (`STUDIO_JOB_WORKER=thread`). **Multi-org lite is membership isolation, not SaaS billing, and not SSO org mapping.**
 
 ## Ports (local)
 
@@ -35,7 +35,7 @@ Roles are **app-level** on the default org, not an IdP claim:
 
 Seed: default org + `STUDIO_DEFAULT_USER` as **producer**. A producer adds members by local user name. Switch the studio chrome “Local user” field to that `X-User-Name` to act as them.
 
-Do not treat the token as multi-tenant SaaS security. There is a single default organization (`SMF Works (local)`).
+Do not treat the token as multi-tenant SaaS security. **Multi-org lite** lets a producer create additional organizations, list orgs they belong to, and switch the active org (`X-Org-Id`). Members and projects are scoped to the active org. Cross-org IDs 404. There is still no billing, no SSO org mapping, and no SaaS tenancy. The seed keeps `SMF Works (local)` as the default org for existing single-org databases.
 
 ## Database and files
 
@@ -43,19 +43,20 @@ Do not treat the token as multi-tenant SaaS security. There is a single default 
 - Media (sheets/plates/costumes/**hop-1 previews**) and stored pack zips: `data/media/` (gitignored) via the **local** media adapter. Do not commit likeness stills or engine MP4s. Preview MP4s are allowed **on disk** with `kind=preview` only.
 - Optional S3/MinIO: `STUDIO_MEDIA_BACKEND=s3` plus `STUDIO_S3_BUCKET` (and `STUDIO_S3_ENDPOINT` for MinIO). Incomplete config **stays local** and `/api/meta` says so. Credentials stay in the process environment, not git. Install `pip install -e "./studio[s3]"` for boto3.
 
-## Operator path (Phase 6)
+## Operator path (Phase 7)
 
 1. Start API + shell + builder: `./scripts/dev-studio.sh all` **or** `docker compose -f docker-compose.studio.yml up --build`
-2. Confirm chrome shows your role (`producer` for the seeded local user)
-3. **Members**: add a colleague as `viewer` → they cannot enqueue → promote to `editor` → they can comment on a shot
-4. Open an episode: presence chips (heartbeat TTL ~60s). **Copy episode link** to share `#/projects/<id>/episodes/<id>`
-5. **New from template** or create a blank project; set adapter defaults (stub unless a live hook exists)
-6. Fill Script → Assets → Storyboard → Preview in the builder; **Export pack zip**. **Open in Studio** (`VITE_STUDIO_URL`, default http://localhost:5174) lands on `?import=1#/projects` — pick an episode → **Import pack zip**
-7. Confirm candidates, set shots `ready` (prepared, not generating)
-8. Adapter status strip: stub is always healthy. Unset live hooks stay stub. Configured-but-down live slots **409** on enqueue
-9. Enqueue stub jobs (batch-precheck → hop-1). Job rows store estimated/actual **cost units**
-10. Hop-1 preview desk → shot comments → preview-watched → a **reviewer or producer signs off** → `generate-ok` (producer override is allowed and audited as `review.override`)
-11. **Export EDL** / **Export shot playlist**. Retention dry-run / apply (producer) expires stub outputs — **pack revisions are kept**
+2. Confirm chrome shows your role (`producer` for the seeded local user) on the default org
+3. **Create org** → switch the active org in chrome → add a member on org A who cannot see org B
+4. Empty org: **Seed demo episode** (short-drama-ep template + JSON fixture metadata — no likeness, no MP4)
+5. **Members**: add a colleague as `viewer` → they cannot enqueue → promote to `editor` → they can comment on a shot
+6. Open an episode: presence chips, **Continuity** panel (entity-schedule + lock-diff, red gates, deep-link to the shot board — not an NLE)
+7. Fill Script → Assets → Storyboard → Preview in the builder; **Export pack zip**. **Open in Studio** (`VITE_STUDIO_URL`, default http://localhost:5174) lands on `?import=1#/projects`
+8. Confirm candidates, set shots `ready` (prepared, not generating)
+9. Enqueue stub jobs. Bell shows **job succeeded/failed**. Optional `STUDIO_NOTIFY_WEBHOOK_URL` POSTs the same JSON when set; unset means in-app only (`/api/meta` reports `notify_webhook_configured`)
+10. Hop-1 preview desk → shot comments (`@name` mentions) → preview-watched → a **reviewer or producer signs off** → `generate-ok`
+11. **Export backup zip** (org/project/episode metadata + media manifest hashes). Restore dry-run, then apply. **Pack revisions are never deleted.**
+12. `/healthz` liveness, `/readyz` DB + worker mode, `/metrics` Prometheus text (optional scrape — not a SaaS APM)
 
 ## Compose deploy pack
 
@@ -117,7 +118,7 @@ This never claims a cloud bill was paid.
 
 ## Audit + retention
 
-Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `media.upload`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`. `GET /api/audit?project_id=&episode_id=&action=`.
+Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `media.upload`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
 
 Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed (producer). `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.**
 
@@ -175,12 +176,16 @@ Required hop-1 = first edit-list row of each take with `hop1Planned`. `generate-
 
 OpenAPI is canonical: http://localhost:8000/docs
 
-Phase 2–5 surface still applies. Phase 6 adds:
+Phase 2–6 surface still applies. Phase 7 adds:
 
 | Area | Methods |
 |---|---|
-| Review sign-off | `GET/POST /api/episodes/{id}/review/signoff`, `GET …/review/signoffs`; `PUT …/review` accepts `override` |
-| Meta | `phase: 6`, `celery_enabled`, `oidc_configured`, `oidc_apply_role_claim` |
+| Orgs | `GET/POST /api/orgs`, `GET /api/orgs/{id}`; members stay `…/members`. Header `X-Org-Id` selects the active org |
+| Notifications | `GET /api/notifications`, `POST /api/notifications/read-all`, `POST /api/notifications/{id}/read` |
+| Continuity | `GET /api/episodes/{id}/continuity` (read/visualize + navigate, not an NLE) |
+| Demo | `POST /api/demo/seed` |
+| Backup | `GET /api/backup`, `POST /api/backup/restore` (`dry_run` + `confirm=restore`) |
+| Ops | `/healthz`, `/readyz`, `/metrics` (Prometheus text). `/api/meta` has `notify_webhook_configured`, `multi_org` |
 
 ## Tests
 
@@ -197,9 +202,12 @@ GitHub Actions (`.github/workflows/ci.yml`) runs those three jobs on every pull 
 
 ## What this phase is not
 
-- No full NLE timeline editor (EDL/playlist assemble metadata only)
+- No full NLE timeline editor (continuity panel + EDL/playlist assemble metadata only)
 - Celery is **optional** and off by default — never claimed running unless `STUDIO_JOB_WORKER=celery`
 - OIDC is **optional** and off by default — this repo does not ship a production IdP
+- Multi-org lite is **not** SaaS billing, SSO org mapping, or a multi-tenant product
+- Optional notify webhook is **unset by default** — `/api/meta` says so; we never invent delivery
+- `/metrics` is an optional Prometheus scrape, not a claimed SaaS APM
 - No rewrite of the pack builder
 - No engine MP4s in git
 - No auto generate-ok from shot `ready`, candidate extract, a succeeded stub job, a vertical template, or a missing sign-off

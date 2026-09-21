@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, downloadExport, downloadMedia, downloadPack, getToken, getUserName, setToken, setUserName } from "./api.ts";
+import { api, downloadExport, downloadMedia, downloadPack, downloadBackup, getOrgId, getToken, getUserName, setOrgId, setToken, setUserName } from "./api.ts";
 import type {
   AdapterCatalog,
   AdapterHealth,
@@ -14,6 +14,7 @@ import type {
   Review,
   ReviewStateName,
   Shot,
+  StudioOrg,
   StudioUser,
   VerticalTemplate,
 } from "./types.ts";
@@ -27,6 +28,9 @@ import { AuditLog } from "./AuditLog.tsx";
 import { MembersPanel } from "./MembersPanel.tsx";
 import { PresenceBar } from "./PresenceBar.tsx";
 import { AdapterStrip } from "./AdapterStrip.tsx";
+import { OrgSwitcher } from "./OrgSwitcher.tsx";
+import { NotificationBell } from "./NotificationBell.tsx";
+import { ContinuityPanel } from "./ContinuityPanel.tsx";
 import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
 
 function can(user: StudioUser | null, perm: string): boolean {
@@ -52,6 +56,7 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [me, setMe] = useState<StudioUser | null>(null);
+  const [orgs, setOrgs] = useState<StudioOrg[]>([]);
   const [adapterHealth, setAdapterHealth] = useState<AdapterHealth[]>([]);
 
   const packBuilderUrl =
@@ -63,9 +68,13 @@ export default function App() {
 
   useEffect(() => {
     api.meta().then(setMeta).catch(() => setMeta(null));
-    api.me().then(setMe).catch(() => setMe(null));
+    api.me().then((user) => {
+      setMe(user);
+      if (user.org_id && !getOrgId()) setOrgId(user.org_id);
+    }).catch(() => setMe(null));
+    api.orgs().then(setOrgs).catch(() => setOrgs([]));
     api.adapterHealth().then(setAdapterHealth).catch(() => setAdapterHealth([]));
-  }, [token, userName]);
+  }, [token, userName, view.page]);
 
   useEffect(() => {
     const onHash = () => setView(parseHash());
@@ -87,15 +96,15 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 6</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 7</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects, hop-1 preview desk, members, presence, and adapter health around the pack zip.
-          Jobs default to an in-process thread worker; Celery is opt-in. Budget units are operator
-          credits — not a cloud bill. Media is local disk unless S3 is configured. OIDC is opt-in
-          and off by default. Pack zip remains the contract.
+          Projects, hop-1 preview desk, members, presence, continuity, and adapter health around the pack zip.
+          Multi-org lite is membership isolation — not SaaS billing. Jobs default to an in-process thread
+          worker; Celery is opt-in. Budget units are operator credits — not a cloud bill. Media is local
+          disk unless S3 is configured. OIDC is opt-in and off by default. Pack zip remains the contract.
         </p>
         <nav className="mast-nav" aria-label="Studio">
           <button
@@ -152,6 +161,31 @@ export default function App() {
             />
           </label>
           {me?.role ? <em className={`role-chip is-${me.role}`}>{me.role}</em> : <em className="role-chip">not a member</em>}
+          <OrgSwitcher
+            me={me}
+            orgs={orgs}
+            onSwitch={() => {
+              navigate({ page: "projects" });
+              api.me().then(setMe).catch(() => setMe(null));
+              api.orgs().then(setOrgs).catch(() => setOrgs([]));
+            }}
+            onCreated={(org) => {
+              setOrgId(org.id);
+              setNotice(`Created ${org.name} — multi-org lite, not SaaS`);
+              navigate({ page: "projects" });
+              api.me().then(setMe).catch(() => setMe(null));
+              api.orgs().then(setOrgs).catch(() => setOrgs([]));
+            }}
+            onError={showError}
+          />
+          <NotificationBell
+            orgId={me?.org_id}
+            onError={showError}
+            onOpenHref={(href) => {
+              const next = href.startsWith("#") ? href : `#${href}`;
+              window.location.hash = next;
+            }}
+          />
           <span className="hint">
             Auth {meta?.auth_mode ?? "local"}
             {meta?.oidc_configured ? " (OIDC JWKS configured)" : " (OIDC off)"}. Roles are
@@ -205,6 +239,7 @@ export default function App() {
       {view.page === "projects" ? (
         <ProjectList
           me={me}
+          orgId={me?.org_id}
           onOpen={(projectId) => navigate({ page: "project", projectId })}
           onError={showError}
           onNotice={setNotice}
@@ -250,11 +285,13 @@ export default function App() {
 
 function ProjectList({
   me,
+  orgId,
   onOpen,
   onError,
   onNotice,
 }: {
   me: StudioUser | null;
+  orgId?: string | null;
   onOpen: (id: string) => void;
   onError: (err: unknown) => void;
   onNotice: (msg: string) => void;
@@ -265,6 +302,7 @@ function ProjectList({
   const [description, setDescription] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [busy, setBusy] = useState(false);
+  const restoreRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -277,7 +315,7 @@ function ProjectList({
     } catch (err) {
       onError(err);
     }
-  }, [onError]);
+  }, [onError, orgId]);
 
   useEffect(() => {
     void load();
@@ -349,7 +387,31 @@ function ProjectList({
         </button>
       </form>
       {projects.length === 0 ? (
-        <p className="empty">No projects yet. Create one, then import a pack zip.</p>
+        <div className="empty-tip">
+          <p className="empty">No projects yet in this org. Create one, import a pack zip, or seed a stub demo episode.</p>
+          <p className="hint">
+            First-run: <strong>Seed demo episode</strong> uses the short-drama-ep template plus JSON fixture
+            metadata — no likeness still, no engine MP4, gates stay red.
+          </p>
+          <button
+            type="button"
+            className="btn btn-go"
+            disabled={!can(me, "mutate") || busy}
+            onClick={() => {
+              setBusy(true);
+              void api
+                .seedDemo()
+                .then((seeded) => {
+                  onNotice(seeded.honesty);
+                  onOpen(seeded.project.id);
+                })
+                .catch(onError)
+                .finally(() => setBusy(false));
+            }}
+          >
+            Seed demo episode
+          </button>
+        </div>
       ) : (
         <ul className="card-list">
           {projects.map((project) => (
@@ -366,6 +428,52 @@ function ProjectList({
           ))}
         </ul>
       )}
+      <div className="toolbar">
+        <button
+          type="button"
+          className="btn"
+          onClick={() =>
+            void downloadBackup()
+              .then(() => onNotice("Downloaded org backup zip (metadata + media manifest). Pack revisions kept on restore."))
+              .catch(onError)
+          }
+        >
+          Export backup zip
+        </button>
+        <button type="button" className="btn" disabled={!can(me, "members")} onClick={() => restoreRef.current?.click()}>
+          Restore backup
+        </button>
+        <input
+          ref={restoreRef}
+          type="file"
+          accept=".zip,application/zip"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (!file) return;
+            void api
+              .restoreBackup(file, true)
+              .then((dry) => {
+                const summary = `Dry-run: create ${dry.would_create_projects?.length ?? 0} projects, add ${
+                  dry.would_add_revisions?.length ?? 0
+                } missing pack revisions, keep ${dry.would_keep_revisions?.length ?? 0} existing. Pack revisions are never deleted. Apply?`;
+                onNotice(summary);
+                if (!window.confirm(summary)) return null;
+                return api.restoreBackup(file, false);
+              })
+              .then((applied) => {
+                if (applied?.applied) {
+                  onNotice(
+                    `Restore applied. Pack revisions preserved. Added ${applied.added_revisions ?? 0} missing revisions.`,
+                  );
+                  return load();
+                }
+              })
+              .catch(onError);
+          }}
+        />
+      </div>
       <MembersPanel me={me} onError={onError} onNotice={onNotice} />
     </section>
   );
@@ -946,6 +1054,15 @@ function EpisodeView({
           </ol>
         )}
       </section>
+
+      <ContinuityPanel
+        episodeId={episodeId}
+        onError={onError}
+        onOpenHref={(href) => {
+          const next = href.startsWith("#") ? href : `#${href}`;
+          window.location.hash = next;
+        }}
+      />
 
       <ShotBoard
         shots={shots}

@@ -46,6 +46,7 @@ class Organization(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     projects: Mapped[list["Project"]] = relationship(
@@ -57,10 +58,15 @@ class Organization(Base):
         cascade="all, delete-orphan",
         order_by="OrgMember.created_at.asc()",
     )
+    notifications: Mapped[list["Notification"]] = relationship(
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        order_by="Notification.created_at.desc()",
+    )
 
 
 class OrgMember(Base):
-    """App-level role on the default org. Identity still comes from AUTH.md — not OIDC."""
+    """App-level role on one org. Multi-org lite is not SaaS billing or SSO org mapping."""
 
     __tablename__ = "org_members"
     __table_args__ = (UniqueConstraint("organization_id", "user_name", name="uq_org_member_name"),)
@@ -415,9 +421,56 @@ class AuditEvent(Base):
     episode_id: Mapped[str | None] = mapped_column(
         ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True
     )
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True
+    )
     detail: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     project: Mapped[Project | None] = relationship(foreign_keys=[project_id])
     episode: Mapped[Episode | None] = relationship(foreign_keys=[episode_id])
+    organization: Mapped[Organization | None] = relationship(foreign_keys=[organization_id])
+
+
+NOTIFY_JOB_SUCCEEDED = "job.succeeded"
+NOTIFY_JOB_FAILED = "job.failed"
+NOTIFY_COMMENT_MENTION = "comment.mention"
+NOTIFY_COMMENT_SHOT = "comment.shot"
+NOTIFY_SIGNOFF_REQUESTED = "review.signoff_requested"
+NOTIFY_BLOCKER_CLEARED = "review.blocker_cleared"
+NOTIFY_KINDS = (
+    NOTIFY_JOB_SUCCEEDED,
+    NOTIFY_JOB_FAILED,
+    NOTIFY_COMMENT_MENTION,
+    NOTIFY_COMMENT_SHOT,
+    NOTIFY_SIGNOFF_REQUESTED,
+    NOTIFY_BLOCKER_CLEARED,
+)
+
+
+class Notification(Base):
+    """In-app notice for one org member. Optional outbound webhook is separate."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    user_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(240), nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="")
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
+    episode_id: Mapped[str | None] = mapped_column(
+        ForeignKey("episodes.id", ondelete="SET NULL"), nullable=True
+    )
+    shot_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    job_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    comment_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    organization: Mapped[Organization] = relationship(back_populates="notifications")
 

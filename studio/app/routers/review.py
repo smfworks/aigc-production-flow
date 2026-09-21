@@ -34,14 +34,14 @@ def _review_out(episode) -> ReviewOut:
 
 
 @router.get("/api/episodes/{episode_id}/review", response_model=ReviewOut)
-def get_review(episode_id: str, _user: ReadUser, db: DbDep) -> ReviewOut:
-    episode = get_episode(db, episode_id)
+def get_review(episode_id: str, user: ReadUser, db: DbDep) -> ReviewOut:
+    episode = get_episode(db, episode_id, user)
     return _review_out(episode)
 
 
 @router.get("/api/episodes/{episode_id}/review/signoffs", response_model=list[ReviewSignoffOut])
-def get_signoffs(episode_id: str, _user: ReadUser, db: DbDep) -> list[ReviewSignoffOut]:
-    episode = get_episode(db, episode_id)
+def get_signoffs(episode_id: str, user: ReadUser, db: DbDep) -> list[ReviewSignoffOut]:
+    episode = get_episode(db, episode_id, user)
     return [signoff_out(row) for row in list_signoffs(episode)]
 
 
@@ -53,7 +53,10 @@ def get_signoffs(episode_id: str, _user: ReadUser, db: DbDep) -> list[ReviewSign
 def create_signoff(
     episode_id: str, body: ReviewSignoffCreate, user: SignoffUser, db: DbDep
 ) -> ReviewOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
+    from ..notify import blocker_codes, notify_blockers_cleared
+
+    before = blocker_codes(episode)
     row = add_signoff(
         db,
         episode,
@@ -72,6 +75,8 @@ def create_signoff(
         entity_id=episode.id,
         detail={"note": (body.note or "").strip(), "role": user.role, "signoff_id": row.id},
     )
+    db.flush()
+    notify_blockers_cleared(db, episode, before, blocker_codes(episode), actor=user.name)
     db.commit()
     db.refresh(episode)
     return _review_out(episode)
@@ -79,7 +84,7 @@ def create_signoff(
 
 @router.put("/api/episodes/{episode_id}/review", response_model=ReviewOut)
 def set_review(episode_id: str, body: ReviewSet, user: ReviewUser, db: DbDep) -> ReviewOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     override = bool(body.override)
     if body.state == "generate-ok":
         blocked = generate_ok_blockers(episode)
@@ -138,6 +143,10 @@ def set_review(episode_id: str, body: ReviewSet, user: ReviewUser, db: DbDep) ->
             entity_id=episode.id,
             detail={"state": body.state, "note": body.note.strip()},
         )
+    if body.state == "preview-watched":
+        from ..notify import notify_signoff_requested
+
+        notify_signoff_requested(db, episode, actor=user.name)
     db.commit()
     db.refresh(episode)
     return _review_out(episode)

@@ -12,6 +12,10 @@ def as_user(auth: dict[str, str], name: str) -> dict[str, str]:
     return {**auth, "X-User-Name": name}
 
 
+def as_org(auth: dict[str, str], organization_id: str) -> dict[str, str]:
+    return {**auth, "X-Org-Id": organization_id}
+
+
 def org_id(client, auth) -> str:
     me = client.get("/api/me", headers=auth)
     assert me.status_code == 200

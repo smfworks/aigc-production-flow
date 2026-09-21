@@ -22,8 +22,8 @@ def _next_chapter(db, project_id: str) -> int:
 
 
 @router.get("/api/projects/{project_id}/episodes", response_model=list[EpisodeOut])
-def list_episodes(project_id: str, _user: ReadUser, db: DbDep) -> list[EpisodeOut]:
-    get_project(db, project_id)
+def list_episodes(project_id: str, user: ReadUser, db: DbDep) -> list[EpisodeOut]:
+    get_project(db, project_id, user)
     rows = (
         db.query(Episode)
         .filter(Episode.project_id == project_id)
@@ -39,9 +39,9 @@ def list_episodes(project_id: str, _user: ReadUser, db: DbDep) -> list[EpisodeOu
     status_code=status.HTTP_201_CREATED,
 )
 def create_episode(
-    project_id: str, body: EpisodeCreate, _user: MutateUser, db: DbDep
+    project_id: str, body: EpisodeCreate, user: MutateUser, db: DbDep
 ) -> EpisodeOut:
-    project = get_project(db, project_id)
+    project = get_project(db, project_id, user)
     chapter = body.chapter if body.chapter else _next_chapter(db, project.id)
     clash = (
         db.query(Episode)
@@ -68,15 +68,15 @@ def create_episode(
 
 
 @router.get("/api/episodes/{episode_id}", response_model=EpisodeOut)
-def get_episode_detail(episode_id: str, _user: ReadUser, db: DbDep) -> EpisodeOut:
-    return episode_out(get_episode(db, episode_id))
+def get_episode_detail(episode_id: str, user: ReadUser, db: DbDep) -> EpisodeOut:
+    return episode_out(get_episode(db, episode_id, user))
 
 
 @router.patch("/api/episodes/{episode_id}", response_model=EpisodeOut)
 def update_episode(
-    episode_id: str, body: EpisodeUpdate, _user: MutateUser, db: DbDep
+    episode_id: str, body: EpisodeUpdate, user: MutateUser, db: DbDep
 ) -> EpisodeOut:
-    episode = get_episode(db, episode_id)
+    episode = get_episode(db, episode_id, user)
     if body.title is not None:
         episode.title = body.title.strip()
     if body.synopsis is not None:
@@ -105,8 +105,8 @@ def update_episode(
 
 
 @router.delete("/api/episodes/{episode_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_episode(episode_id: str, _user: MutateUser, db: DbDep) -> None:
-    episode = get_episode(db, episode_id)
+def delete_episode(episode_id: str, user: MutateUser, db: DbDep) -> None:
+    episode = get_episode(db, episode_id, user)
     project = episode.project
     db.delete(episode)
     touch(project)

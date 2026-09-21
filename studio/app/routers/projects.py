@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from ..adapters.catalog import require_slot
 from ..audit import PROJECT_CREATE, record
 from ..config import get_settings
-from ..deps import DbDep, get_default_org, get_project
+from ..deps import DbDep, get_active_org, get_project
 from ..models import Project, utcnow
 from ..packzip import slugify
 from ..rbac import PERM_BUDGET, PERM_RETENTION, MutateUser, ReadUser, refuse_unless
@@ -34,14 +34,20 @@ def _adapter_or_default(value: str | None, kind: str, fallback: str) -> str:
 
 
 @router.get("", response_model=list[ProjectOut])
-def list_projects(_user: ReadUser, db: DbDep) -> list[ProjectOut]:
-    projects = db.query(Project).order_by(Project.updated_at.desc()).all()
+def list_projects(user: ReadUser, db: DbDep) -> list[ProjectOut]:
+    org = get_active_org(db, user)
+    projects = (
+        db.query(Project)
+        .filter(Project.organization_id == org.id)
+        .order_by(Project.updated_at.desc())
+        .all()
+    )
     return [project_out(project) for project in projects]
 
 
 @router.post("", response_model=ProjectOut, status_code=201)
 def create_project(body: ProjectCreate, user: MutateUser, db: DbDep) -> ProjectOut:
-    org = get_default_org(db)
+    org = get_active_org(db, user)
     cfg = get_settings()
     slug = _unique_slug(db, org.id, body.slug or body.name)
     project = Project(
@@ -64,6 +70,7 @@ def create_project(body: ProjectCreate, user: MutateUser, db: DbDep) -> ProjectO
         project_id=project.id,
         entity_type="project",
         entity_id=project.id,
+        organization_id=org.id,
         detail={"name": project.name, "still_adapter": project.still_adapter, "clip_adapter": project.clip_adapter},
     )
     db.commit()
@@ -72,13 +79,13 @@ def create_project(body: ProjectCreate, user: MutateUser, db: DbDep) -> ProjectO
 
 
 @router.get("/{project_id}", response_model=ProjectOut)
-def get_project_detail(project_id: str, _user: ReadUser, db: DbDep) -> ProjectOut:
-    return project_out(get_project(db, project_id))
+def get_project_detail(project_id: str, user: ReadUser, db: DbDep) -> ProjectOut:
+    return project_out(get_project(db, project_id, user))
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
 def update_project(project_id: str, body: ProjectUpdate, user: MutateUser, db: DbDep) -> ProjectOut:
-    project = get_project(db, project_id)
+    project = get_project(db, project_id, user)
     if body.budget_hard_stop is not None or body.budget_cap_units is not None or body.clear_budget_cap:
         refuse_unless(user, PERM_BUDGET, field="budget hard-stop / cap")
     if body.retention_days is not None or body.clear_retention_days:
@@ -110,7 +117,7 @@ def update_project(project_id: str, body: ProjectUpdate, user: MutateUser, db: D
 
 
 @router.delete("/{project_id}", status_code=204)
-def delete_project(project_id: str, _user: MutateUser, db: DbDep) -> None:
-    project = get_project(db, project_id)
+def delete_project(project_id: str, user: MutateUser, db: DbDep) -> None:
+    project = get_project(db, project_id, user)
     db.delete(project)
     db.commit()

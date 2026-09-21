@@ -30,13 +30,16 @@ class UserOut(BaseModel):
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     role: OrgRole | None = None
     org_id: str | None = None
+    org_name: str | None = None
     permissions: list[str] = Field(default_factory=list)
     oidc_role: OrgRole | None = None
+    orgs: list["OrgMembershipOut"] = Field(default_factory=list)
+    multi_org: bool = False
 
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 6
+    phase: int = 7
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -56,14 +59,34 @@ class MetaOut(BaseModel):
     celery_enabled: bool = False
     oidc_configured: bool = False
     oidc_apply_role_claim: bool = False
+    notify_webhook_configured: bool = False
+    multi_org: bool = True
+    multi_org_note: str = (
+        "Multi-org lite: membership isolation only. Not SaaS billing, not SSO org mapping."
+    )
 
 
 class OrganizationOut(BaseModel):
     id: str
     name: str
+    is_default: bool = False
+    role: OrgRole | None = None
     created_at: datetime
+    note: str = "Multi-org lite — not SaaS billing or SSO org mapping."
 
     model_config = {"from_attributes": True}
+
+
+class OrgMembershipOut(BaseModel):
+    id: str
+    name: str
+    is_default: bool = False
+    role: OrgRole
+    created_at: datetime
+
+
+class OrganizationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
 
 
 class ProjectCreate(BaseModel):
@@ -536,6 +559,7 @@ class AuditEventOut(BaseModel):
     entity_id: str = ""
     project_id: str | None = None
     episode_id: str | None = None
+    organization_id: str | None = None
     project_name: str = ""
     episode_title: str = ""
     detail: dict[str, Any] = Field(default_factory=dict)
@@ -565,5 +589,73 @@ class ProjectFromTemplate(BaseModel):
     description: str | None = None
     still_adapter: str | None = None
     clip_adapter: str | None = None
+
+
+class NotificationOut(BaseModel):
+    id: str
+    organization_id: str
+    user_name: str
+    kind: str
+    title: str
+    body: str = ""
+    project_id: str | None = None
+    episode_id: str | None = None
+    shot_id: str | None = None
+    job_id: str | None = None
+    comment_id: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    read_at: datetime | None = None
+    created_at: datetime
+    href: str = ""
+
+    model_config = {"from_attributes": True}
+
+
+class NotificationListOut(BaseModel):
+    items: list[NotificationOut]
+    unread_count: int = 0
+
+
+class DemoSeedOut(BaseModel):
+    project: ProjectOut
+    episode: EpisodeOut
+    template_id: str
+    honesty: str
+    fixture_media: int = 0
+    fake_generate: bool = False
+    likeness: bool = False
+    engine_mp4: bool = False
+
+
+class BackupRestoreBody(BaseModel):
+    dry_run: bool = True
+    confirm: str = ""
+
+
+class ContinuityShotOut(BaseModel):
+    shot_id: str
+    edit_row_id: str = ""
+    sort_index: int = 0
+    take: str = ""
+    join: str = ""
+    entities: str = ""
+    issues: list[str] = Field(default_factory=list)
+    href: str = ""
+
+
+class ContinuitySummaryOut(BaseModel):
+    episode_id: str
+    project_id: str
+    honesty: str = "Read/visualize + navigate only. Not a full NLE."
+    all_green: bool = False
+    red_gates: list[GateResultOut] = Field(default_factory=list)
+    entity_schedule: list[dict[str, Any]] = Field(default_factory=list)
+    entity_schedule_problems: list[str] = Field(default_factory=list)
+    lock_diff_problems: list[str] = Field(default_factory=list)
+    mismatches: list[str] = Field(default_factory=list)
+    shots: list[ContinuityShotOut] = Field(default_factory=list)
+
+
+UserOut.model_rebuild()
 
 

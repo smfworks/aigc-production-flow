@@ -1,4 +1,4 @@
-# Phase 6 studio pack. Not a production IdP. No secrets in this file.
+# Phase 7 studio pack. Not a production IdP. No secrets in this file.
 #
 #   docker compose -f docker-compose.studio.yml up --build
 #
@@ -48,6 +48,7 @@ services:
       STUDIO_OIDC_ROLE_CLAIM: ${STUDIO_OIDC_ROLE_CLAIM:-}
       STUDIO_OIDC_ROLE_MAP: ${STUDIO_OIDC_ROLE_MAP:-}
       STUDIO_OIDC_APPLY_ROLE_CLAIM: ${STUDIO_OIDC_APPLY_ROLE_CLAIM:-false}
+      STUDIO_NOTIFY_WEBHOOK_URL: ${STUDIO_NOTIFY_WEBHOOK_URL:-}
       STUDIO_STILL_ADAPTER: ${STUDIO_STILL_ADAPTER:-stub}
       STUDIO_CLIP_ADAPTER: ${STUDIO_CLIP_ADAPTER:-stub}
     volumes:
