@@ -15,11 +15,13 @@ from ..preview import (
     receipt_complete,
     receipt_out,
     extend_ok,
+    playlist_scrub,
 )
-from ..rbac import MutateUser, ReadUser
+from ..rbac import EditUser, ReadUser
 from ..store import get_store
 from ..schemas import (
     ContinuityReceiptOut,
+    PlaylistScrubOut,
     PreviewDeskOut,
     PreviewDeskShot,
     PreviewWatchedSet,
@@ -95,6 +97,12 @@ def get_preview_desk(episode_id: str, user: ReadUser, db: DbDep) -> PreviewDeskO
     )
 
 
+@router.get("/api/episodes/{episode_id}/playlist-scrub", response_model=PlaylistScrubOut)
+def get_playlist_scrub(episode_id: str, user: ReadUser, db: DbDep) -> PlaylistScrubOut:
+    episode = get_episode(db, episode_id, user)
+    return PlaylistScrubOut.model_validate(playlist_scrub(episode))
+
+
 @router.get(
     "/api/episodes/{episode_id}/shots/{shot_id}/receipt",
     response_model=ContinuityReceiptOut | None,
@@ -109,7 +117,7 @@ def get_receipt(episode_id: str, shot_id: str, user: ReadUser, db: DbDep) -> Con
     response_model=ContinuityReceiptOut,
 )
 def set_receipt(
-    episode_id: str, shot_id: str, body: ReceiptSet, user: MutateUser, db: DbDep
+    episode_id: str, shot_id: str, body: ReceiptSet, user: EditUser, db: DbDep
 ) -> ContinuityReceiptOut:
     shot = _get_shot(db, episode_id, shot_id, user)
     from ..notify import blocker_codes, notify_blockers_cleared
@@ -144,7 +152,7 @@ def set_receipt(
     response_model=ContinuityReceiptOut,
 )
 def set_preview_watched(
-    episode_id: str, shot_id: str, body: PreviewWatchedSet, user: MutateUser, db: DbDep
+    episode_id: str, shot_id: str, body: PreviewWatchedSet, user: EditUser, db: DbDep
 ) -> ContinuityReceiptOut:
     shot = _get_shot(db, episode_id, shot_id, user)
     if shot.receipt is None:
@@ -178,7 +186,7 @@ def set_preview_watched(
 async def attach_preview(
     episode_id: str,
     shot_id: str,
-    user: MutateUser,
+    user: EditUser,
     db: DbDep,
     file: UploadFile | None = File(default=None),
     media_id: str = Form(""),

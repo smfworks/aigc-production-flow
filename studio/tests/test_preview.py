@@ -119,3 +119,37 @@ def test_json_preview_parses_duration(client, auth):
     assert body["still_vs_lock"] == "parsed lock note"
     assert body["preview_watched"] is False
     assert body["source"] == "parsed"
+
+
+def test_playlist_scrub_uses_stub_preview_and_does_not_invent_video(client, auth):
+    _, episode = create_episode(client, auth, "Scrub empty")
+    empty = client.get(f"/api/episodes/{episode['id']}/playlist-scrub", headers=auth)
+    assert empty.status_code == 200, empty.text
+    body = empty.json()
+    assert body["nle"] is False
+    assert body["shots"] == []
+    assert "not an nle" in body["honesty"].lower()
+    assert "invent" in body["honesty"].lower()
+
+    _, ready, shots = green_ready_episode(client, auth, "Scrub")
+    before = client.get(f"/api/episodes/{ready['id']}/playlist-scrub", headers=auth).json()
+    assert before["shot_count"] >= 1
+    assert all(row["empty"] for row in before["shots"])
+
+    shot_id = shots[0]["id"]
+    payload = json.dumps(
+        {"duration_s": 10.125, "frames": 243, "still_vs_lock": "stub receipt, no mp4"}
+    ).encode()
+    posted = client.post(
+        f"/api/episodes/{ready['id']}/shots/{shot_id}/preview",
+        headers=auth,
+        files={"file": ("hop1.fixture.json", payload, "application/json")},
+    )
+    assert posted.status_code == 201, posted.text
+    scrub = client.get(f"/api/episodes/{ready['id']}/playlist-scrub", headers=auth).json()
+    row = next(item for item in scrub["shots"] if item["shot_id"] == shot_id)
+    assert row["stub"] is True
+    assert row["playable"] is False
+    assert row["empty"] is False
+    assert row["media_id"]
+    assert "mp4" in row["note"].lower() or "stub" in row["note"].lower()

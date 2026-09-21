@@ -34,6 +34,7 @@ import { OrgSwitcher } from "./OrgSwitcher.tsx";
 import { NotificationBell } from "./NotificationBell.tsx";
 import { ContinuityPanel } from "./ContinuityPanel.tsx";
 import { IdentityStore } from "./IdentityStore.tsx";
+import { PlaylistScrubber } from "./PlaylistScrubber.tsx";
 import { PackDiffPanel } from "./PackDiffPanel.tsx";
 import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
 import {
@@ -137,13 +138,14 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 8</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 9</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects, identity store, pack revision diff, hop-1 preview desk, members, presence,
-          continuity, and adapter health around the pack zip. Multi-org lite is membership
+          Projects, identity store, pack revision diff, playlist scrubber, hop-1 preview desk,
+          members (writer / art / editor / producer), presence, continuity, and adapter health
+          around the pack zip. Multi-org lite is membership
           isolation — not SaaS billing. Jobs default to an in-process thread worker; Celery is
           opt-in. Budget units are operator credits — not a cloud bill. Media is local disk unless
           S3 is configured. OIDC is opt-in and off by default. Pack zip remains the contract.
@@ -273,7 +275,7 @@ export default function App() {
         </p>
       ) : null}
       {importHint() ? (
-        <p className="banner banner-ok" role="status">
+        <p className="banner banner-ok" role="status" data-testid="import-hint">
           Pack builder handoff: export a zip there, open a project/episode, then{" "}
           <strong>Import pack zip</strong>. Deep links:{" "}
           <code>#/projects/&lt;id&gt;/episodes/&lt;id&gt;</code>
@@ -456,6 +458,7 @@ function ProjectList({
           <button
             type="button"
             className="btn btn-go"
+            data-testid="seed-demo"
             disabled={!can(me, "mutate") || busy}
             onClick={() => {
               setBusy(true);
@@ -643,6 +646,43 @@ function ProjectView({
     }
   }
 
+  async function moveEpisode(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= episodes.length) return;
+    const current = episodes[index];
+    const neighbor = episodes[target];
+    try {
+      const ordered = await api.reorderEpisodes(
+        projectId,
+        episodes.map((episode) => {
+          if (episode.id === current.id) {
+            return {
+              id: episode.id,
+              season: neighbor.season || 1,
+              sequence: neighbor.sequence || neighbor.chapter,
+            };
+          }
+          if (episode.id === neighbor.id) {
+            return {
+              id: episode.id,
+              season: current.season || 1,
+              sequence: current.sequence || current.chapter,
+            };
+          }
+          return {
+            id: episode.id,
+            season: episode.season || 1,
+            sequence: episode.sequence || episode.chapter,
+          };
+        }),
+      );
+      setEpisodes(ordered);
+      onNotice("Episode order updated. Backup and retention keep this season/sequence.");
+    } catch (err) {
+      onError(err);
+    }
+  }
+
   async function runRetention(apply: boolean) {
     try {
       const result = await api.retentionApply({
@@ -765,19 +805,24 @@ function ProjectView({
           value={synopsis}
           onChange={(event) => setSynopsis(event.target.value)}
         />
-        <button type="submit" className="btn btn-go" disabled={busy || !can(me, "mutate")}>
+        <button type="submit" className="btn btn-go" disabled={busy || !can(me, "script")}>
           New episode
         </button>
       </form>
       {episodes.length === 0 ? (
         <p className="empty">No episodes. Add a chapter, then import a pack zip.</p>
       ) : (
-        <ul className="card-list">
-          {episodes.map((episode) => (
+        <ul className="card-list" data-testid="episode-list">
+          {episodes.map((episode, index) => (
             <li key={episode.id}>
-              <button type="button" className="card-btn" onClick={() => onOpenEpisode(episode.id)}>
+              <button
+                type="button"
+                className="card-btn"
+                data-testid="episode-card"
+                onClick={() => onOpenEpisode(episode.id)}
+              >
                 <strong>
-                  Ch. {episode.chapter} · {episode.title}
+                  S{episode.season || 1} · seq {episode.sequence || episode.chapter} · {episode.title}
                 </strong>
                 <span>
                   {episode.review_state}
@@ -788,10 +833,34 @@ function ProjectView({
                     : " · no pack yet"}
                 </span>
               </button>
+              {can(me, "script") && episodes.length > 1 ? (
+                <span className="toolbar">
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={index === 0}
+                    onClick={() => void moveEpisode(index, -1)}
+                  >
+                    Up
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={index === episodes.length - 1}
+                    onClick={() => void moveEpisode(index, 1)}
+                  >
+                    Down
+                  </button>
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
+      <p className="hint">
+        Season and sequence are the episode order. Retention and backup keep that order; they do
+        not reorder episodes. Writer (and the legacy editor bundle) can move them.
+      </p>
     </section>
   );
 }
@@ -1028,10 +1097,55 @@ function EpisodeView({
       <div className="panel-head">
         <h2>{episode?.title ?? "Episode"}</h2>
         <p>
-          Chapter {episode?.chapter ?? "—"}.{" "}
+          S{episode?.season ?? 1} · seq {episode?.sequence ?? episode?.chapter ?? "—"} · chapter{" "}
+          {episode?.chapter ?? "—"}.{" "}
           {episode?.synopsis || "Import a pack zip from the builder. generate-ok stays locked until every gate is green."}
         </p>
       </div>
+      <form
+        className="create-row"
+        key={`${episodeId}:${episode?.updated_at || ""}`}
+        onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          void api
+            .updateEpisode(episodeId, {
+              log_line: String(data.get("log_line") || ""),
+              map_notes: String(data.get("map_notes") || ""),
+              dialogue: String(data.get("dialogue") || ""),
+            })
+            .then(() => {
+              onNotice("Script, map, and dialogue saved. Pack zip is still the round-trip.");
+              return load();
+            })
+            .catch(onError);
+        }}
+      >
+        <input
+          name="log_line"
+          defaultValue={episode?.log_line || ""}
+          placeholder="Log line (writer)"
+          disabled={!can(me, "script")}
+          aria-label="Log line"
+        />
+        <input
+          name="map_notes"
+          defaultValue={episode?.map_notes || ""}
+          placeholder="Map notes — clock to beat, not shots"
+          disabled={!can(me, "script")}
+          aria-label="Map notes"
+        />
+        <input
+          name="dialogue"
+          defaultValue={episode?.dialogue || ""}
+          placeholder="Dialogue finish-by"
+          disabled={!can(me, "script")}
+          aria-label="Dialogue"
+        />
+        <button type="submit" className="btn" disabled={!can(me, "script")}>
+          Save script fields
+        </button>
+      </form>
       <PresenceBar episodeId={episodeId} shotId={selectedShotId} onError={onError} />
 
       <section className="panel">
@@ -1203,7 +1317,7 @@ function EpisodeView({
           edit_row_id: shot.edit_row_id,
         }))}
         selectedId={identityId}
-        canMutate={can(me, "media")}
+        canIdentity={can(me, "identity")}
         honesty={identity?.honesty || "Approved sheets and per-window plates. Not embeddings."}
         onApprove={(assetId, lockKeywords) => {
           void api
@@ -1212,6 +1326,24 @@ function EpisodeView({
               onNotice(
                 "Identity asset approved (who/when recorded). Approved lock keywords count for lock-diff and generate-ok. Draft does not.",
               );
+              return load();
+            })
+            .catch(onError);
+        }}
+        onSaveKeywords={(assetId, lockKeywords) => {
+          void api
+            .saveIdentityKeywords(episodeId, assetId, lockKeywords, "keyword edit")
+            .then(() => {
+              onNotice("Keywords saved as draft. They do not count until you re-approve.");
+              return load();
+            })
+            .catch(onError);
+        }}
+        onUnapprove={(assetId) => {
+          void api
+            .unapproveIdentity(episodeId, assetId, "unapproved in studio")
+            .then(() => {
+              onNotice("Identity unapproved. Audit recorded. Draft keywords do not count.");
               return load();
             })
             .catch(onError);
@@ -1237,7 +1369,7 @@ function EpisodeView({
         onSelectShot={selectShot}
         episodeId={episodeId}
         canComment={can(me, "comment")}
-        canMutate={can(me, "mutate")}
+        canMutate={can(me, "edit")}
         onError={onError}
         onNotice={onNotice}
         onExtract={() => {
@@ -1275,6 +1407,8 @@ function EpisodeView({
             .catch(onError);
         }}
       />
+
+      <PlaylistScrubber episodeId={episodeId} onError={onError} />
 
       <PreviewDeskPanel
         episodeId={episodeId}
@@ -1349,7 +1483,7 @@ function EpisodeView({
             ? " — generate-ok refused while any gate is red, a required hop-1 lacks preview-watched + receipt, or a reviewer/producer has not signed off."
             : ""}
         </p>
-        <div className="signoff-box">
+        <div className="signoff-box" data-testid="signoff-status">
           <p>
             Sign-off:{" "}
             {signedOff
@@ -1479,7 +1613,14 @@ function EpisodeView({
               value={mediaNotes}
               onChange={(event) => setMediaNotes(event.target.value)}
             />
-            <button type="button" className="btn" disabled={!can(me, "media")} onClick={() => mediaRef.current?.click()}>
+            <button
+              type="button"
+              className="btn"
+              disabled={
+                kind === "preview" || kind === "other" ? !can(me, "media") : !can(me, "identity")
+              }
+              onClick={() => mediaRef.current?.click()}
+            >
               Upload
             </button>
             <input

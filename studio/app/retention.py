@@ -11,7 +11,10 @@ from .config import Settings, get_settings
 from .models import ContinuityReceipt, Episode, Job, MediaAsset, PackRevision, Project, utcnow
 from .store import get_store
 
-KEEP_NOTE = "Pack revisions are not deleted by default."
+KEEP_NOTE = (
+    "Pack revisions are not deleted by default. Episode season/sequence order is "
+    "project metadata and is preserved; retention does not reorder or delete episodes."
+)
 
 
 def effective_days(project: Project | None, settings: Settings | None = None) -> int:

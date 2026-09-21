@@ -1,6 +1,6 @@
 # Auth (studio spine)
 
-Identity modes pick **who the process believes you are**. App-level **roles** (`producer` / `editor` / `reviewer` / `viewer`) sit on each organization the user belongs to.
+Identity modes pick **who the process believes you are**. App-level **roles** (`producer` / `editor` / `writer` / `art` / `reviewer` / `viewer`) sit on each organization the user belongs to. They are not IdP groups unless the optional OIDC claim map is enabled.
 
 **OIDC is opt-in and off by default.** This repo does not ship a production IdP. Local-dev remains the default. Do not treat a local token or a lab JWKS as multi-tenant SaaS security.
 
@@ -20,20 +20,26 @@ Local-dev token default: `local-dev-token`. Multi-org lite isolates memberships;
 
 `/api/me` reports `auth_mode`, `sso`, `role`, and `oidc_configured` on `/api/meta`. Meta `oidc_configured` is true only when issuer **and** audience are set. An empty issuer is not a live IdP.
 
-## App-level roles (Phase 5, still per-org in Phase 7)
+## App-level roles (Phase 5 bundle, Phase 9 matrix)
 
 Seed on first boot: default org + current `STUDIO_DEFAULT_USER` as **producer**. Extra orgs created later get the creating producer as their first member.
 
-| Role | Reads | Writes |
-|---|---|---|
-| `producer` | yes | members, budget hard-stop / cap, retention apply, **sign-off**, plus editor writes |
-| `editor` | yes | review set, job enqueue/cancel, pack import, media upload, shots, comments |
-| `reviewer` | yes | comments, review set, **sign-off** |
-| `viewer` | yes | none (presence heartbeat only) |
+Phase 9 maps the pack-convention roles onto these permissions. The original four roles keep their Phase 5 powers. `writer` and `art` are narrower roles you can assign when those jobs should not share the legacy editor bundle.
 
-Producers manage members at `GET/POST /api/orgs/{id}/members`. Unknown names are authenticated but **not** members until a producer adds them.
+| Role | Legacy | Reads | Writes |
+|---|---|---|---|
+| `producer` | yes | yes | members, budget hard-stop / cap, retention apply, **sign-off**, generate-ok override, plus the editor bundle |
+| `editor` | yes | yes | **craft bundle**: script/map/dialogue, sheets/plates/identity, joins/board/edit-list, review set, job enqueue/cancel, pack import, media, shots, comments. Not budget, retention, members, or sign-off |
+| `writer` | no | yes | script, map, dialogue, episode season/sequence order, comments |
+| `art` | no | yes | sheets, plates, costumes, identity approve / unapprove / keyword edit, comments |
+| `reviewer` | yes | yes | comments, review set, **sign-off** |
+| `viewer` | yes | yes | none (presence heartbeat only) |
 
-**App roles stay authoritative** unless the optional OIDC claim map is enabled (below). Forward-header still only supplies a name. OIDC still only supplies a name unless `STUDIO_OIDC_APPLY_ROLE_CLAIM` is true.
+`editor` is not narrowed. An existing editor can still enqueue and import packs. Assign `writer` or `art` when those permissions must differ. GPU **budget** hard-stop stays producer-only; job enqueue stays on the legacy editor bundle and on producer.
+
+Producers manage members at `GET/POST /api/orgs/{id}/members`. Unknown names are authenticated but **not** members until a producer adds them. `GET /api/meta` includes `role_matrix`.
+
+**App roles stay authoritative** unless the optional OIDC claim map is enabled (below). Forward-header still only supplies a name. OIDC still only supplies a name unless `STUDIO_OIDC_APPLY_ROLE_CLAIM` is true. The claim map may name `writer` or `art`; that is still an app role, not an IdP group.
 
 ## Optional OIDC (`STUDIO_AUTH_MODE=oidc`)
 
@@ -54,7 +60,7 @@ Optional:
 | `STUDIO_OIDC_JWKS_URL` | Override JWKS URI (otherwise `{issuer}/.well-known/openid-configuration` → `jwks_uri`) |
 | `STUDIO_OIDC_NAME_CLAIM` | Default `preferred_username` |
 | `STUDIO_OIDC_ROLE_CLAIM` | Claim name to read (unused unless apply is on) |
-| `STUDIO_OIDC_ROLE_MAP` | `claim_value:app_role` pairs, comma-separated. Example: `admin:producer,review:reviewer` |
+| `STUDIO_OIDC_ROLE_MAP` | `claim_value:app_role` pairs, comma-separated. Example: `admin:producer,review:reviewer,script:writer,stills:art`. Unknown app roles are ignored |
 | `STUDIO_OIDC_APPLY_ROLE_CLAIM` | Default `false`. When `true`, mapped claim upserts the org member role |
 
 Install the extra: `pip install -e "./studio[oidc]"`.

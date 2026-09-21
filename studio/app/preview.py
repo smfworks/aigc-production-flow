@@ -495,3 +495,83 @@ def plates_bound_for_shot(
     if is_real_still_file(plate):
         return True, "pack plate file"
     return False, "Hop-1 plate is not bound (need a plate file or none + why)."
+
+
+SCRUB_HONESTY = (
+    "Soft playlist scrubber. Plays a local or stub preview file (kind=preview) when one "
+    "is actually stored. Metadata only otherwise. Not an NLE timeline editor. "
+    "This studio does not invent MP4s."
+)
+
+
+def _scrub_flags(asset: MediaAsset) -> tuple[bool, bool, bool, str]:
+    ctype = (asset.content_type or "").lower()
+    name = (asset.original_name or "").lower()
+    playable = ctype.startswith("video/") or name.endswith((".mp4", ".webm", ".mov"))
+    image = ctype.startswith("image/") or name.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+    stub = ctype.startswith("application/json") or ctype.startswith("text/") or name.endswith(
+        (".json", ".txt", ".md")
+    )
+    if playable:
+        return True, False, False, "Local preview file. Playback only — not an NLE."
+    if image:
+        return False, True, False, "Still preview. Not a timeline editor."
+    if stub or not ctype.startswith("video/"):
+        return False, False, True, "Stub receipt or non-video preview. No MP4 in this tree."
+    return False, False, True, "Preview metadata only."
+
+
+def playlist_scrub(episode: Episode) -> dict[str, Any]:
+    """Ordered shot playlist plus whatever preview media is actually stored."""
+    previews = [asset for asset in episode.media if asset.kind == "preview"]
+    by_id = {asset.id: asset for asset in previews}
+    by_shot: dict[str, MediaAsset] = {}
+    for asset in previews:
+        if asset.shot_id and asset.shot_id not in by_shot:
+            by_shot[asset.shot_id] = asset
+    shots: list[dict[str, Any]] = []
+    for shot in episode.shots:
+        receipt = shot.receipt
+        asset = None
+        if receipt and receipt.media_id and receipt.media_id in by_id:
+            asset = by_id[receipt.media_id]
+        elif receipt and receipt.media_id:
+            linked = next((item for item in episode.media if item.id == receipt.media_id), None)
+            if linked and linked.kind == "preview":
+                asset = linked
+        if asset is None and shot.id in by_shot:
+            asset = by_shot[shot.id]
+        playable = image = stub = False
+        note = "No local preview on this shot."
+        if asset is not None:
+            playable, image, stub, note = _scrub_flags(asset)
+        shots.append(
+            {
+                "shot_id": shot.id,
+                "sort_index": shot.sort_index,
+                "edit_row_id": shot.edit_row_id or "",
+                "take": shot.take or "",
+                "join": shot.join or "",
+                "action": shot.action or "",
+                "song_t": shot.song_t or "",
+                "camera_verb": shot.camera_verb or "",
+                "duration_s": receipt.duration_s if receipt else None,
+                "frames": receipt.frames if receipt else None,
+                "preview_watched": bool(receipt.preview_watched) if receipt else False,
+                "media_id": asset.id if asset else None,
+                "content_type": asset.content_type if asset else "",
+                "original_name": asset.original_name if asset else "",
+                "playable": playable,
+                "image": image,
+                "stub": stub,
+                "empty": asset is None,
+                "note": note,
+            }
+        )
+    return {
+        "episode_id": episode.id,
+        "honesty": SCRUB_HONESTY,
+        "nle": False,
+        "shot_count": len(shots),
+        "shots": shots,
+    }

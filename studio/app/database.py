@@ -50,6 +50,11 @@ _ADDITIVE_COLUMNS = (
     ("media_assets", "shot_id", "VARCHAR(36) DEFAULT ''"),
     ("media_assets", "edit_row_id", "VARCHAR(80) DEFAULT ''"),
     ("media_assets", "lock_keywords", "TEXT DEFAULT ''"),
+    ("episodes", "season", "INTEGER DEFAULT 1"),
+    ("episodes", "sequence_index", "INTEGER DEFAULT 1"),
+    ("episodes", "log_line", "TEXT DEFAULT ''"),
+    ("episodes", "map_notes", "TEXT DEFAULT ''"),
+    ("episodes", "dialogue", "TEXT DEFAULT ''"),
 )
 
 

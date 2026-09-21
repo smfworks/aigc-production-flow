@@ -51,7 +51,12 @@ export type Episode = {
   project_id: string;
   title: string;
   chapter: number;
+  season: number;
+  sequence: number;
   synopsis: string;
+  log_line: string;
+  map_notes: string;
+  dialogue: string;
   review_state: ReviewStateName;
   latest_revision: PackRevisionSummary | null;
   comment_count: number;
@@ -100,7 +105,15 @@ export type Comment = {
   created_at: string;
 };
 
-export type OrgRole = "producer" | "editor" | "reviewer" | "viewer";
+export type OrgRole = "producer" | "editor" | "reviewer" | "viewer" | "writer" | "art";
+
+export type RoleMatrixRow = {
+  role: string;
+  label: string;
+  legacy: boolean;
+  permissions: string[];
+  note: string;
+};
 
 export type StudioUser = {
   name: string;
@@ -207,6 +220,7 @@ export type Meta = {
   media_note?: string;
   presence_ttl_seconds?: number;
   roles?: string[];
+  role_matrix?: RoleMatrixRow[];
   celery_enabled?: boolean;
   oidc_configured?: boolean;
   oidc_apply_role_claim?: boolean;
@@ -569,7 +583,12 @@ export type PackDiff = {
   left: PackDiffRef | null;
   right: PackDiffRef | null;
   gates: PackDiffGate[];
-  entity_schedule: { added?: unknown[]; removed?: unknown[]; changed?: unknown[] };
+  entity_schedule: {
+    added?: unknown[];
+    removed?: unknown[];
+    changed?: unknown[];
+    ambiguous?: { natural?: string; note?: string; matched_by?: string }[];
+  };
   edit_list: { added?: unknown[]; removed?: unknown[]; changed?: unknown[] };
   identity_keywords: { added?: unknown[]; removed?: unknown[]; changed?: unknown[] };
   summary: Record<string, unknown>;
@@ -586,6 +605,36 @@ export type PackHandoff = {
   episode_id: string | null;
   honesty: string;
   auto_generate: boolean;
+};
+
+export type PlaylistScrubShot = {
+  shot_id: string;
+  sort_index: number;
+  edit_row_id: string;
+  take: string;
+  join: string;
+  action: string;
+  song_t: string;
+  camera_verb: string;
+  duration_s: number | null;
+  frames: number | null;
+  preview_watched: boolean;
+  media_id: string | null;
+  content_type: string;
+  original_name: string;
+  playable: boolean;
+  image: boolean;
+  stub: boolean;
+  empty: boolean;
+  note: string;
+};
+
+export type PlaylistScrub = {
+  episode_id: string;
+  honesty: string;
+  nle: boolean;
+  shot_count: number;
+  shots: PlaylistScrubShot[];
 };
 
 export type DemoSeed = {

@@ -708,6 +708,60 @@ a.btn {
   border-color: rgba(52, 211, 153, 0.45);
 }
 
+.role-chip.is-writer,
+.presence-chip.is-writer {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+.role-chip.is-art,
+.presence-chip.is-art {
+  color: #c4b5fd;
+  border-color: rgba(196, 181, 253, 0.5);
+}
+
+.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 8px 0 12px;
+}
+
+.matrix th,
+.matrix td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.matrix-notes {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.scrub-transport,
+.scrub-stage {
+  display: grid;
+  gap: 10px;
+}
+
+.scrub-transport {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+}
+
+.scrub-range input[type="range"] {
+  width: 100%;
+}
+
+.scrub-stage video,
+.scrub-stage img {
+  max-width: 100%;
+  border: 1px solid var(--line);
+  background: #05070d;
+}
+
 .member-list {
   list-style: none;
   padding: 0;

@@ -113,15 +113,15 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
-## Studio spine (Phase 8) vs pack builder
+## Studio spine (Phase 9) vs pack builder
 
 Two pieces, one contract:
 
 | | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
 |---|---|---|
-| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. **Open in Studio** stages the zip when the studio API is reachable. | Projects, episodes, pack revisions, **pack diff**, **identity store**, review **sign-off**, comments, media, shots, job center, stub adapters, hop-1 desk, budget, audit, EDL, templates, RBAC lite, presence, adapter health, **multi-org lite**, **notifications**, **continuity panel**, **demo seed**, **backup**. Optional Celery / OIDC. |
+| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. **Open in Studio** stages the zip when the studio API is reachable. | Projects, ordered episodes, pack revisions, **pack diff**, **identity store** (unapprove + keyword edit), review **sign-off**, comments, media, shots, job center, stub adapters, hop-1 desk, **playlist scrubber**, budget, audit, EDL, templates, **writer/art/editor/producer** roles, presence, adapter health, **multi-org lite**, **notifications**, **continuity panel**, **demo seed**, **backup**. Optional Celery / OIDC. |
 | Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. Compose pack: `docker-compose.studio.yml`. |
-| Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles. Optional OIDC JWKS (**off by default**). Multi-org lite is membership isolation, not SaaS. [docs/AUTH.md](docs/AUTH.md). |
+| Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles (`writer` / `art` plus the Phase 5 four). Optional OIDC JWKS (**off by default**). Roles stay app-level unless the OIDC claim map is on. Multi-org lite is membership isolation, not SaaS. [docs/AUTH.md](docs/AUTH.md). |
 | Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green, hop-1 receipts are preview-watched, **and** a reviewer/producer has signed off. Default adapter=`stub`. Budget units are operator credits, not a cloud bill. Media is local disk unless S3 is configured. |
 | Not this | NLE, GPU, MP4. | Full NLE, CapCut clone, a generate API, SaaS billing. Celery and OIDC stay opt-in. |
 
@@ -134,9 +134,9 @@ Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/
 # Builder http://localhost:5173
 ```
 
-Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. Create a second org, switch, confirm the member cannot see it. Seed a demo episode. Approve a sheet, link a plate, open Continuity into identity. Diff two pack revisions before import. Open in Studio auto-imports after episode pick when configured. Bell on a stub job. `/readyz` green. Download a backup zip. A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, or sign-off is missing. Unset comfy-* hooks stay stub / not live.
+Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. Assign **writer** and **art** as different roles (script vs identity). Reorder episodes. Scrub the shot playlist against a stub preview. Unapprove or edit identity keywords, then re-approve. Create a second org, switch, confirm the member cannot see it. Seed a demo episode. Approve a sheet, link a plate, open Continuity into identity. Diff two pack revisions before import (shared entity-schedule rows stay distinct). Open in Studio auto-imports after episode pick when configured. Bell on a stub job. `/readyz` green. Download a backup zip (season/sequence kept). A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, sign-off is missing, or approved identity keywords conflict. Unset comfy-* hooks stay stub / not live.
 
-CI: GitHub Actions runs `studio` pytest, `app` `npm test`, and `studio-web` `tsc --noEmit` on every pull request and fails the PR on red.
+CI: GitHub Actions runs `studio` pytest, `app` `npm test`, `studio-web` `tsc --noEmit`, and a Playwright smoke (skips with `E2E_SKIP` if Chromium is unavailable) on every pull request and fails the PR on red.
 
 ```bash
 docker compose -f docker-compose.studio.yml up --build
@@ -149,14 +149,14 @@ docker compose -f docker-compose.studio.yml up --build
 ```
 app/                     client-side pack builder (Vite + React) — do not rewrite
 studio/                  FastAPI spine (SQLite default, Postgres-ready URL)
-studio-web/              thin studio shell (lists, review, identity, pack diff, jobs, budget, audit, EDL, members)
+studio-web/              thin studio shell (lists, review, identity, playlist scrubber, pack diff, jobs, budget, audit, EDL, members)
 docker-compose.studio.yml  API + studio-web (optional worker / postgres / minio / celery profiles)
 scripts/dev-studio.sh    local API + studio + builder
 data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 templates/verticals/     education / brand promo / short-drama empty packs
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 8 studio operator path (identity, pack diff, auto-import, measured Comfy hooks)
+docs/STUDIO.md           Phase 9 studio operator path (role matrix, episode order, scrubber, identity edit)
 docs/AUTH.md             local / forward-header / optional OIDC — multi-org lite, not SaaS or a production IdP
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)

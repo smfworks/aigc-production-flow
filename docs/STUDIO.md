@@ -1,6 +1,6 @@
-# Studio spine (Phase 8)
+# Studio spine (Phase 9)
 
-The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, **pack revision diff**, review, **reviewer/producer sign-off**, comments, **visual identity store** (approved sheets + per-window plates), sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC**, **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, optional **OIDC**, **multi-org lite**, **in-app notifications**, **ops probes**, a **continuity panel**, **demo seed**, **backup/restore**, and **builder Open in Studio auto-import**.
+The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes (season/sequence order), pack zip revisions, **pack revision diff**, review, **reviewer/producer sign-off**, comments, **visual identity store** (approved sheets + per-window plates, unapprove, keyword edit), sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **soft playlist scrubber**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC** (writer / art plus the Phase 5 roles), **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, optional **OIDC**, **multi-org lite**, **in-app notifications**, **ops probes**, a **continuity panel**, **demo seed**, **backup/restore**, and **builder Open in Studio auto-import**.
 
 It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is opt-in and off by default.** Celery is opt-in and off by default (`STUDIO_JOB_WORKER=thread`). **Multi-org lite is membership isolation, not SaaS billing, and not SSO org mapping.**
 
@@ -24,12 +24,14 @@ Local-dev: `Authorization: Bearer $STUDIO_API_TOKEN` (default `local-dev-token`)
 
 `STUDIO_AUTH_MODE` is `local` (default), `forward-header` (trust `X-Forwarded-User`), or `oidc` (Bearer JWT via issuer JWKS). **OIDC is opt-in and off by default.** This repo does not ship a production IdP. See [AUTH.md](AUTH.md).
 
-Roles are **app-level** on the default org, not an IdP claim:
+Roles are **app-level** on the active org, not an IdP claim (unless `STUDIO_OIDC_APPLY_ROLE_CLAIM` is set):
 
 | Role | Mutating |
 |---|---|
 | `producer` | All writes, including members, budget hard-stop / cap, retention apply, **sign-off**, producer override of generate-ok |
-| `editor` | Review, jobs, pack import, media, shots, comments |
+| `editor` | Legacy craft bundle: script, identity, edit-list, review, jobs, pack import, media, shots, comments. Not budget, retention, members, or sign-off |
+| `writer` | Script, map, dialogue, episode season/sequence order, comments |
+| `art` | Sheets, plates, costumes, identity approve / unapprove / keyword edit, comments |
 | `reviewer` | Comments + review set + **sign-off** |
 | `viewer` | Read-only (presence heartbeat still allowed) |
 
@@ -42,6 +44,16 @@ Do not treat the token as multi-tenant SaaS security. **Multi-org lite** lets a 
 - Default DB: SQLite at `data/studio.db` (gitignored). Override with `STUDIO_DATABASE_URL` (Postgres URL works if you install `pip install -e "./studio[postgres]"`).
 - Media (sheets/plates/costumes/**hop-1 previews**) and stored pack zips: `data/media/` (gitignored) via the **local** media adapter. Do not commit likeness stills or engine MP4s. Preview MP4s are allowed **on disk** with `kind=preview` only.
 - Optional S3/MinIO: `STUDIO_MEDIA_BACKEND=s3` plus `STUDIO_S3_BUCKET` (and `STUDIO_S3_ENDPOINT` for MinIO). Incomplete config **stays local** and `/api/meta` says so. Credentials stay in the process environment, not git. Install `pip install -e "./studio[s3]"` for boto3.
+
+## Operator path (Phase 9)
+
+The Phase 8 path still applies. Phase 9 adds:
+
+1. **Members matrix** — add `writer` and `art` as different roles. A writer can save log line / map / dialogue and reorder episodes. An art member can approve a sheet. Neither can enqueue. The legacy `editor` still can
+2. **Episode order** — on the project, move episodes up/down. `season` + `sequence` are what backup restores. Retention expires stub media only and does not reorder episodes
+3. **Playlist scrubber** — on the episode, scrub the shot list. A stored `kind=preview` file plays (video or still). A JSON stub receipt shows metadata and does not pretend to be an MP4. Empty shots say so. This is not an NLE
+4. **Identity** — after approve, **Unapprove** (audited) or edit keywords. **Save draft keywords** drops an approved asset back to draft. **Re-approve** is what makes the new keywords count
+5. **Pack diff** — two entity-schedule rows that share kind/name/take/windows stay two rows (matched by id). The panel says when that group was ambiguous
 
 ## Operator path (Phase 8)
 
@@ -181,9 +193,9 @@ This never claims a cloud bill was paid.
 
 ## Audit + retention
 
-Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `pack.diff`, `media.upload`, `identity.approve`, `identity.link`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
+Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `pack.diff`, `media.upload`, `identity.approve`, `identity.unapprove`, `identity.keywords`, `identity.link`, `episode.reorder`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
 
-Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed (producer). `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.**
+Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed (producer). `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.** Episode **season/sequence order is preserved**; retention does not reorder or delete episodes. Backup manifests store that order and restore it with the episode.
 
 ## Light timeline export
 
@@ -216,7 +228,7 @@ Before `generate-ok`:
 1. Latest pack revision: all gates green
 2. Each required hop-1: preview-watched continuity receipt, no NG reason — **live adapters (comfy-h3 / comfy-qwen / webhook / cli) must not skip this**
 3. At least one **sign-off** record from a `reviewer` or `producer` (who / when / note)
-4. I2VA plate bind uses **approved** identity plates only (draft sheets/plates do not count). Label match is exact (take `A` does not match a plate named `smith`). `generate-ok` returns 409 `identity_lock_diff` or `plates_unbound` when this fails. Approved lock keywords are stamped on approve.
+4. I2VA plate bind uses **approved** identity plates only (draft sheets/plates do not count). Label match is exact (take `A` does not match a plate named `smith`). `generate-ok` returns 409 `identity_lock_diff` or `plates_unbound` when this fails. Approved lock keywords are stamped on approve. Unapprove and keyword-save return the asset to draft; those keywords do not count until re-approve. Synonym groups are unchanged.
 
 `POST /api/episodes/{id}/review/signoff`. Viewers cannot sign off. Editors cannot sign off. A producer may stamp `generate-ok` with `{ "override": true }` — audited as `review.override`. Sign-off itself is `review.signoff`.
 
@@ -228,7 +240,18 @@ Required hop-1 = first edit-list row of each take with `hop1Planned`. `generate-
 
 OpenAPI is canonical: http://localhost:8000/docs
 
-Phase 2–7 surface still applies. Phase 8 adds:
+Phase 2–8 surface still applies. Phase 9 adds:
+
+| Area | Methods |
+|---|---|
+| Roles | `writer` and `art` on member create/patch. `GET /api/meta` `role_matrix`. `phase: 9` |
+| Episodes | `season`, `sequence`, `log_line`, `map_notes`, `dialogue`. `POST /api/projects/{id}/episodes/reorder` |
+| Playlist | `GET /api/episodes/{id}/playlist-scrub` (metadata + preview media flags; not an NLE) |
+| Identity | `POST …/identity/{assetId}/unapprove`, `POST …/identity/{assetId}/keywords` (draft; does not count until approve) |
+| Shots | `PATCH /api/episodes/{id}/shots/{shotId}` join / camera verb / action (edit permission) |
+| Pack diff | entity-schedule `ambiguous` when rows share kind/name/take/windows |
+
+Phase 8 surface:
 
 | Area | Methods |
 |---|---|
@@ -236,7 +259,7 @@ Phase 2–7 surface still applies. Phase 8 adds:
 | Pack diff | `GET /api/episodes/{id}/revisions/{left}/diff/{right}`, `POST /api/episodes/{id}/pack/diff` |
 | Handoff | `POST /api/handoffs`, `GET /api/handoffs/{id}`; import accepts `handoff_id` |
 | Adapters | catalog/health include window metadata, `not_live`, `schema_ok`, `hop1_watch_required` |
-| Meta | `phase: 8` |
+| Meta | response `phase` is 9 (see the Phase 9 table) |
 | Orgs | `GET/POST /api/orgs`, `GET /api/orgs/{id}`; members stay `…/members`. Header `X-Org-Id` selects the active org |
 | Notifications | `GET /api/notifications`, `POST /api/notifications/read-all`, `POST /api/notifications/{id}/read` |
 | Continuity | `GET /api/episodes/{id}/continuity` (read/visualize + navigate, not an NLE; identity deep-links) |
@@ -253,16 +276,19 @@ python3 -m pytest
 cd app && npm test
 
 cd studio-web && npx tsc --noEmit
+cd studio-web && npm run e2e
 ```
 
-GitHub Actions (`.github/workflows/ci.yml`) runs those three jobs on every pull request and fails the PR on red.
+GitHub Actions (`.github/workflows/ci.yml`) runs studio pytest, pack-builder `npm test`, studio-web typecheck, and a Playwright smoke. The smoke prints `E2E_SKIP: playwright browsers unavailable` and exits 0 when Chromium cannot launch. It does not need live Comfy, S3, or OIDC.
 
 ## What this phase is not
 
 - No Hailuo / Veo / Kling adapters (documented Comfy slots only; unset stays stub)
 - Identity store is **not** embeddings and does **not** change synonym lock-diff groups
 - Builder Open in Studio never auto-generates; staging can fail (studio down / auth)
-- No full NLE timeline editor (continuity panel + EDL/playlist assemble metadata only)
+- No full NLE timeline editor (continuity panel, playlist scrubber, and EDL/playlist export are metadata plus local preview playback only)
+- No Hermes Desktop pane (separate plugin)
+- Playlist scrubber does not invent MP4s. A missing or JSON stub preview stays a stub
 - Celery is **optional** and off by default — never claimed running unless `STUDIO_JOB_WORKER=celery`
 - OIDC is **optional** and off by default — this repo does not ship a production IdP
 - Multi-org lite is **not** SaaS billing, SSO org mapping, or a multi-tenant product

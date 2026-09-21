@@ -7,7 +7,7 @@ from ..audit import MEDIA_UPLOAD, record
 from ..deps import DbDep, get_episode, touch
 from ..models import ContinuityReceipt, ENTITY_TYPES, Job, MEDIA_KINDS, MediaAsset, utcnow
 from ..packzip import safe_filename, slugify
-from ..rbac import MediaUser, ReadUser
+from ..rbac import PERM_IDENTITY, PERM_MEDIA, MediaOrIdentityUser, ReadUser, refuse_unless
 from ..schemas import MediaAssetOut
 from ..serializers import media_out
 from ..store import get_store
@@ -31,7 +31,7 @@ def list_media(episode_id: str, user: ReadUser, db: DbDep) -> list[MediaAssetOut
 )
 async def upload_media(
     episode_id: str,
-    user: MediaUser,
+    user: MediaOrIdentityUser,
     db: DbDep,
     file: UploadFile = File(...),
     kind: str = Form("other"),
@@ -45,6 +45,10 @@ async def upload_media(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="kind must be sheet, plate, costume, preview, or other.",
         )
+    if kind in {"sheet", "plate", "costume"}:
+        refuse_unless(user, PERM_IDENTITY, field="sheets/plates/costumes")
+    else:
+        refuse_unless(user, PERM_MEDIA, field="preview/other media")
     entity_kind = entity_type.strip()
     if kind == "costume" and not entity_kind:
         entity_kind = "costume"
@@ -134,10 +138,14 @@ def download_media(asset_id: str, user: ReadUser, db: DbDep):
 
 
 @router.delete("/api/media/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_media(asset_id: str, user: MediaUser, db: DbDep) -> None:
+def delete_media(asset_id: str, user: MediaOrIdentityUser, db: DbDep) -> None:
     asset = db.get(MediaAsset, asset_id)
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
+    if asset.kind in {"sheet", "plate", "costume"}:
+        refuse_unless(user, PERM_IDENTITY, field="sheets/plates/costumes")
+    else:
+        refuse_unless(user, PERM_MEDIA, field="preview/other media")
     get_episode(db, asset.episode_id, user)
     rel = asset.path
     episode = asset.episode

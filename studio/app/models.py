@@ -18,7 +18,11 @@ ROLE_PRODUCER = "producer"
 ROLE_EDITOR = "editor"
 ROLE_REVIEWER = "reviewer"
 ROLE_VIEWER = "viewer"
-ORG_ROLES = frozenset({ROLE_PRODUCER, ROLE_EDITOR, ROLE_REVIEWER, ROLE_VIEWER})
+ROLE_WRITER = "writer"
+ROLE_ART = "art"
+ORG_ROLES = frozenset(
+    {ROLE_PRODUCER, ROLE_EDITOR, ROLE_REVIEWER, ROLE_VIEWER, ROLE_WRITER, ROLE_ART}
+)
 SIGNOFF_ROLES = frozenset({ROLE_PRODUCER, ROLE_REVIEWER})
 
 MEDIA_KINDS = ("sheet", "plate", "costume", "preview", "other")
@@ -110,7 +114,7 @@ class Project(Base):
     episodes: Mapped[list["Episode"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan",
-        order_by="Episode.chapter",
+        order_by="Episode.season, Episode.sequence_index, Episode.chapter",
     )
 
 
@@ -121,7 +125,12 @@ class Episode(Base):
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     chapter: Mapped[int] = mapped_column(Integer, default=1)
+    season: Mapped[int] = mapped_column(Integer, default=1)
+    sequence_index: Mapped[int] = mapped_column(Integer, default=1)
     synopsis: Mapped[str] = mapped_column(Text, default="")
+    log_line: Mapped[str] = mapped_column(Text, default="")
+    map_notes: Mapped[str] = mapped_column(Text, default="")
+    dialogue: Mapped[str] = mapped_column(Text, default="")
     review_state: Mapped[str] = mapped_column(String(32), default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(

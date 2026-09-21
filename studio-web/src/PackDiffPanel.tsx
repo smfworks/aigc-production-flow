@@ -69,6 +69,13 @@ export function PackDiffPanel({
           <p className="hint">
             +{schedule.added?.length || 0} / −{schedule.removed?.length || 0} / ~{schedule.changed?.length || 0}
           </p>
+          {schedule.ambiguous?.length ? (
+            <p className="hint">
+              {schedule.ambiguous.length} shared kind/name/take/windows group
+              {schedule.ambiguous.length === 1 ? "" : "s"} kept as separate rows (
+              {schedule.ambiguous[0]?.matched_by || "id"}). Not collapsed.
+            </p>
+          ) : null}
           <h4>Edit list</h4>
           <p className="hint">
             +{edit.added?.length || 0} / −{edit.removed?.length || 0} / ~{edit.changed?.length || 0}

@@ -6,10 +6,19 @@ from ..identity import (
     get_identity_asset,
     identity_summary,
     link_plate,
+    set_lock_keywords,
+    unapprove_asset,
 )
 from ..models import utcnow
-from ..rbac import MediaUser, ReadUser
-from ..schemas import IdentityApprove, IdentityLink, IdentityStoreOut, MediaAssetOut
+from ..rbac import IdentityUser, ReadUser
+from ..schemas import (
+    IdentityApprove,
+    IdentityKeywords,
+    IdentityLink,
+    IdentityStoreOut,
+    IdentityUnapprove,
+    MediaAssetOut,
+)
 from ..serializers import media_out
 
 router = APIRouter(tags=["identity"])
@@ -28,7 +37,7 @@ def get_identity(episode_id: str, user: ReadUser, db: DbDep) -> IdentityStoreOut
 def approve_identity(
     episode_id: str,
     asset_id: str,
-    user: MediaUser,
+    user: IdentityUser,
     db: DbDep,
     body: IdentityApprove | None = None,
 ) -> MediaAssetOut:
@@ -52,13 +61,68 @@ def approve_identity(
 
 
 @router.post(
+    "/api/episodes/{episode_id}/identity/{asset_id}/unapprove",
+    response_model=MediaAssetOut,
+)
+def unapprove_identity(
+    episode_id: str,
+    asset_id: str,
+    user: IdentityUser,
+    db: DbDep,
+    body: IdentityUnapprove | None = None,
+) -> MediaAssetOut:
+    episode = get_episode(db, episode_id, user)
+    asset = get_identity_asset(db, episode, asset_id)
+    unapprove_asset(
+        db,
+        episode,
+        asset,
+        user_name=user.name,
+        note=(body.note if body else ""),
+    )
+    episode.updated_at = utcnow()
+    touch(episode.project)
+    db.commit()
+    db.refresh(asset)
+    return media_out(asset)
+
+
+@router.post(
+    "/api/episodes/{episode_id}/identity/{asset_id}/keywords",
+    response_model=MediaAssetOut,
+)
+def edit_identity_keywords(
+    episode_id: str,
+    asset_id: str,
+    body: IdentityKeywords,
+    user: IdentityUser,
+    db: DbDep,
+) -> MediaAssetOut:
+    episode = get_episode(db, episode_id, user)
+    asset = get_identity_asset(db, episode, asset_id)
+    set_lock_keywords(
+        db,
+        episode,
+        asset,
+        user_name=user.name,
+        lock_keywords=body.lock_keywords,
+        note=body.note,
+    )
+    episode.updated_at = utcnow()
+    touch(episode.project)
+    db.commit()
+    db.refresh(asset)
+    return media_out(asset)
+
+
+@router.post(
     "/api/episodes/{episode_id}/identity/{asset_id}/link",
     response_model=MediaAssetOut,
 )
 def link_identity_plate(
     episode_id: str,
     asset_id: str,
-    user: MediaUser,
+    user: IdentityUser,
     db: DbDep,
     body: IdentityLink,
 ) -> MediaAssetOut:

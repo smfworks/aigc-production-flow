@@ -66,7 +66,12 @@ def episode_out(episode: Episode) -> EpisodeOut:
         project_id=episode.project_id,
         title=episode.title,
         chapter=episode.chapter,
+        season=episode.season or 1,
+        sequence=episode.sequence_index or episode.chapter or 1,
         synopsis=episode.synopsis or "",
+        log_line=episode.log_line or "",
+        map_notes=episode.map_notes or "",
+        dialogue=episode.dialogue or "",
         review_state=episode.review_state,  # type: ignore[arg-type]
         latest_revision=revision_summary(latest),
         comment_count=len(episode.comments),

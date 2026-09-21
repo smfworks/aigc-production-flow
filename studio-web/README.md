@@ -1,6 +1,8 @@
-# Studio shell (Phase 8)
+# Studio shell (Phase 9)
 
-Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 8 adds the **identity store**, **pack revision diff**, and **builder auto-import** on top of org switch, an in-app **bell**, a **continuity** panel, **demo seed**, and **backup**.
+Thin Vite + React UI around the studio API. The pack builder stays in `../app/`. Phase 9 adds the **writer/art role matrix**, **episode reorder**, a **soft playlist scrubber**, and **identity unapprove / keyword edit** on top of the identity store, pack revision diff, and builder auto-import.
+
+`npm run e2e` is the Playwright smoke. It prints `E2E_SKIP: playwright browsers unavailable` and exits 0 when Chromium cannot launch.
 
 Docs: [../docs/STUDIO.md](../docs/STUDIO.md)
 

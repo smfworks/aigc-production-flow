@@ -11,6 +11,9 @@ studio/**/__pycache__/
 studio/*.egg-info/
 studio-web/node_modules/
 studio-web/dist/
+studio-web/test-results/
+studio-web/playwright-report/
+studio-web/blob-report/
 data/
 *.db
 .env
