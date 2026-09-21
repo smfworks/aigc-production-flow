@@ -1,5 +1,38 @@
-from .models import Episode, PackRevision, Project, Shot
-from .schemas import CandidateOut, ContinuityReceiptOut, EpisodeOut, PackRevisionSummary, ProjectOut, ShotOut
+from .models import Episode, MediaAsset, PackRevision, Project, Shot
+from .schemas import (
+    CandidateOut,
+    ContinuityReceiptOut,
+    EpisodeOut,
+    MediaAssetOut,
+    PackRevisionSummary,
+    ProjectOut,
+    ShotOut,
+)
+
+
+def media_out(asset: MediaAsset) -> MediaAssetOut:
+    status = asset.approval_status if asset.approval_status in {"draft", "approved"} else "draft"
+    return MediaAssetOut(
+        id=asset.id,
+        episode_id=asset.episode_id,
+        kind=asset.kind,  # type: ignore[arg-type]
+        original_name=asset.original_name,
+        stored_name=asset.stored_name,
+        content_type=asset.content_type,
+        path=asset.path,
+        entity_label=asset.entity_label or "",
+        entity_type=asset.entity_type or "",
+        notes=asset.notes or "",
+        created_by=asset.created_by,
+        created_at=asset.created_at,
+        approval_status=status,  # type: ignore[arg-type]
+        approved_by=asset.approved_by or "",
+        approved_at=asset.approved_at,
+        shot_id=asset.shot_id or None,
+        edit_row_id=asset.edit_row_id or "",
+        lock_keywords=asset.lock_keywords or "",
+        approved=status == "approved",
+    )
 
 
 def project_out(project: Project) -> ProjectOut:

@@ -159,6 +159,12 @@ def export_org_backup(db: Session, org: Organization) -> bytes:
                         "entity_type": asset.entity_type,
                         "notes": asset.notes,
                         "created_by": asset.created_by,
+                        "approval_status": asset.approval_status or "draft",
+                        "approved_by": asset.approved_by or "",
+                        "approved_at": _iso(asset.approved_at),
+                        "shot_id": asset.shot_id or "",
+                        "edit_row_id": asset.edit_row_id or "",
+                        "lock_keywords": asset.lock_keywords or "",
                         "sha256": digest,
                         "missing": missing or not bool(blob),
                     }
@@ -427,6 +433,11 @@ def restore_backup(
             entity_type=str(row.get("entity_type") or ""),
             notes=str(row.get("notes") or ""),
             created_by=str(row.get("created_by") or user_name),
+            approval_status=str(row.get("approval_status") or "draft"),
+            approved_by=str(row.get("approved_by") or ""),
+            shot_id=str(row.get("shot_id") or ""),
+            edit_row_id=str(row.get("edit_row_id") or ""),
+            lock_keywords=str(row.get("lock_keywords") or ""),
         )
         if old_id:
             asset.id = old_id

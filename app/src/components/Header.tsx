@@ -1,12 +1,12 @@
-import { studioImportUrl } from "../lib/studio";
-
 type Props = {
   onLoadSample: () => void;
   onNewPack: () => void;
   onImport: () => void;
+  onOpenStudio: () => void;
+  studioBusy?: boolean;
 };
 
-export function Header({ onLoadSample, onNewPack, onImport }: Props) {
+export function Header({ onLoadSample, onNewPack, onImport, onOpenStudio, studioBusy }: Props) {
   return (
     <header className="mast">
       <div className="mast-brand">
@@ -50,9 +50,9 @@ export function Header({ onLoadSample, onNewPack, onImport }: Props) {
         <button type="button" className="btn" onClick={onImport}>
           Import zip
         </button>
-        <a className="btn" href={studioImportUrl()} target="_blank" rel="noreferrer">
-          Open in Studio
-        </a>
+        <button type="button" className="btn" onClick={onOpenStudio} disabled={studioBusy}>
+          {studioBusy ? "Handing off…" : "Open in Studio"}
+        </button>
       </div>
     </header>
   );

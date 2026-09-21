@@ -1,5 +1,4 @@
 import { GATE_DESTINATION, type GateId, type GateResult } from "../lib/gate";
-import { studioImportUrl } from "../lib/studio";
 import { useEffect, useRef } from "react";
 
 type Props = {
@@ -12,6 +11,8 @@ type Props = {
   onCopyChecklist: () => void;
   onPrint: () => void;
   onJump: (id: GateId) => void;
+  onOpenStudio: () => void;
+  studioBusy?: boolean;
 };
 
 export function GatePanel({
@@ -24,6 +25,8 @@ export function GatePanel({
   onCopyChecklist,
   onPrint,
   onJump,
+  onOpenStudio,
+  studioBusy,
 }: Props) {
   const green = gates.filter((gate) => gate.ok).length;
   const total = gates.length || 1;
@@ -122,9 +125,9 @@ export function GatePanel({
         <button type="button" className="btn" onClick={onPrint}>
           Print pack summary
         </button>
-        <a className="btn" href={studioImportUrl()} target="_blank" rel="noreferrer">
-          Open in Studio
-        </a>
+        <button type="button" className="btn" onClick={onOpenStudio} disabled={studioBusy}>
+          {studioBusy ? "Handing off…" : "Open in Studio"}
+        </button>
       </div>
       <p className="kbd-hint">
         1–6 steps · E export · D draft · C summary · ? stills help

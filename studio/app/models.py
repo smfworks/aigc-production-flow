@@ -23,6 +23,10 @@ SIGNOFF_ROLES = frozenset({ROLE_PRODUCER, ROLE_REVIEWER})
 
 MEDIA_KINDS = ("sheet", "plate", "costume", "preview", "other")
 ENTITY_TYPES = ("character", "prop", "scene", "costume")
+IDENTITY_KINDS = ("sheet", "plate")
+APPROVAL_DRAFT = "draft"
+APPROVAL_APPROVED = "approved"
+APPROVAL_STATUSES = (APPROVAL_DRAFT, APPROVAL_APPROVED)
 SHOT_READINESS = ("draft", "candidates", "linked", "ready")
 CANDIDATE_KINDS = ("character", "prop", "scene", "costume")
 CANDIDATE_STATUSES = ("pending", "accepted", "ignored", "linked")
@@ -150,6 +154,11 @@ class Episode(Base):
         cascade="all, delete-orphan",
         order_by="MediaAsset.created_at.desc()",
     )
+    handoffs: Mapped[list["PackHandoff"]] = relationship(
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="PackHandoff.created_at.desc()",
+    )
     shots: Mapped[list["Shot"]] = relationship(
         back_populates="episode",
         cascade="all, delete-orphan",
@@ -256,6 +265,8 @@ class PresenceHeartbeat(Base):
 
 
 class MediaAsset(Base):
+    """Sheet/plate/costume/preview file. Identity sheets/plates start as draft."""
+
     __tablename__ = "media_assets"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -270,6 +281,12 @@ class MediaAsset(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    approval_status: Mapped[str] = mapped_column(String(20), default=APPROVAL_DRAFT)
+    approved_by: Mapped[str] = mapped_column(String(120), default="")
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    shot_id: Mapped[str] = mapped_column(String(36), default="")
+    edit_row_id: Mapped[str] = mapped_column(String(80), default="")
+    lock_keywords: Mapped[str] = mapped_column(Text, default="")
 
     episode: Mapped[Episode] = relationship(back_populates="media")
 
@@ -446,6 +463,24 @@ NOTIFY_KINDS = (
     NOTIFY_SIGNOFF_REQUESTED,
     NOTIFY_BLOCKER_CLEARED,
 )
+
+
+class PackHandoff(Base):
+    """Staged pack zip from the builder Open-in-Studio handoff. Not a generate."""
+
+    __tablename__ = "pack_handoffs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    episode_id: Mapped[str | None] = mapped_column(ForeignKey("episodes.id"), nullable=True)
+    filename: Mapped[str] = mapped_column(String(260), nullable=False)
+    zip_path: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    episode: Mapped[Episode | None] = relationship(back_populates="handoffs")
 
 
 class Notification(Base):

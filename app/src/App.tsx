@@ -21,6 +21,7 @@ import { packFromZipBlob } from "./lib/importZip";
 import { clonePack, emptyPack } from "./lib/pack";
 import { sigilsSample } from "./lib/sample";
 import { consumeLoadNote, initialPack, saveStoredPack } from "./lib/storage";
+import { openInStudio } from "./lib/studio";
 import { STEPS, type CapturePack, type StepId } from "./types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -128,8 +129,8 @@ export default function App() {
         downloadBlob(blob, zipFilename(pack, !asDraft && complete));
         showToast(
           asDraft
-            ? "Draft zip downloaded. Open in Studio → pick an episode → Import pack zip."
-            : "Pack zip downloaded. Open in Studio → pick an episode → Import pack zip.",
+            ? "Draft zip downloaded. Open in Studio stages the zip when the API is reachable."
+            : "Pack zip downloaded. Open in Studio stages the zip when the API is reachable.",
         );
       } catch (error) {
         showToast(error instanceof Error ? error.message : "Export failed.");
@@ -139,6 +140,19 @@ export default function App() {
     },
     [complete, pack, showToast],
   );
+
+  const openStudio = useCallback(async () => {
+    setBusy(true);
+    try {
+      const blob = await packToZipBlob(pack);
+      const result = await openInStudio(blob, zipFilename(pack, complete));
+      showToast(result.message);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Studio handoff failed.");
+    } finally {
+      setBusy(false);
+    }
+  }, [complete, pack, showToast]);
 
   const copyChecklist = useCallback(async () => {
     const text = packSummaryMarkdown(pack);
@@ -210,6 +224,8 @@ export default function App() {
         onLoadSample={loadSample}
         onNewPack={newPack}
         onImport={() => importRef.current?.click()}
+        onOpenStudio={() => void openStudio()}
+        studioBusy={busy}
       />
       <input
         ref={importRef}
@@ -279,6 +295,8 @@ export default function App() {
           onCopyChecklist={() => void copyChecklist()}
           onPrint={() => window.print()}
           onJump={jumpGate}
+          onOpenStudio={() => void openStudio()}
+          studioBusy={busy}
         />
       </div>
       <footer className="site-foot">

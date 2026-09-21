@@ -54,8 +54,10 @@ def seed_demo(
                 "kind": "sheet",
                 "entity": "lead",
                 "adapter": "stub",
+                "approval": "draft",
                 "claim": "Fixture metadata only. No likeness still was generated.",
             },
+            "lock_keywords": "lead sheet placeholder — not a likeness",
         },
         {
             "kind": "plate",
@@ -66,8 +68,10 @@ def seed_demo(
                 "kind": "plate",
                 "entity": "lead",
                 "adapter": "stub",
+                "approval": "draft",
                 "claim": "Fixture metadata only. This is not a hop-1 frame.",
             },
+            "lock_keywords": "lead plate placeholder — not a likeness",
         },
         {
             "kind": "other",
@@ -96,6 +100,8 @@ def seed_demo(
             entity_type=item["entity_type"],
             notes=FIXTURE_NOTES,
             created_by=user_name,
+            lock_keywords=item.get("lock_keywords") or "",
+            approval_status="draft",
         )
         db.add(asset)
         db.flush()

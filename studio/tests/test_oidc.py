@@ -99,7 +99,7 @@ def test_oidc_missing_config_is_honest(tmp_path, monkeypatch):
         meta = client.get("/api/meta").json()
         assert meta["auth_mode"] == "oidc"
         assert meta["oidc_configured"] is False
-        assert meta["phase"] == 7
+        assert meta["phase"] == 8
     get_settings.cache_clear()
 
 

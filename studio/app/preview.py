@@ -148,7 +148,8 @@ def generate_ok_blockers(episode: Episode) -> dict[str, Any] | None:
             "code": "preview_incomplete",
             "message": (
                 "Refuse generate-ok until each required hop-1 is preview-watched with a "
-                "continuity receipt (duration/frames + still-vs-lock). An NG reason blocks spend."
+                "continuity receipt (duration/frames + still-vs-lock). An NG reason blocks spend. "
+                "Live adapters (comfy-h3 / comfy-qwen / webhook / cli) must not skip this protocol."
             ),
             "missing": missing,
         }
@@ -424,21 +425,34 @@ def plates_bound_for_shot(
             break
     mode = str((take_card or {}).get("hop1Mode") or "").strip().lower()
     plate = str((take_card or {}).get("hop1Plate") or "")
+    from .identity import approved_identity, is_approved
+
+    approved_plates = approved_identity(media, kind="plate")
     if mode == "i2va":
         if is_real_still_file(plate):
             return True, "pack plate file"
-        labels = {(asset.entity_label or "").strip().lower() for asset in media if asset.kind == "plate"}
+        labels = {(asset.entity_label or "").strip().lower() for asset in approved_plates}
         entities = [part.strip().lower() for part in (shot.entities or "").split(",") if part.strip()]
         take_key = (shot.take or "").strip().lower()
+        if any((asset.shot_id or "") == shot.id for asset in approved_plates):
+            return True, "approved identity plate (shot)"
+        if any(
+            (asset.edit_row_id or "") and (asset.edit_row_id or "") == (shot.edit_row_id or "")
+            for asset in approved_plates
+        ):
+            return True, "approved identity plate (window)"
         if take_key and any(take_key in label for label in labels):
-            return True, "studio plate media (take)"
+            return True, "approved identity plate (take)"
         if any(entity and any(entity in label for label in labels) for entity in entities):
-            return True, "studio plate media (entity)"
-        for asset in media:
-            if asset.kind == "plate" and (asset.entity_type or "") in {"character", "prop", "scene"}:
+            return True, "approved identity plate (entity)"
+        for asset in approved_plates:
+            if (asset.entity_type or "") in {"character", "prop", "scene"}:
                 if (asset.entity_label or "").strip().lower() in entities:
-                    return True, "studio plate media"
-        return False, "I2VA hop-1 needs a bound plate (pack still or studio media)."
+                    return True, "approved identity plate"
+        draft_plates = [asset for asset in media if asset.kind == "plate" and not is_approved(asset)]
+        if draft_plates:
+            return False, "I2VA hop-1 needs an *approved* identity plate (draft plates do not count)."
+        return False, "I2VA hop-1 needs a bound plate (pack still or approved identity plate)."
     if mode == "t2v":
         if still_ok(plate) and is_none_still(plate):
             return True, "T2V none + why"

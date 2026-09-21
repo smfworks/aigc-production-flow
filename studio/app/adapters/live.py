@@ -64,13 +64,23 @@ def _fallback(ctx: JobContext, wanted: str) -> AdapterResult:
     return result
 
 
-def _payload(ctx: JobContext) -> dict[str, Any]:
+def _payload(ctx: JobContext, slot_id: str | None = None) -> dict[str, Any]:
+    from .catalog import slot_for
+
+    slot = slot_for(slot_id)
     return {
         "job_id": ctx.job_id,
         "job_type": ctx.job_type,
         "episode_id": ctx.episode_id,
         "shot_id": ctx.shot_id,
         "payload": ctx.payload,
+        "window": {
+            "window_s": slot.window_s,
+            "frames": slot.frames,
+            "fps": slot.fps,
+            "canvas": slot.canvas,
+            "hop1_watch_required": slot.hop1_watch_required,
+        },
     }
 
 
@@ -151,7 +161,7 @@ def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
         try:
             response = httpx.post(
                 url,
-                json=_payload(ctx),
+                json=_payload(ctx, slot),
                 timeout=settings.adapter_timeout_seconds,
             )
             response.raise_for_status()
@@ -166,7 +176,17 @@ def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
             **(result.receipt or {}),
             "requested_slot": slot,
             "transport": "webhook",
+            "hop1_watch_required": True,
         }
+        from .catalog import slot_for
+
+        meta = slot_for(slot)
+        if meta.window_s:
+            result.receipt.setdefault("window_s", meta.window_s)
+            result.receipt.setdefault("frames", meta.frames)
+            result.receipt.setdefault("fps", meta.fps)
+        if meta.canvas:
+            result.receipt.setdefault("canvas", meta.canvas)
         return result
     if transport == "cli":
         command = (settings.adapter_cli or "").strip()
@@ -185,7 +205,7 @@ def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
         try:
             completed = subprocess.run(  # noqa: S603 — operator-configured local hook
                 args,
-                input=json.dumps(_payload(ctx)),
+                input=json.dumps(_payload(ctx, slot)),
                 capture_output=True,
                 text=True,
                 timeout=settings.adapter_timeout_seconds,
@@ -208,6 +228,16 @@ def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
             **(result.receipt or {}),
             "requested_slot": slot,
             "transport": "cli",
+            "hop1_watch_required": True,
         }
+        from .catalog import slot_for
+
+        meta = slot_for(slot)
+        if meta.window_s:
+            result.receipt.setdefault("window_s", meta.window_s)
+            result.receipt.setdefault("frames", meta.frames)
+            result.receipt.setdefault("fps", meta.fps)
+        if meta.canvas:
+            result.receipt.setdefault("canvas", meta.canvas)
         return result
     return _fallback(ctx, slot)

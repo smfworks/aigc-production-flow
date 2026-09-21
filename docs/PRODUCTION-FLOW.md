@@ -111,18 +111,26 @@ OIDC and Celery are **optional in Phase 6** and **off by default**. They are not
 - **Demo seed** (`POST /api/demo/seed`) from a vertical template with fixture media metadata (no likeness, no MP4 claims)
 - **Backup/restore** — org/project/episode metadata + media manifest (paths/hashes). Restore dry-run then apply. Pack revisions are never deleted
 
+**Phase 8 (this repo, identity + pack diff + auto-import + measured Comfy hooks):**
+
+- **Visual identity store** — approved sheets and per-window plates as assets linked to characters/props/scenes and to shots/windows. Draft → approved (who/when). Only approved sheets/plates count for lock-diff extras and I2VA generate readiness. Not embeddings. Synonym lock-diff groups unchanged. Fixture/placeholder metadata in tests/seed — no likeness stills in the public tree
+- **Pack revision diff** — API diffs two `PackRevision`s or current pack vs a candidate import (gates, entity-schedule, edit-list, identity keywords). Studio-web shows the structured diff before overwrite; Confirm applies. Audit `pack.diff` / `pack.import`
+- **Builder → studio auto-import** — Open in Studio stages the zip (`POST /api/handoffs`) when `VITE_STUDIO_URL` is set (CORS/token documented). Pick project/episode → import uses the handed-off zip (no re-choose file). Failure modes: studio down, auth. Never auto-generate
+- **Measured live Comfy hooks** — `comfy-h3` declares hop-1 **10.125 s / 243 f @ 24 fps**; `comfy-qwen` declares canvas **1344×768**. Health/dry-run include config schema validation. Unset env is **not live** and still resolves to stub. Hop-1 watch protocol remains required; live adapters must not skip it. Stub remains default. No Hailuo/Veo/Kling in this phase
+
 v2 leftover (platform, do not pretend we have it):
 
-- visual identity store (approved sheet + per-window plates), not a pasted wardrobe paragraph
 - GPU queue / one engine adapter at a time per GPU (ops pin)
 - multi-tenant SaaS billing / SSO org mapping
+- full writer/art/editor/producer matrix
+- episode/season order, soft playlist scrubber, Hermes Desktop pane, Playwright E2E
 
 **Phase 6 (this repo, production readiness):**
 
 - Optional **Celery** (`STUDIO_JOB_WORKER=celery` + Redis broker). Default remains the in-process thread worker. Never run both against the same SQLite file.
 - Optional **OIDC** (`STUDIO_AUTH_MODE=oidc` + issuer JWKS). Off by default. Not a production IdP.
 - **Review sign-off** required before `generate-ok` (reviewer or producer; producer override audited)
-- Pack ↔ studio **deep links** and builder **Open in Studio** import handoff (`?import=`)
+- Pack ↔ studio **deep links** and builder **Open in Studio** import handoff (`?import=` hint; Phase 8 upgrades this to a staged zip)
 - GitHub Actions CI: studio pytest, pack-builder `npm test`, studio-web typecheck
 
 **Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). Auth is a local-dev API token plus optional reverse-proxy / optional OIDC. Operator path: [STUDIO.md](STUDIO.md). Auth: [AUTH.md](AUTH.md).

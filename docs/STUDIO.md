@@ -1,6 +1,6 @@
-# Studio spine (Phase 7)
+# Studio spine (Phase 8)
 
-The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, review, **reviewer/producer sign-off**, comments, sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC**, **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, optional **OIDC**, **multi-org lite**, **in-app notifications**, **ops probes**, a **continuity panel**, **demo seed**, and **backup/restore**.
+The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, **pack revision diff**, review, **reviewer/producer sign-off**, comments, **visual identity store** (approved sheets + per-window plates), sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC**, **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, optional **OIDC**, **multi-org lite**, **in-app notifications**, **ops probes**, a **continuity panel**, **demo seed**, **backup/restore**, and **builder Open in Studio auto-import**.
 
 It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is opt-in and off by default.** Celery is opt-in and off by default (`STUDIO_JOB_WORKER=thread`). **Multi-org lite is membership isolation, not SaaS billing, and not SSO org mapping.**
 
@@ -43,20 +43,21 @@ Do not treat the token as multi-tenant SaaS security. **Multi-org lite** lets a 
 - Media (sheets/plates/costumes/**hop-1 previews**) and stored pack zips: `data/media/` (gitignored) via the **local** media adapter. Do not commit likeness stills or engine MP4s. Preview MP4s are allowed **on disk** with `kind=preview` only.
 - Optional S3/MinIO: `STUDIO_MEDIA_BACKEND=s3` plus `STUDIO_S3_BUCKET` (and `STUDIO_S3_ENDPOINT` for MinIO). Incomplete config **stays local** and `/api/meta` says so. Credentials stay in the process environment, not git. Install `pip install -e "./studio[s3]"` for boto3.
 
-## Operator path (Phase 7)
+## Operator path (Phase 8)
 
 1. Start API + shell + builder: `./scripts/dev-studio.sh all` **or** `docker compose -f docker-compose.studio.yml up --build`
 2. Confirm chrome shows your role (`producer` for the seeded local user) on the default org
 3. **Create org** → switch the active org in chrome → add a member on org A who cannot see org B
 4. Empty org: **Seed demo episode** (short-drama-ep template + JSON fixture metadata — no likeness, no MP4)
 5. **Members**: add a colleague as `viewer` → they cannot enqueue → promote to `editor` → they can comment on a shot
-6. Open an episode: presence chips, **Continuity** panel (entity-schedule + lock-diff, red gates, deep-link to the shot board — not an NLE)
-7. Fill Script → Assets → Storyboard → Preview in the builder; **Export pack zip**. **Open in Studio** (`VITE_STUDIO_URL`, default http://localhost:5174) lands on `?import=1#/projects`
-8. Confirm candidates, set shots `ready` (prepared, not generating)
-9. Enqueue stub jobs. Bell shows **job succeeded/failed**. Optional `STUDIO_NOTIFY_WEBHOOK_URL` POSTs the same JSON when set; unset means in-app only (`/api/meta` reports `notify_webhook_configured`)
-10. Hop-1 preview desk → shot comments (`@name` mentions) → preview-watched → a **reviewer or producer signs off** → `generate-ok`
-11. **Export backup zip** (org/project/episode metadata + media manifest hashes). Restore dry-run, then apply. **Pack revisions are never deleted.**
-12. `/healthz` liveness, `/readyz` DB + worker mode, `/metrics` Prometheus text (optional scrape — not a SaaS APM)
+6. Open an episode: presence chips, **Continuity** panel (entity-schedule + lock-diff, red gates, deep-link to the shot board **and identity store** — not an NLE)
+7. **Identity store**: upload a sheet/plate (fixture JSON is fine in public trees — no likeness stills) → **Approve** (who/when). Link a plate to a shot/window. Draft assets do **not** count for lock-diff / I2VA generate readiness
+8. Fill Script → Assets → Storyboard → Preview in the builder; **Export pack zip** or **Open in Studio**. When `VITE_STUDIO_URL` is set, Open in Studio stages the zip (`POST /api/handoffs`, CORS + token documented below). Pick a project/episode → review the **pack revision diff** → Confirm import. The file is not re-chosen when the handoff carried the zip. **Never auto-generate**
+9. Confirm candidates, set shots `ready` (prepared, not generating)
+10. Enqueue stub jobs. Bell shows **job succeeded/failed**. Optional `STUDIO_NOTIFY_WEBHOOK_URL` POSTs the same JSON when set; unset means in-app only (`/api/meta` reports `notify_webhook_configured`)
+11. Hop-1 preview desk → shot comments (`@name` mentions) → preview-watched → a **reviewer or producer signs off** → `generate-ok`
+12. **Export backup zip** (org/project/episode metadata + media manifest hashes). Restore dry-run, then apply. **Pack revisions are never deleted.**
+13. `/healthz` liveness, `/readyz` DB + worker mode, `/metrics` Prometheus text (optional scrape — not a SaaS APM)
 
 ## Compose deploy pack
 
@@ -90,17 +91,77 @@ The older `docker-compose.yml` is still API-only.
 
 ## Adapters + health
 
-Registry: `stub` (default, not live) plus documented slots `comfy-h3` (clip), `comfy-qwen` (still), `webhook`, `cli`. Per-project still/clip default. Unset live hooks **always** resolve to stub.
+Registry: `stub` (default, not live) plus documented slots `comfy-h3` (clip), `comfy-qwen` (still), `webhook`, `cli`. Per-project still/clip default. Unset live hooks **always** resolve to stub and report **not live**.
 
 | Env | Default | Notes |
 |---|---|---|
 | `STUDIO_STILL_ADAPTER` | `stub` | `stub` \| `comfy-qwen` \| `webhook` \| `cli` |
 | `STUDIO_CLIP_ADAPTER` | `stub` | `stub` \| `comfy-h3` \| `webhook` \| `cli` |
-| `STUDIO_ADAPTER_WEBHOOK_URL` | empty | Transport for live slots. Unset → stub only |
+| `STUDIO_ADAPTER_WEBHOOK_URL` | empty | Transport for live slots. Unset → **not live**, stub only |
 | `STUDIO_ADAPTER_CLI` | empty | `{job_id} {job_type} {episode_id} {shot_id}` template; JSON on stdin |
-| `STUDIO_ADAPTER_TIMEOUT_SECONDS` | `60` | |
+| `STUDIO_ADAPTER_TIMEOUT_SECONDS` | `60` | Must be > 0 (schema-validated) |
 
-`GET /api/adapters` lists slots + health. `GET /api/adapters/{id}/health` and `POST /api/adapters/{id}/dry-run` ask: config present? reachable? They do **not** enqueue a generate. Stub is always ok. A configured live slot that is down **blocks enqueue** (409 `adapter_unhealthy`). Unset hooks still fall back to stub.
+Measured window metadata (declared on the slot, not a generate):
+
+| Slot | Kind | Declared window / canvas | Hop-1 watch |
+|---|---|---|---|
+| `comfy-h3` | clip | **10.125 s / 243 f @ 24 fps** (measured hop-1 default) | required — live adapters must not skip |
+| `comfy-qwen` | still | canvas **1344×768** | hop-1 watch still required before generate-ok |
+| `stub` | both | same numbers on fixture receipts | required |
+
+`GET /api/adapters` lists slots + health + window metadata. `GET /api/adapters/{id}/health` and `POST /api/adapters/{id}/dry-run` ask: config present? schema valid? reachable? They do **not** enqueue a generate. Stub is always ok. Unset hooks report `not_live` and enqueue still falls back to stub. A configured live slot that is down **blocks enqueue** (409 `adapter_unhealthy`). This PR does **not** add Hailuo / Veo / Kling.
+
+Point a live Comfy box (optional):
+
+```bash
+export STUDIO_STILL_ADAPTER=comfy-qwen
+export STUDIO_CLIP_ADAPTER=comfy-h3
+export STUDIO_ADAPTER_WEBHOOK_URL="http://127.0.0.1:8188/studio-hook"   # or
+export STUDIO_ADAPTER_CLI="/path/to/comfy-hook.sh {job_id} {job_type} {episode_id} {shot_id}"
+```
+
+Honesty labels in the studio adapter strip: **ok** (stub), **not live** (hook unset), **live**, or **down**. Studio chrome never claims H3/Qwen ran unless a live hook is configured *and* reachable.
+
+## Visual identity store
+
+Sheets (character/prop bible) and per-window plates are first-class media with `draft → approved` (who / when). Link a plate to a shot / edit-list window. Only **approved** sheets/plates count for lock-diff extras and I2VA plate-bind / generate readiness. Synonym lock-diff groups are unchanged (explicit list, not embeddings). Continuity panel deep-links into `#/projects/<id>/episodes/<id>/identity/<assetId>`.
+
+Public trees use fixture/placeholder JSON metadata. Do not commit likeness stills.
+
+`GET /api/episodes/{id}/identity` · `POST …/identity/{assetId}/approve` · `POST …/identity/{assetId}/link`
+
+## Pack revision diff
+
+Diff two stored `PackRevision`s, or the current episode pack vs a candidate import (zip or builder handoff). Compares gates, entity-schedule, edit-list, and identity keywords. Studio-web shows the structured diff **before** overwrite; Confirm applies. Audit: `pack.diff` (preview) and `pack.import` (apply).
+
+`GET /api/episodes/{id}/revisions/{left}/diff/{right}` · `POST /api/episodes/{id}/pack/diff`
+
+## Pack ↔ studio bridge (auto-import)
+
+Studio-web deep links (shareable):
+
+- `#/projects/<projectId>`
+- `#/projects/<projectId>/episodes/<episodeId>`
+- `#/projects/<projectId>/episodes/<episodeId>/shots/<shotId>`
+- `#/projects/<projectId>/episodes/<episodeId>/identity/<assetId>`
+
+Handoff from the pack builder: **Open in Studio** (`VITE_STUDIO_URL`, default http://localhost:5174) stages the current pack zip:
+
+| Builder env | Default | Role |
+|---|---|---|
+| `VITE_STUDIO_URL` | `http://localhost:5174` | Studio shell to open |
+| `VITE_STUDIO_API_URL` | `http://localhost:8000` (derived from Vite 5174) | FastAPI for `POST /api/handoffs` |
+| `VITE_STUDIO_TOKEN` | local-dev default on localhost only | Must match `STUDIO_API_TOKEN`. Leave empty off-localhost |
+
+CORS: `STUDIO_CORS_ORIGINS` already includes `http://localhost:5173`. Studio-web consumes `?handoff=<id>` after you pick a project/episode — import does **not** re-ask for the file. You still Confirm the pack diff. Query `?import=1` remains a hint if staging failed.
+
+Failure modes (documented in the builder toast — never claimed as auto-generate):
+
+- **Studio down / CORS**: zip is not staged; export the zip and Import pack zip by hand
+- **Auth 401/403**: set `VITE_STUDIO_TOKEN` to the same local-dev token the studio API expects
+- **Expired / already imported handoff**: stage a new zip from Open in Studio
+
+`POST /api/handoffs` · `GET /api/handoffs/{id}` · `POST /api/episodes/{id}/pack` with `handoff_id`
 
 ## Presence + comments
 
@@ -118,7 +179,7 @@ This never claims a cloud bill was paid.
 
 ## Audit + retention
 
-Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `media.upload`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
+Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `pack.diff`, `media.upload`, `identity.approve`, `identity.link`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
 
 Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed (producer). `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.**
 
@@ -146,27 +207,16 @@ Types: `still-sheet | still-plate | clip-hop1 | clip-extend | batch-precheck`
 
 Default worker: in-process **thread** (`STUDIO_JOB_WORKER=thread`). Optional `celery` mode uses Redis (`STUDIO_CELERY_BROKER_URL`) and Celery tasks against the same `Job` rows (`pip install -e "./studio[celery]"`). Tests use `inline` or `off`; the celery path is mocked unless Redis is available.
 
-## Review gate matrix (Phase 6)
+## Review gate matrix (Phase 6, still)
 
 Before `generate-ok`:
 
 1. Latest pack revision: all gates green
-2. Each required hop-1: preview-watched continuity receipt, no NG reason
+2. Each required hop-1: preview-watched continuity receipt, no NG reason — **live adapters (comfy-h3 / comfy-qwen / webhook / cli) must not skip this**
 3. At least one **sign-off** record from a `reviewer` or `producer` (who / when / note)
+4. I2VA plate bind uses **approved** identity plates only (draft sheets/plates do not count)
 
 `POST /api/episodes/{id}/review/signoff`. Viewers cannot sign off. Editors cannot sign off. A producer may stamp `generate-ok` with `{ "override": true }` — audited as `review.override`. Sign-off itself is `review.signoff`.
-
-## Pack ↔ studio bridge
-
-Studio-web deep links (shareable):
-
-- `#/projects/<projectId>`
-- `#/projects/<projectId>/episodes/<episodeId>`
-- `#/projects/<projectId>/episodes/<episodeId>/shots/<shotId>`
-
-Copy-link controls live on the project and episode panels.
-
-Handoff from the pack builder: **Export pack zip** (still a zip) → **Open in Studio** (`VITE_STUDIO_URL`, default http://localhost:5174) opens `/?import=1#/projects`. Pick a project/episode and **Import pack zip**. Query `?import=` is an optional hint, not an auto-upload.
 
 ## Hop-1 preview desk
 
@@ -176,13 +226,18 @@ Required hop-1 = first edit-list row of each take with `hop1Planned`. `generate-
 
 OpenAPI is canonical: http://localhost:8000/docs
 
-Phase 2–6 surface still applies. Phase 7 adds:
+Phase 2–7 surface still applies. Phase 8 adds:
 
 | Area | Methods |
 |---|---|
+| Identity | `GET /api/episodes/{id}/identity`, `POST …/identity/{assetId}/approve`, `POST …/identity/{assetId}/link` |
+| Pack diff | `GET /api/episodes/{id}/revisions/{left}/diff/{right}`, `POST /api/episodes/{id}/pack/diff` |
+| Handoff | `POST /api/handoffs`, `GET /api/handoffs/{id}`; import accepts `handoff_id` |
+| Adapters | catalog/health include window metadata, `not_live`, `schema_ok`, `hop1_watch_required` |
+| Meta | `phase: 8` |
 | Orgs | `GET/POST /api/orgs`, `GET /api/orgs/{id}`; members stay `…/members`. Header `X-Org-Id` selects the active org |
 | Notifications | `GET /api/notifications`, `POST /api/notifications/read-all`, `POST /api/notifications/{id}/read` |
-| Continuity | `GET /api/episodes/{id}/continuity` (read/visualize + navigate, not an NLE) |
+| Continuity | `GET /api/episodes/{id}/continuity` (read/visualize + navigate, not an NLE; identity deep-links) |
 | Demo | `POST /api/demo/seed` |
 | Backup | `GET /api/backup`, `POST /api/backup/restore` (`dry_run` + `confirm=restore`) |
 | Ops | `/healthz`, `/readyz`, `/metrics` (Prometheus text). `/api/meta` has `notify_webhook_configured`, `multi_org` |
@@ -202,6 +257,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs those three jobs on every pull 
 
 ## What this phase is not
 
+- No Hailuo / Veo / Kling adapters (documented Comfy slots only; unset stays stub)
+- Identity store is **not** embeddings and does **not** change synonym lock-diff groups
+- Builder Open in Studio never auto-generates; staging can fail (studio down / auth)
 - No full NLE timeline editor (continuity panel + EDL/playlist assemble metadata only)
 - Celery is **optional** and off by default — never claimed running unless `STUDIO_JOB_WORKER=celery`
 - OIDC is **optional** and off by default — this repo does not ship a production IdP

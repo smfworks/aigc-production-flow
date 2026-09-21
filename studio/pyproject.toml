@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aigc-studio"
-version = "0.7.0"
-description = "Phase 7 studio spine for the AIGC production flow (multi-org lite, notifications, ops visibility)."
+version = "0.8.0"
+description = "Phase 8 studio spine for the AIGC production flow (identity store, pack diff, builder auto-import, measured Comfy hooks)."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

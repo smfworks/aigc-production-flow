@@ -122,8 +122,13 @@ def collect_lock_texts(pack: dict[str, Any]) -> list[dict[str, str]]:
     return rows
 
 
-def lock_diff_problems(pack: dict[str, Any]) -> list[str]:
+def lock_diff_problems(
+    pack: dict[str, Any], extra_texts: list[dict[str, str]] | None = None
+) -> list[str]:
+    """Synonym groups stay explicit (not embeddings). extra_texts is identity-store only."""
     texts = collect_lock_texts(pack)
+    if extra_texts:
+        texts.extend(extra_texts)
     problems: list[str] = []
     for i, left in enumerate(texts):
         for right in texts[i + 1 :]:
