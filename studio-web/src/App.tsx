@@ -439,10 +439,9 @@ function EpisodeView({
         ← Episodes
       </button>
       <div className="panel-head">
-        <h2>
-          Ch. {episode?.chapter ?? "—"} · {episode?.title ?? "Episode"}
-        </h2>
+        <h2>{episode?.title ?? "Episode"}</h2>
         <p>
+          Chapter {episode?.chapter ?? "—"}.{" "}
           {episode?.synopsis || "Import a pack zip from the builder. generate-ok stays locked until nine green."}
         </p>
       </div>

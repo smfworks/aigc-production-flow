@@ -279,11 +279,13 @@ a.btn {
 }
 
 .gate-ok {
-  border-color: rgba(52, 211, 153, 0.35);
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.08);
 }
 
 .gate-bad {
-  border-color: rgba(244, 63, 94, 0.4);
+  border-color: rgba(244, 63, 94, 0.55);
+  background: rgba(244, 63, 94, 0.1);
 }
 
 .gates em {
@@ -306,6 +308,21 @@ a.btn {
 
 .thread p {
   margin: 4px 0 0;
+  flex-basis: 100%;
+}
+
+.thread li,
+.media-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+}
+
+.thread span,
+.media-list span {
+  color: var(--muted);
+  font-size: 0.9em;
 }
 
 .builder-frame {
