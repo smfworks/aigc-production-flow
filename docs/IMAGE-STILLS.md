@@ -1,5 +1,7 @@
 # Still factory → clip factory
 
+This is **Asset setup** in the production flow ([PRODUCTION-FLOW.md](PRODUCTION-FLOW.md)). The clip adapter we measured first is MiniMax H3; the rule is engine-agnostic: a sheet is not a plate.
+
 Long-form H3 does not remember the last clip. A pasted wardrobe paragraph is not a face. Identity holds **inside** a Motion-Context take. At `cut` and `fadeblack` it drifts until a **plate still** conditions hop-1.
 
 This file is the image half of the capture bible. Serving pins stay in SMF ops. Prompt field syntax stays in MiniMax `h3-prompt-writing`. Do not queue either Spark until the nine gates in the README are green **and** every hop-1 that must hold a face or prop has a plate (or explicit `none` + why).

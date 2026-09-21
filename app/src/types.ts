@@ -218,12 +218,12 @@ export const DEFAULT_SMOKE_NOTES =
   "One hop-1 per take — I2VA if a plate exists, else T2V — watched before hopping. continue = plate on hop-1 only; hop 2+ is Motion-Context latent (no new Qwen still). cut / fadeblack = new plate → I2VA hop-1. Chorus independent takes = independent plates → I2VA.";
 
 export const STEPS = [
-  { id: "pack", n: 1, label: "Pack" },
-  { id: "map", n: 2, label: "Map" },
-  { id: "takes", n: 3, label: "Takes" },
-  { id: "edit", n: 4, label: "Edit list" },
-  { id: "cards", n: 5, label: "Cards" },
-  { id: "smoke", n: 6, label: "Smoke + log" },
+  { id: "pack", n: 1, label: "Log line", stage: "Script analysis" },
+  { id: "map", n: 2, label: "Beats", stage: "Script analysis" },
+  { id: "cards", n: 3, label: "Assets", stage: "Asset setup" },
+  { id: "takes", n: 4, label: "Takes", stage: "Storyboard" },
+  { id: "edit", n: 5, label: "Boards", stage: "Storyboard" },
+  { id: "smoke", n: 6, label: "Preview", stage: "Video preview" },
 ] as const;
 
 export type StepId = (typeof STEPS)[number]["id"];

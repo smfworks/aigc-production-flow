@@ -11,20 +11,24 @@ export function Header({ onLoadSample, onNewPack, onImport }: Props) {
         <div className="mark" aria-hidden="true" />
         <div>
           <p className="eyebrow">SMF Works · Human-AI lab</p>
-          <h1>H3 Capture Pack</h1>
+          <h1>AIGC Production Flow</h1>
         </div>
       </div>
       <p className="lede">
-        Two Sparks, two jobs. Still factory is Qwen-Image-2.1 at native{" "}
-        <strong>1344×768</strong> (do not stretch 1024²). Clip factory is MiniMax
-        H3 + Motion-Context. A <strong>sheet</strong> is the character/prop bible;
-        a <strong>plate</strong> is hop-1 / cut / fadeblack{" "}
-        <code>first_frame</code>. This builder encodes the nine-gate bible — it
-        does not run either engine, and it does not export MP4s.
+        Script analysis → asset setup → storyboard → video preview. A{" "}
+        <strong>sheet</strong> is the character/prop bible; a{" "}
+        <strong>plate</strong> is the first frame of this window. Native still
+        canvas <strong>1344×768</strong> (do not stretch 1024²). This builder
+        encodes the nine-gate production pack — it does not run a video engine,
+        and it does not export MP4s.
       </p>
       <p className="lede lede-sub">
-        Procedure:{" "}
-        <a href="https://github.com/smfworks/h3-longform-capture/blob/main/docs/IMAGE-STILLS.md">
+        Flow:{" "}
+        <a href="https://github.com/smfworks/aigc-production-flow/blob/main/docs/PRODUCTION-FLOW.md">
+          docs/PRODUCTION-FLOW.md
+        </a>
+        {" · "}
+        <a href="https://github.com/smfworks/aigc-production-flow/blob/main/docs/IMAGE-STILLS.md">
           docs/IMAGE-STILLS.md
         </a>
         {" · "}
