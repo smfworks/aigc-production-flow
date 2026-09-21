@@ -114,10 +114,10 @@ export const api = {
   markNotificationsRead: () => request<{ ok: boolean; marked: number }>("/api/notifications/read-all", { method: "POST" }),
   continuity: (episodeId: string) => request<ContinuitySummary>(`/api/episodes/${episodeId}/continuity`),
   identity: (episodeId: string) => request<IdentityStore>(`/api/episodes/${episodeId}/identity`),
-  approveIdentity: (episodeId: string, assetId: string, note = "") =>
+  approveIdentity: (episodeId: string, assetId: string, note = "", lockKeywords = "") =>
     request<MediaAsset>(`/api/episodes/${episodeId}/identity/${assetId}/approve`, {
       method: "POST",
-      body: JSON.stringify({ note }),
+      body: JSON.stringify({ note, lock_keywords: lockKeywords }),
     }),
   linkIdentityPlate: (episodeId: string, assetId: string, shotId: string) =>
     request<MediaAsset>(`/api/episodes/${episodeId}/identity/${assetId}/link`, {

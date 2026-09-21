@@ -17,6 +17,7 @@ from .models import (
     APPROVAL_APPROVED,
     APPROVAL_DRAFT,
     APPROVAL_STATUSES,
+    ENTITY_TYPES,
     IDENTITY_KINDS,
     Episode,
     MediaAsset,
@@ -66,7 +67,7 @@ def identity_lock_texts(episode: Episode) -> list[dict[str, str]]:
         if not text:
             continue
         kind = (asset.entity_type or "").strip() or "character"
-        if kind not in {"character", "prop"}:
+        if kind not in {"character", "prop", "scene"}:
             kind = "character"
         name = (asset.entity_label or "").strip() or asset.original_name
         rows.append(
@@ -104,22 +105,42 @@ def approve_asset(
     *,
     user_name: str,
     note: str = "",
+    lock_keywords: str | None = None,
+    entity_label: str | None = None,
+    entity_type: str | None = None,
 ) -> MediaAsset:
     if not is_identity_kind(asset.kind):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only sheets and plates enter the identity store.",
         )
+    if entity_type is not None:
+        kind = entity_type.strip()
+        if kind and kind not in ENTITY_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="entity_type must be character, prop, scene, costume, or empty.",
+            )
+        asset.entity_type = kind
+    if entity_label is not None:
+        asset.entity_label = entity_label.strip()
+    keywords_changed = False
+    if lock_keywords is not None:
+        next_keywords = lock_keywords.strip()
+        keywords_changed = next_keywords != (asset.lock_keywords or "")
+        asset.lock_keywords = next_keywords
     status_value = (asset.approval_status or APPROVAL_DRAFT).strip().lower()
     if status_value not in APPROVAL_STATUSES:
         status_value = APPROVAL_DRAFT
-    if status_value != APPROVAL_APPROVED:
+    newly_approved = status_value != APPROVAL_APPROVED
+    if newly_approved:
         asset.approval_status = APPROVAL_APPROVED
         asset.approved_by = user_name
         asset.approved_at = utcnow()
         if note.strip():
             extra = f"approved: {note.strip()}"
             asset.notes = f"{asset.notes}\n{extra}".strip() if asset.notes else extra
+    if newly_approved or keywords_changed:
         record(
             db,
             actor=user_name,

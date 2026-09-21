@@ -34,7 +34,9 @@ BACKUP_VERSION = 1
 KEEP_REVISIONS_NOTE = (
     "Pack revisions are preserved. Restore apply never deletes an existing "
     "PackRevision row. Missing revisions are added. Media files are restored "
-    "from the zip when present; otherwise only the manifest path/hash is stored."
+    "from the zip when present. A manifest path is not rebound — that would "
+    "point at another org's store object. Ids that already belong to another "
+    "org are refused."
 )
 HONESTY = (
     "Metadata + media manifest backup. Not a CapCut project, not an NLE, not a "
@@ -213,6 +215,39 @@ def parse_backup(data: bytes) -> dict[str, Any]:
     return manifest
 
 
+def _row_id(row: Any) -> str:
+    if not isinstance(row, dict):
+        return ""
+    return str(row.get("id") or "")
+
+
+def cross_org_conflicts(db: Session, org: Organization, manifest: dict[str, Any]) -> list[str]:
+    """Ids that already belong to a different organization. Restore must not write them."""
+    conflicts: list[str] = []
+    for row in manifest.get("projects") or []:
+        existing = db.get(Project, _row_id(row))
+        if existing is not None and existing.organization_id != org.id:
+            conflicts.append(f"project {existing.id}")
+    for row in manifest.get("episodes") or []:
+        existing = db.get(Episode, _row_id(row))
+        project = existing.project if existing is not None else None
+        if existing is not None and (project is None or project.organization_id != org.id):
+            conflicts.append(f"episode {existing.id}")
+    for row in manifest.get("pack_revisions") or []:
+        existing = db.get(PackRevision, _row_id(row))
+        episode = existing.episode if existing is not None else None
+        project = episode.project if episode is not None else None
+        if existing is not None and (project is None or project.organization_id != org.id):
+            conflicts.append(f"pack revision {existing.id}")
+    for row in manifest.get("media_manifest") or []:
+        existing = db.get(MediaAsset, _row_id(row))
+        episode = existing.episode if existing is not None else None
+        project = episode.project if episode is not None else None
+        if existing is not None and (project is None or project.organization_id != org.id):
+            conflicts.append(f"media {existing.id}")
+    return conflicts
+
+
 def _plan(db: Session, org: Organization, manifest: dict[str, Any]) -> dict[str, Any]:
     projects = manifest.get("projects") if isinstance(manifest.get("projects"), list) else []
     episodes = manifest.get("episodes") if isinstance(manifest.get("episodes"), list) else []
@@ -281,6 +316,7 @@ def _plan(db: Session, org: Organization, manifest: dict[str, Any]) -> dict[str,
         "would_keep_revisions": would_keep_revisions,
         "would_create_media": would_create_media,
         "would_skip_media": would_skip_media,
+        "cross_org_conflicts": cross_org_conflicts(db, org, manifest),
         "dry_run": True,
         "applied": False,
     }
@@ -296,6 +332,15 @@ def restore_backup(
 ) -> dict[str, Any]:
     manifest = parse_backup(data)
     plan = _plan(db, org, manifest)
+    conflicts = list(plan.get("cross_org_conflicts") or [])
+    if conflicts and not dry_run:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Backup ids belong to another organization. Cross-org restore is refused. "
+                + "; ".join(conflicts[:8])
+            ),
+        )
     if dry_run:
         return plan
     files: dict[str, bytes] = manifest.get("_files") if isinstance(manifest.get("_files"), dict) else {}
@@ -353,6 +398,12 @@ def restore_backup(
         old_id = str(row.get("id") or "")
         existing = db.get(Episode, old_id) if old_id else None
         if existing:
+            project = existing.project
+            if project is None or project.organization_id != org.id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Backup episode id belongs to another org. Cross-org restore is refused.",
+                )
             id_map_episodes[old_id] = existing.id
             continue
         project_id = id_map_projects.get(str(row.get("project_id") or ""))
@@ -447,8 +498,6 @@ def restore_backup(
         if blob:
             store.put(str(rel), blob)
             asset.path = str(rel)
-        elif row.get("path"):
-            asset.path = str(row.get("path"))
         created_media += 1
 
     db.flush()

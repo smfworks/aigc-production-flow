@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, Response
 from ..audit import MEDIA_UPLOAD, record
 from ..deps import DbDep, get_episode, touch
 from ..models import ContinuityReceipt, ENTITY_TYPES, Job, MEDIA_KINDS, MediaAsset, utcnow
-from ..packzip import slugify
+from ..packzip import safe_filename, slugify
 from ..rbac import MediaUser, ReadUser
 from ..schemas import MediaAssetOut
 from ..serializers import media_out
@@ -122,12 +122,14 @@ def download_media(asset_id: str, user: ReadUser, db: DbDep):
     if local is not None:
         if not local.is_file():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media file missing from disk.")
-        return FileResponse(local, media_type=asset.content_type, filename=asset.original_name)
+        download_name = safe_filename(asset.original_name, "asset.bin")
+        return FileResponse(local, media_type=asset.content_type, filename=download_name)
     data = store.get_bytes(asset.path)
+    download_name = safe_filename(asset.original_name, "asset.bin")
     return Response(
         content=data,
         media_type=asset.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{asset.original_name}"'},
+        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
     )
 
 

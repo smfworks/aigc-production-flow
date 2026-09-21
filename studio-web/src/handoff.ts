@@ -65,8 +65,27 @@ export function clearHandoffSearch(): void {
   window.history.replaceState(null, "", `${url.pathname}${search ? `?${search}` : ""}${url.hash}`);
 }
 
-export function listenForBuilderHandoff(onReceive: (file: File, filename: string) => void): () => void {
+export function trustedHandoffOrigin(eventOrigin: string, allowed: string[]): boolean {
+  const origin = (eventOrigin || "").trim();
+  if (!origin || origin === "null") return false;
+  for (const raw of allowed) {
+    const value = (raw || "").trim();
+    if (!value) continue;
+    try {
+      if (new URL(value).origin === origin) return true;
+    } catch {
+      if (value === origin) return true;
+    }
+  }
+  return false;
+}
+
+export function listenForBuilderHandoff(
+  onReceive: (file: File, filename: string) => void,
+  allowedOrigins: string[],
+): () => void {
   function onMessage(event: MessageEvent) {
+    if (!trustedHandoffOrigin(event.origin, allowedOrigins)) return;
     const data = event.data as { type?: string; filename?: string; bytes?: ArrayBuffer } | null;
     if (!data || data.type !== MESSAGE || !data.bytes) return;
     const filename = data.filename || "pack.zip";

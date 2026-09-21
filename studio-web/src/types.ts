@@ -610,6 +610,7 @@ export type BackupRestoreResult = {
   would_create_episodes?: string[];
   would_add_revisions?: string[];
   would_keep_revisions?: string[];
+  cross_org_conflicts?: string[];
   created_projects?: number;
   created_episodes?: number;
   added_revisions?: number;

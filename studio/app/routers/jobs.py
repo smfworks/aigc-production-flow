@@ -13,7 +13,7 @@ router = APIRouter(tags=["jobs"])
 def _job_for_org(db, job_id: str, user):
     job = get_job(db, job_id)
     org_id = org_of_job(job)
-    if user.org_id and org_id and org_id != user.org_id:
+    if not user.org_id or org_id != user.org_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
     return job
 

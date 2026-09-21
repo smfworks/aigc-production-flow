@@ -6,10 +6,10 @@ from fastapi.responses import FileResponse
 from ..audit import PACK_DIFF, PACK_EXPORT, PACK_IMPORT, record
 from ..deps import DbDep, get_episode, latest_revision, touch
 from ..gates import gate_snapshot
-from ..handoff import get_live_handoff, mark_consumed, read_handoff_bytes
+from ..handoff import consume_handoff, get_live_handoff, read_handoff_bytes
 from ..models import PackRevision, utcnow
 from ..packdiff import diff_packs, pack_payload, revision_ref
-from ..packzip import PackZipError, extract_pack_json, slugify
+from ..packzip import PackZipError, extract_pack_json, safe_filename, slugify
 from ..rbac import PackUser, ReadUser
 from ..schemas import GateSnapshotOut, PackDiffOut, PackDiffRef, PackRevisionOut, PackRevisionSummary
 from ..shots import sync_shots_from_pack
@@ -46,6 +46,7 @@ def _apply_zip(
     data: bytes,
     filename: str,
     handoff_id: str = "",
+    from_handoff: bool = False,
 ) -> PackRevision:
     from ..notify import blocker_codes, notify_blockers_cleared
 
@@ -75,12 +76,9 @@ def _apply_zip(
     sync_shots_from_pack(db, episode, revision)
     episode.updated_at = utcnow()
     touch(episode.project)
-    if handoff_id and user.org_id:
-        try:
-            row = get_live_handoff(db, handoff_id, user.org_id)
-            mark_consumed(row)
-        except HTTPException:
-            pass
+    if from_handoff and handoff_id and user.org_id:
+        row = get_live_handoff(db, handoff_id, user.org_id)
+        consume_handoff(db, row)
     record(
         db,
         actor=user.name,
@@ -201,7 +199,7 @@ async def preview_import_diff(
     handoff_id: str = Form(""),
 ) -> PackDiffOut:
     episode = get_episode(db, episode_id, user)
-    data, filename = await _load_zip(db, user, file=file, handoff_id=handoff_id)
+    data, filename, _source = await _load_zip(db, user, file=file, handoff_id=handoff_id)
     try:
         pack = extract_pack_json(data)
     except PackZipError as exc:
@@ -243,9 +241,7 @@ async def import_pack(
     handoff_id: str = Form(""),
 ) -> PackRevisionOut:
     episode = get_episode(db, episode_id, user)
-    data, filename = await _load_zip(db, user, file=file, handoff_id=handoff_id)
-    if file is not None and file.filename:
-        filename = file.filename or filename
+    data, filename, source = await _load_zip(db, user, file=file, handoff_id=handoff_id)
     revision = _apply_zip(
         db,
         episode,
@@ -253,23 +249,25 @@ async def import_pack(
         data=data,
         filename=filename,
         handoff_id=handoff_id.strip(),
+        from_handoff=source == "handoff",
     )
     db.commit()
     db.refresh(revision)
     return _revision_out(revision)
 
 
-async def _load_zip(db, user, *, file: UploadFile | None, handoff_id: str) -> tuple[bytes, str]:
+async def _load_zip(db, user, *, file: UploadFile | None, handoff_id: str) -> tuple[bytes, str, str]:
+    """Return (bytes, filename, source). A live handoff_id wins over a simultaneous file part."""
     token = (handoff_id or "").strip()
-    if file is not None:
-        data = await file.read()
-        if data:
-            return data, file.filename or "pack.zip"
     if token:
         if not user.org_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Handoff not found.")
         row = get_live_handoff(db, token, user.org_id)
-        return read_handoff_bytes(row), row.filename
+        return read_handoff_bytes(row), row.filename, "handoff"
+    if file is not None:
+        data = await file.read()
+        if data:
+            return data, safe_filename(file.filename or "pack.zip", "pack.zip"), "upload"
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Provide a pack zip file or a handoff_id from Open in Studio.",
@@ -307,13 +305,14 @@ def export_pack(episode_id: str, user: ReadUser, db: DbDep):
         return FileResponse(
             local,
             media_type="application/zip",
-            filename=revision.filename,
+            filename=safe_filename(revision.filename, "pack.zip"),
         )
     data = store.get_bytes(revision.zip_path)
     from fastapi.responses import Response
 
+    download_name = safe_filename(revision.filename, "pack.zip")
     return Response(
         content=data,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{revision.filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
     )
