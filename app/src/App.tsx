@@ -1,4 +1,5 @@
 import { CardsStep } from "./components/CardsStep";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { EditListStep } from "./components/EditListStep";
 import { GatePanel } from "./components/GatePanel";
 import { Header } from "./components/Header";
@@ -18,7 +19,7 @@ import {
 } from "./lib/gate";
 import { downloadBlob, packToZipBlob, zipFilename } from "./lib/exportZip";
 import { packFromZipBlob } from "./lib/importZip";
-import { clonePack, emptyPack } from "./lib/pack";
+import { WIPE_PROMPTS, packAfterConfirmedWipe, type WipeKind } from "./lib/confirmWipe";
 import { sigilsSample } from "./lib/sample";
 import { consumeLoadNote, initialPack, saveStoredPack } from "./lib/storage";
 import { openInStudio } from "./lib/studio";
@@ -58,6 +59,9 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [pendingWipe, setPendingWipe] = useState<
+    { kind: WipeKind; file?: File } | null
+  >(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((message: string) => {
@@ -90,32 +94,16 @@ export default function App() {
   }, []);
 
   const loadSample = useCallback(() => {
-    if (
-      !window.confirm(
-        "Replace the current pack with the Sigils lessons sample? Autosaved work in this browser will be overwritten.",
-      )
-    ) {
-      return;
-    }
-    setPack(clonePack(sigilsSample()));
-    setStep("pack");
-    setCardsTab("characters");
-    showToast("Loaded Sigils lessons sample — not generate-ready until the axe is pinned.");
-  }, [showToast]);
+    setPendingWipe({ kind: "load-sample" });
+  }, []);
 
   const newPack = useCallback(() => {
-    if (
-      !window.confirm(
-        "Start a new blank pack? Autosaved work in this browser will be overwritten.",
-      )
-    ) {
-      return;
-    }
-    setPack(emptyPack());
-    setStep("pack");
-    setCardsTab("characters");
-    showToast("New pack.");
-  }, [showToast]);
+    setPendingWipe({ kind: "new-pack" });
+  }, []);
+
+  const cancelWipe = useCallback(() => {
+    setPendingWipe(null);
+  }, []);
 
   const exportZip = useCallback(
     async (asDraft: boolean) => {
@@ -179,8 +167,29 @@ export default function App() {
     [showToast],
   );
 
+  const confirmWipe = useCallback(() => {
+    if (!pendingWipe) return;
+    if (pendingWipe.kind === "import-zip") {
+      const file = pendingWipe.file;
+      setPendingWipe(null);
+      if (file) void importZip(file);
+      return;
+    }
+    const next = packAfterConfirmedWipe(pendingWipe.kind);
+    setPack(next);
+    setStep("pack");
+    setCardsTab("characters");
+    setPendingWipe(null);
+    showToast(
+      pendingWipe.kind === "new-pack"
+        ? "New pack."
+        : "Loaded Sigils lessons sample — not generate-ready until the axe is pinned.",
+    );
+  }, [importZip, pendingWipe, showToast]);
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
+      if (pendingWipe) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (typingInField(event.target)) return;
       if (event.key === "1" || event.key === "2" || event.key === "3" || event.key === "4" || event.key === "5" || event.key === "6") {
@@ -215,7 +224,7 @@ export default function App() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [complete, copyChecklist, exportZip]);
+  }, [complete, copyChecklist, exportZip, pendingWipe]);
 
   return (
     <div className="page">
@@ -237,14 +246,7 @@ export default function App() {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (!file) return;
-          if (
-            !window.confirm(
-              "Replace the current pack with this zip? Autosaved work in this browser will be overwritten.",
-            )
-          ) {
-            return;
-          }
-          void importZip(file);
+          setPendingWipe({ kind: "import-zip", file });
         }}
       />
       <div className="workspace">
@@ -327,6 +329,15 @@ export default function App() {
       </footer>
       <pre className="print-summary">{packSummaryMarkdown(pack)}</pre>
       <Toast message={toast} />
+      {pendingWipe ? (
+        <ConfirmDialog
+          title={WIPE_PROMPTS[pendingWipe.kind].title}
+          message={WIPE_PROMPTS[pendingWipe.kind].message}
+          confirmLabel={WIPE_PROMPTS[pendingWipe.kind].confirmLabel}
+          onConfirm={confirmWipe}
+          onCancel={cancelWipe}
+        />
+      ) : null}
     </div>
   );
 }
