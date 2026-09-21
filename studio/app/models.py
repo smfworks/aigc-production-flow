@@ -19,6 +19,7 @@ ROLE_EDITOR = "editor"
 ROLE_REVIEWER = "reviewer"
 ROLE_VIEWER = "viewer"
 ORG_ROLES = frozenset({ROLE_PRODUCER, ROLE_EDITOR, ROLE_REVIEWER, ROLE_VIEWER})
+SIGNOFF_ROLES = frozenset({ROLE_PRODUCER, ROLE_REVIEWER})
 
 MEDIA_KINDS = ("sheet", "plate", "costume", "preview", "other")
 ENTITY_TYPES = ("character", "prop", "scene", "costume")
@@ -159,6 +160,11 @@ class Episode(Base):
         cascade="all, delete-orphan",
         order_by="ContinuityReceipt.created_at.asc()",
     )
+    signoffs: Mapped[list["ReviewSignoff"]] = relationship(
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="ReviewSignoff.created_at.desc()",
+    )
 
 
 class PackRevision(Base):
@@ -175,6 +181,21 @@ class PackRevision(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     episode: Mapped[Episode] = relationship(back_populates="revisions")
+
+
+class ReviewSignoff(Base):
+    """Reviewer or producer sign-off required before generate-ok (unless producer override)."""
+
+    __tablename__ = "review_signoffs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    user_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    episode: Mapped[Episode] = relationship(back_populates="signoffs")
 
 
 class ReviewState(Base):
@@ -313,7 +334,7 @@ class ShotCandidate(Base):
 
 
 class Job(Base):
-    """Async still/clip/precheck work. In-process worker now; Celery later."""
+    """Async still/clip/precheck work. Thread worker default; Celery is opt-in."""
 
     __tablename__ = "jobs"
 

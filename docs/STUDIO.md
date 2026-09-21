@@ -1,8 +1,8 @@
-# Studio spine (Phase 5)
+# Studio spine (Phase 6)
 
-The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, review, comments, sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC**, **presence**, **shot comments**, **media store adapters**, and **adapter health**.
+The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, review, **reviewer/producer sign-off**, comments, sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, **vertical templates**, **app-level RBAC**, **presence**, **shot comments**, **media store adapters**, **adapter health**, optional **Celery**, and optional **OIDC**.
 
-It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is not implemented.** Celery is not this process.
+It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is opt-in and off by default.** Celery is opt-in and off by default (`STUDIO_JOB_WORKER=thread`).
 
 ## Ports (local)
 
@@ -10,26 +10,27 @@ It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the co
 |---|---|---|---|
 | Studio API (+ in-process job worker) | `studio/` | `./scripts/dev-studio.sh api` | http://localhost:8000 — OpenAPI at `/docs` |
 | Standalone job poller (optional) | `studio/` | `./scripts/dev-studio.sh worker` | no HTTP — use when API has `STUDIO_JOB_WORKER=off` |
+| Celery worker (optional) | `studio/` | `./scripts/dev-studio.sh celery` | Redis broker from `STUDIO_CELERY_BROKER_URL`. API must use `STUDIO_JOB_WORKER=celery` |
 | Studio shell | `studio-web/` | `./scripts/dev-studio.sh web` | http://localhost:5174 |
 | Pack builder | `app/` | `./scripts/dev-studio.sh app` | http://localhost:5173 |
 
 `scripts/dev-studio.sh all` starts API (with the in-process worker) + both Vite apps.
 
-Do not start `api` and `worker` together unless the API worker is off — both would dequeue the same SQLite rows.
+Do not start `api` (thread worker) and `worker` together unless the API worker is off — both would dequeue the same SQLite rows. **Never run the thread worker and a Celery worker against the same SQLite file.** Prefer the `postgres` compose profile when Celery is enabled.
 
 ## Auth + RBAC lite (honest)
 
 Local-dev: `Authorization: Bearer $STUDIO_API_TOKEN` (default `local-dev-token`). Display name: `X-User-Name` or `STUDIO_DEFAULT_USER`.
 
-`STUDIO_AUTH_MODE` is `local` (default) or `forward-header` (trust `X-Forwarded-User`; reverse-proxy SSO **later**). **OIDC is not implemented.** See [AUTH.md](AUTH.md).
+`STUDIO_AUTH_MODE` is `local` (default), `forward-header` (trust `X-Forwarded-User`), or `oidc` (Bearer JWT via issuer JWKS). **OIDC is opt-in and off by default.** This repo does not ship a production IdP. See [AUTH.md](AUTH.md).
 
 Roles are **app-level** on the default org, not an IdP claim:
 
 | Role | Mutating |
 |---|---|
-| `producer` | All writes, including members, budget hard-stop / cap, retention apply |
+| `producer` | All writes, including members, budget hard-stop / cap, retention apply, **sign-off**, producer override of generate-ok |
 | `editor` | Review, jobs, pack import, media, shots, comments |
-| `reviewer` | Comments + review set |
+| `reviewer` | Comments + review set + **sign-off** |
 | `viewer` | Read-only (presence heartbeat still allowed) |
 
 Seed: default org + `STUDIO_DEFAULT_USER` as **producer**. A producer adds members by local user name. Switch the studio chrome “Local user” field to that `X-User-Name` to act as them.
@@ -42,18 +43,18 @@ Do not treat the token as multi-tenant SaaS security. There is a single default 
 - Media (sheets/plates/costumes/**hop-1 previews**) and stored pack zips: `data/media/` (gitignored) via the **local** media adapter. Do not commit likeness stills or engine MP4s. Preview MP4s are allowed **on disk** with `kind=preview` only.
 - Optional S3/MinIO: `STUDIO_MEDIA_BACKEND=s3` plus `STUDIO_S3_BUCKET` (and `STUDIO_S3_ENDPOINT` for MinIO). Incomplete config **stays local** and `/api/meta` says so. Credentials stay in the process environment, not git. Install `pip install -e "./studio[s3]"` for boto3.
 
-## Operator path (Phase 5)
+## Operator path (Phase 6)
 
 1. Start API + shell + builder: `./scripts/dev-studio.sh all` **or** `docker compose -f docker-compose.studio.yml up --build`
 2. Confirm chrome shows your role (`producer` for the seeded local user)
 3. **Members**: add a colleague as `viewer` → they cannot enqueue → promote to `editor` → they can comment on a shot
-4. Open an episode: presence chips (heartbeat TTL ~60s)
+4. Open an episode: presence chips (heartbeat TTL ~60s). **Copy episode link** to share `#/projects/<id>/episodes/<id>`
 5. **New from template** or create a blank project; set adapter defaults (stub unless a live hook exists)
-6. Fill Script → Assets → Storyboard → Preview in the builder; export pack zip and import
+6. Fill Script → Assets → Storyboard → Preview in the builder; **Export pack zip**. **Open in Studio** (`VITE_STUDIO_URL`, default http://localhost:5174) lands on `?import=1#/projects` — pick an episode → **Import pack zip**
 7. Confirm candidates, set shots `ready` (prepared, not generating)
 8. Adapter status strip: stub is always healthy. Unset live hooks stay stub. Configured-but-down live slots **409** on enqueue
 9. Enqueue stub jobs (batch-precheck → hop-1). Job rows store estimated/actual **cost units**
-10. Hop-1 preview desk → shot comments → preview-watched → `generate-ok` still needs green gates + receipts
+10. Hop-1 preview desk → shot comments → preview-watched → a **reviewer or producer signs off** → `generate-ok` (producer override is allowed and audited as `review.override`)
 11. **Export EDL** / **Export shot playlist**. Retention dry-run / apply (producer) expires stub outputs — **pack revisions are kept**
 
 ## Compose deploy pack
@@ -67,15 +68,22 @@ docker compose -f docker-compose.studio.yml up --build
 | `studio-api` | 8000 | FastAPI + in-process **thread** worker. SQLite volume `studio-data:/data` |
 | `studio-web` | 5174 | nginx SPA; `/api` and `/health` proxy to the API |
 
-Optional profiles (not production SSO, not Celery):
+Optional profiles (not production SSO, not a live IdP):
 
 | Profile | What |
 |---|---|
-| `worker` | Standalone poller (`python -m app.jobs`). Set `STUDIO_JOB_WORKER=off` on the API so only one process dequeues |
+| `worker` | Standalone **thread** poller (`python -m app.jobs`). Set `STUDIO_JOB_WORKER=off` on the API so only one process dequeues |
 | `postgres` | Postgres 16. Point `STUDIO_DATABASE_URL` at it **and** install the API `postgres` extra |
 | `minio` | Local object store on 9000/9001. Set root user/password in the **shell**. Then `STUDIO_MEDIA_BACKEND=s3`, `STUDIO_S3_ENDPOINT=http://127.0.0.1:9000`, `STUDIO_S3_BUCKET=…`. Unset → local disk stays honest |
+| `celery` | Redis 7 + Celery worker. Set `STUDIO_JOB_WORKER=celery` **and** `STUDIO_CELERY_BROKER_URL` (compose default `redis://redis:6379/0`) on the API. Tasks enqueue/dequeue the same `Job` rows. **Never** also run the thread worker against the same SQLite file. Prefer `postgres` with Celery |
 
-No secrets belong in the repo. The API token default is local-dev only. This compose file does **not** claim OIDC, TLS, or a paid cloud bill.
+```bash
+# Celery opt-in (API must not use the thread worker on this SQLite file)
+STUDIO_JOB_WORKER=celery STUDIO_CELERY_BROKER_URL=redis://redis:6379/0 \
+  docker compose -f docker-compose.studio.yml --profile celery up --build
+```
+
+OIDC env vars (`STUDIO_AUTH_MODE=oidc`, `STUDIO_OIDC_ISSUER`, `STUDIO_OIDC_AUDIENCE`, optional client id / JWKS URL / role map) pass through compose. Empty issuer = OIDC is **not** configured. No secrets belong in the repo.
 
 The older `docker-compose.yml` is still API-only.
 
@@ -109,7 +117,7 @@ This never claims a cloud bill was paid.
 
 ## Audit + retention
 
-Audit table: `review.set`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `media.upload`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`. `GET /api/audit?project_id=&episode_id=&action=`.
+Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `media.upload`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`. `GET /api/audit?project_id=&episode_id=&action=`.
 
 Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed (producer). `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.**
 
@@ -131,30 +139,48 @@ Empty structured packs under `templates/verticals/` (`education-lesson`, `brand-
 
 `GET /api/templates` · `POST /api/templates/{id}/projects`
 
-## Jobs (Phase 3, unchanged contract)
+## Jobs (Phase 3 contract, Phase 6 worker)
 
 Types: `still-sheet | still-plate | clip-hop1 | clip-extend | batch-precheck`
 
-Default worker: in-process **thread** (`STUDIO_JOB_WORKER=thread`). Celery is the documented upgrade path, not this process. Tests use `inline` or `off`.
+Default worker: in-process **thread** (`STUDIO_JOB_WORKER=thread`). Optional `celery` mode uses Redis (`STUDIO_CELERY_BROKER_URL`) and Celery tasks against the same `Job` rows (`pip install -e "./studio[celery]"`). Tests use `inline` or `off`; the celery path is mocked unless Redis is available.
+
+## Review gate matrix (Phase 6)
+
+Before `generate-ok`:
+
+1. Latest pack revision: all gates green
+2. Each required hop-1: preview-watched continuity receipt, no NG reason
+3. At least one **sign-off** record from a `reviewer` or `producer` (who / when / note)
+
+`POST /api/episodes/{id}/review/signoff`. Viewers cannot sign off. Editors cannot sign off. A producer may stamp `generate-ok` with `{ "override": true }` — audited as `review.override`. Sign-off itself is `review.signoff`.
+
+## Pack ↔ studio bridge
+
+Studio-web deep links (shareable):
+
+- `#/projects/<projectId>`
+- `#/projects/<projectId>/episodes/<episodeId>`
+- `#/projects/<projectId>/episodes/<episodeId>/shots/<shotId>`
+
+Copy-link controls live on the project and episode panels.
+
+Handoff from the pack builder: **Export pack zip** (still a zip) → **Open in Studio** (`VITE_STUDIO_URL`, default http://localhost:5174) opens `/?import=1#/projects`. Pick a project/episode and **Import pack zip**. Query `?import=` is an optional hint, not an auto-upload.
 
 ## Hop-1 preview desk
 
-Required hop-1 = first edit-list row of each take with `hop1Planned`. `generate-ok` and `clip-extend` stay 409 until every required hop-1 has preview-watched + receipt and no NG reason.
+Required hop-1 = first edit-list row of each take with `hop1Planned`. `generate-ok` and `clip-extend` stay 409 until every required hop-1 has preview-watched + receipt and no NG reason. `generate-ok` also stays 409 until a reviewer/producer sign-off exists (unless a producer override is audited).
 
 ## API surface
 
 OpenAPI is canonical: http://localhost:8000/docs
 
-Phase 2–4 surface still applies. Phase 5 adds:
+Phase 2–5 surface still applies. Phase 6 adds:
 
 | Area | Methods |
 |---|---|
-| Me / roles | `GET /api/me` includes `role`, `org_id`, `permissions` |
-| Members | `GET/POST /api/orgs/{id}/members`, `PATCH /api/orgs/{id}/members/{member_id}` |
-| Presence | `GET/POST /api/episodes/{id}/presence`, `GET …/presence/stream` |
-| Comments | `POST` may include `shot_id` / `board_node_id`; `POST /api/comments/{id}/resolve` |
-| Adapters | `GET /api/adapters/health`, `GET/POST /api/adapters/{id}/health|dry-run` |
-| Meta | `media_backend`, `media_note`, `presence_ttl_seconds` |
+| Review sign-off | `GET/POST /api/episodes/{id}/review/signoff`, `GET …/review/signoffs`; `PUT …/review` accepts `override` |
+| Meta | `phase: 6`, `celery_enabled`, `oidc_configured`, `oidc_apply_role_claim` |
 
 ## Tests
 
@@ -163,15 +189,19 @@ cd studio && python3 -m pip install -e ".[dev]"
 python3 -m pytest
 
 cd app && npm test
+
+cd studio-web && npx tsc --noEmit
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs those three jobs on every pull request and fails the PR on red.
 
 ## What this phase is not
 
 - No full NLE timeline editor (EDL/playlist assemble metadata only)
-- No Celery broker (documented upgrade only)
-- No OIDC / full SSO (forward-header hook + app-level roles + [AUTH.md](AUTH.md) only)
+- Celery is **optional** and off by default — never claimed running unless `STUDIO_JOB_WORKER=celery`
+- OIDC is **optional** and off by default — this repo does not ship a production IdP
 - No rewrite of the pack builder
 - No engine MP4s in git
-- No auto generate-ok from shot `ready`, candidate extract, a succeeded stub job, or a vertical template
+- No auto generate-ok from shot `ready`, candidate extract, a succeeded stub job, a vertical template, or a missing sign-off
 - No claim that budget units are a paid cloud invoice
 - No claim that S3/MinIO is live when `STUDIO_MEDIA_BACKEND` is unset or the bucket is empty

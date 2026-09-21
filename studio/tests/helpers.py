@@ -121,6 +121,18 @@ def attach_watched_receipt(
     return response.json()
 
 
+def sign_off(client, auth, episode_id: str, note: str = "reviewer sign-off") -> dict:
+    response = client.post(
+        f"/api/episodes/{episode_id}/review/signoff",
+        headers=auth,
+        json={"note": note},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["signed_off"] is True
+    return body
+
+
 def wait_job(client, auth, job_id: str, timeout: float = 8.0) -> dict:
     deadline = time.time() + timeout
     last = None

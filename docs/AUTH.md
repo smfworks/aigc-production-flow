@@ -1,52 +1,102 @@
 # Auth (studio spine)
 
-This is **not** SSO and **not** an IdP integration.
+Identity modes pick **who the process believes you are**. App-level **roles** (`producer` / `editor` / `reviewer` / `viewer`) sit on the default org after that.
 
-Identity modes (`STUDIO_AUTH_MODE`) pick **who the process believes you are**. App-level **roles** (`producer` / `editor` / `reviewer` / `viewer`) sit on the default org after that. The IdP is still outside this repo.
-
-Phase 4 added a reverse-proxy hook so a later ops deploy can put Caddy/nginx/oauth2-proxy in front of the API. Phase 5 did **not** implement OIDC, SAML, or a login page. Roles are stored on `org_members`, not on a JWT.
+**OIDC is opt-in and off by default.** This repo does not ship a production IdP. Local-dev remains the default. Do not treat a local token or a lab JWKS as multi-tenant SaaS security.
 
 ## Identity modes (`STUDIO_AUTH_MODE`)
 
-Use the named values `local` (default) or `forward-header`. Aliases for local: `local-dev`, `token`, `bearer`.
+Use the named values `local` (default), `forward-header`, or `oidc`. Aliases for local: `local-dev`, `token`, `bearer`.
 
 | Value | Identity | API gate |
 |---|---|---|
 | `local` | `X-User-Name` or `STUDIO_DEFAULT_USER` (`local-dev`) | Bearer `STUDIO_API_TOKEN` |
 | `forward-header` | **Required** `X-Forwarded-User` (set by the reverse proxy after it authenticates the human) | Bearer token still required so scripts and the Vite shell keep working |
+| `oidc` | JWT claims (`preferred_username`, then `email`, then `name`, then `sub`) | Bearer JWT validated against the issuer JWKS. **Not configured** unless `STUDIO_OIDC_ISSUER` and `STUDIO_OIDC_AUDIENCE` are set |
 
-Local-dev token default: `local-dev-token`. Do not treat this as multi-tenant SaaS security. There is a single default organization.
+Local-dev token default: `local-dev-token`. There is a single default organization.
 
-## App-level roles (Phase 5)
+`/api/me` reports `auth_mode`, `sso`, `role`, and `oidc_configured` on `/api/meta`. Meta `oidc_configured` is true only when issuer **and** audience are set. An empty issuer is not a live IdP.
+
+## App-level roles (Phase 5, unchanged)
 
 Seed on first boot: default org + current `STUDIO_DEFAULT_USER` as **producer**.
 
 | Role | Reads | Writes |
 |---|---|---|
-| `producer` | yes | members, budget hard-stop / cap, retention apply, plus editor writes |
+| `producer` | yes | members, budget hard-stop / cap, retention apply, **sign-off**, plus editor writes |
 | `editor` | yes | review set, job enqueue/cancel, pack import, media upload, shots, comments |
-| `reviewer` | yes | comments (create/resolve), review set |
+| `reviewer` | yes | comments, review set, **sign-off** |
 | `viewer` | yes | none (presence heartbeat only) |
 
-Producers manage members at `GET/POST /api/orgs/{id}/members`. `/api/me` reports `role` and `permissions`. Unknown `X-User-Name` values are authenticated (same token) but **not** members until a producer adds them.
+Producers manage members at `GET/POST /api/orgs/{id}/members`. Unknown names are authenticated but **not** members until a producer adds them.
 
-Roles do **not** come from OIDC groups. Forward-header still only supplies a name.
+**App roles stay authoritative** unless the optional OIDC claim map is enabled (below). Forward-header still only supplies a name. OIDC still only supplies a name unless `STUDIO_OIDC_APPLY_ROLE_CLAIM` is true.
 
-## Reverse-proxy SSO later (not this PR)
+## Optional OIDC (`STUDIO_AUTH_MODE=oidc`)
 
-When you are ready:
+This process is a **resource server**. It verifies Bearer JWTs. It does not implement authorization-code login, a callback route, or a confidential client. Do not put client secrets in git. `studio/.env.example` uses empty placeholders only.
 
-1. Terminate TLS and authenticate at the proxy (oauth2-proxy, Authentik, Cloud IAP, …).
+Required:
+
+| Env | Meaning |
+|---|---|
+| `STUDIO_OIDC_ISSUER` | Issuer URL (must match the JWT `iss`) |
+| `STUDIO_OIDC_AUDIENCE` | API audience (must match JWT `aud`) |
+
+Optional:
+
+| Env | Meaning |
+|---|---|
+| `STUDIO_OIDC_CLIENT_ID` | If set, JWT `azp` or `aud` must include this value |
+| `STUDIO_OIDC_JWKS_URL` | Override JWKS URI (otherwise `{issuer}/.well-known/openid-configuration` → `jwks_uri`) |
+| `STUDIO_OIDC_NAME_CLAIM` | Default `preferred_username` |
+| `STUDIO_OIDC_ROLE_CLAIM` | Claim name to read (unused unless apply is on) |
+| `STUDIO_OIDC_ROLE_MAP` | `claim_value:app_role` pairs, comma-separated. Example: `admin:producer,review:reviewer` |
+| `STUDIO_OIDC_APPLY_ROLE_CLAIM` | Default `false`. When `true`, mapped claim upserts the org member role |
+
+Install the extra: `pip install -e "./studio[oidc]"`.
+
+Allowed JWT algs: RS256 / RS384 / RS512 / ES256 / ES384 / ES512. `none` and HMAC algs are refused.
+
+### Wire Authentik / Keycloak / Auth0
+
+Same shape for each. Create an API / resource in the IdP, copy the **issuer** and the **audience** (API identifier), then:
+
+```bash
+export STUDIO_AUTH_MODE=oidc
+export STUDIO_OIDC_ISSUER="https://idp.example.invalid/realms/studio"
+export STUDIO_OIDC_AUDIENCE="aigc-studio-api"
+export STUDIO_OIDC_CLIENT_ID=""   # optional; not a secret
+# Do not set a client secret here. This API does not redeem codes.
+```
+
+| Provider | Issuer | Audience |
+|---|---|---|
+| **Authentik** | Application provider issuer URL (often `https://<host>/application/o/<slug>/`) | The provider's audience / client id you assigned to this API |
+| **Keycloak** | `https://<host>/realms/<realm>` | Client id or dedicated audience mapper for this API |
+| **Auth0** | `https://<tenant>.auth0.com/` | API Identifier on the Auth0 APIs page |
+
+Then map IdP users onto org members in the studio (producer adds `preferred_username`). Roles still live on `org_members` unless you explicitly set `STUDIO_OIDC_APPLY_ROLE_CLAIM=true` **and** a role claim map.
+
+This file does **not** claim any of those IdPs are configured in this repo.
+
+## Reverse-proxy SSO (forward-header)
+
+When you want the proxy to authenticate humans and the API to trust a header:
+
+1. Terminate TLS and authenticate at the proxy (oauth2-proxy, Authentik forward-auth, Cloud IAP, …).
 2. Set `STUDIO_AUTH_MODE` to `forward-header`.
 3. Have the proxy **overwrite** `X-Forwarded-User` (never pass it through from the public internet).
 4. Keep the studio API off the public network except through that proxy.
 5. Optionally rotate `STUDIO_API_TOKEN` and inject it only on the trusted path.
 6. Map proxy names onto org members (producers still add roles in the studio).
 
-Until that exists, use `local`. The studio shell still shows a token field and a local user field. `/api/me` reports `auth_mode` and `sso: "not implemented — see docs/AUTH.md"`.
+Until that exists, use `local`. The studio shell still shows a token field and a local user field.
 
 ## What this file is not
 
-- Not OIDC discovery, JWKS, or callback routes
-- Not a promise that `X-Forwarded-User` is spoof-proof without a correctly locked-down proxy
+- Not a promise that a production IdP is running
+- Not a confidential-client OAuth app (no client secret, no login page)
+- Not a promise that `X-Forwarded-User` is spoof-proof without a locked-down proxy
 - Not multi-tenant isolation

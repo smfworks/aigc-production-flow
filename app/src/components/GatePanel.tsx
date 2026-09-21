@@ -1,4 +1,5 @@
 import { GATE_DESTINATION, type GateId, type GateResult } from "../lib/gate";
+import { studioImportUrl } from "../lib/studio";
 import { useEffect, useRef } from "react";
 
 type Props = {
@@ -121,6 +122,9 @@ export function GatePanel({
         <button type="button" className="btn" onClick={onPrint}>
           Print pack summary
         </button>
+        <a className="btn" href={studioImportUrl()} target="_blank" rel="noreferrer">
+          Open in Studio
+        </a>
       </div>
       <p className="kbd-hint">
         1–6 steps · E export · D draft · C summary · ? stills help

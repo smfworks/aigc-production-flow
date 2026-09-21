@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Start Phase 5 studio processes. From repo root:
-#   ./scripts/dev-studio.sh api|web|app|worker|all
+# Start Phase 6 studio processes. From repo root:
+#   ./scripts/dev-studio.sh api|web|app|worker|celery|all
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -35,10 +35,22 @@ start_api() {
 
 start_worker() {
   ensure_studio_venv
-  echo "Studio job poller (standalone). Set STUDIO_JOB_WORKER=off on the API so only this process dequeues."
-  echo "Celery is not running — this is the in-process worker extracted to its own loop."
+  echo "Studio job poller (standalone thread). Set STUDIO_JOB_WORKER=off on the API so only this process dequeues."
+  echo "Do not run this alongside a Celery worker against the same SQLite file."
   cd "$ROOT/studio"
   exec "$ROOT/studio/.venv/bin/python" -m app.jobs.worker
+}
+
+start_celery() {
+  ensure_studio_venv
+  "$ROOT/studio/.venv/bin/pip" install -e "$ROOT/studio[celery]"
+  if [[ -z "${STUDIO_CELERY_BROKER_URL:-}" ]]; then
+    echo "STUDIO_CELERY_BROKER_URL is empty. Celery is opt-in. Example: redis://localhost:6379/0" >&2
+    exit 1
+  fi
+  echo "Celery worker. Set STUDIO_JOB_WORKER=celery on the API. Do not also run the thread worker against the same SQLite file."
+  cd "$ROOT/studio"
+  exec "$ROOT/studio/.venv/bin/celery" -A app.jobs.celery_app worker --loglevel=info
 }
 
 start_web() {
@@ -92,9 +104,10 @@ case "$ROLE" in
   web) start_web ;;
   app) start_app ;;
   worker) start_worker ;;
+  celery) start_celery ;;
   all) start_all ;;
   *)
-    echo "Usage: $0 [api|web|app|worker|all]" >&2
+    echo "Usage: $0 [api|web|app|worker|celery|all]" >&2
     exit 1
     ;;
 esac

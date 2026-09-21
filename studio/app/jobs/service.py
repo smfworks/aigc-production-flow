@@ -1,4 +1,4 @@
-"""Job enqueue / cancel / retry. Job rows are the source of truth for Celery later."""
+"""Job enqueue / cancel / retry. Job rows are the source of truth for thread and optional Celery."""
 
 from __future__ import annotations
 
@@ -162,14 +162,41 @@ def enqueue_job(
     db.commit()
     db.refresh(job)
 
-    mode = (cfg.job_worker or "thread").strip().lower()
-    if mode == "inline":
+    from .modes import WORKER_CELERY, WORKER_INLINE, WORKER_THREAD, normalize_worker
+
+    mode = normalize_worker(cfg.job_worker)
+    if mode == WORKER_INLINE:
         execute_job(db, job.id)
         db.refresh(job)
-    elif mode == "thread":
+    elif mode == WORKER_THREAD:
         worker = get_worker()
         if worker:
             worker.wakeup()
+    elif mode == WORKER_CELERY:
+        try:
+            from .celery_app import send_execute_job
+
+            send_execute_job(job.id)
+        except Exception as exc:  # noqa: BLE001 — leave the Job row, fail the HTTP call honestly
+            job.status = "failed"
+            job.error = f"Celery dispatch failed: {exc}"
+            job.finished_at = utcnow()
+            job.actual_cost_units = 0.0
+            job.updated_at = utcnow()
+            db.commit()
+            db.refresh(job)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "celery_unavailable",
+                    "message": (
+                        f"Celery enqueue failed: {exc}. "
+                        "Celery is opt-in. Default worker is thread. "
+                        "Never run thread and Celery against the same SQLite file."
+                    ),
+                    "job_id": job.id,
+                },
+            ) from exc
     return job
 
 

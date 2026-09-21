@@ -60,7 +60,7 @@ export function MembersPanel({
         <h2>Org members</h2>
         <p>
           App-level roles on the default org. Identity is still the local-dev token / X-User-Name
-          (or X-Forwarded-User). OIDC is not implemented — docs/AUTH.md.
+          (or X-Forwarded-User / optional OIDC). App roles stay on the org. docs/AUTH.md.
         </p>
       </div>
       <ul className="member-list">

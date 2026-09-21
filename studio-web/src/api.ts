@@ -16,6 +16,7 @@ import type {
   Project,
   RetentionPreview,
   Review,
+  ReviewSignoff,
   ReviewStateName,
   Shot,
   ShotReadiness,
@@ -127,10 +128,17 @@ export const api = {
     }),
   episode: (id: string) => request<Episode>(`/api/episodes/${id}`),
   review: (episodeId: string) => request<Review>(`/api/episodes/${episodeId}/review`),
-  setReview: (episodeId: string, state: ReviewStateName, note = "") =>
+  setReview: (episodeId: string, state: ReviewStateName, note = "", override = false) =>
     request<Review>(`/api/episodes/${episodeId}/review`, {
       method: "PUT",
-      body: JSON.stringify({ state, note }),
+      body: JSON.stringify({ state, note, override }),
+    }),
+  signoffs: (episodeId: string) =>
+    request<ReviewSignoff[]>(`/api/episodes/${episodeId}/review/signoffs`),
+  signOff: (episodeId: string, note = "") =>
+    request<Review>(`/api/episodes/${episodeId}/review/signoff`, {
+      method: "POST",
+      body: JSON.stringify({ note }),
     }),
   comments: (episodeId: string, query: { shot_id?: string; include_resolved?: boolean } = {}) => {
     const params = new URLSearchParams();

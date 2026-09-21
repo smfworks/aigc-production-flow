@@ -26,18 +26,19 @@ CandidateSource = Literal["stub", "manual"]
 
 class UserOut(BaseModel):
     name: str
-    auth_mode: Literal["local", "forward-header"] = "local"
-    sso: str = "not implemented — see docs/AUTH.md"
+    auth_mode: Literal["local", "forward-header", "oidc"] = "local"
+    sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     role: OrgRole | None = None
     org_id: str | None = None
     permissions: list[str] = Field(default_factory=list)
+    oidc_role: OrgRole | None = None
 
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 5
-    auth_mode: Literal["local", "forward-header"] = "local"
-    sso: str = "not implemented — see docs/AUTH.md"
+    phase: int = 6
+    auth_mode: Literal["local", "forward-header", "oidc"] = "local"
+    sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
     docs: str = "/docs"
     default_user: str
@@ -52,6 +53,9 @@ class MetaOut(BaseModel):
     media_note: str = "Local disk. S3/MinIO is not live until backend=s3 and a bucket are set."
     presence_ttl_seconds: int = 60
     roles: list[str] = Field(default_factory=lambda: ["producer", "editor", "reviewer", "viewer"])
+    celery_enabled: bool = False
+    oidc_configured: bool = False
+    oidc_apply_role_claim: bool = False
 
 
 class OrganizationOut(BaseModel):
@@ -166,6 +170,22 @@ class EpisodeOut(BaseModel):
 class ReviewSet(BaseModel):
     state: ReviewStateName
     note: str = ""
+    override: bool = False
+
+
+class ReviewSignoffCreate(BaseModel):
+    note: str = ""
+
+
+class ReviewSignoffOut(BaseModel):
+    id: str
+    episode_id: str
+    user_name: str
+    role: OrgRole
+    note: str = ""
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class ReviewStateOut(BaseModel):
@@ -183,6 +203,8 @@ class ReviewOut(BaseModel):
     current: ReviewStateName
     history: list[ReviewStateOut]
     latest_gates: GateSnapshotOut | None = None
+    signoffs: list[ReviewSignoffOut] = Field(default_factory=list)
+    signed_off: bool = False
 
 
 class CommentCreate(BaseModel):

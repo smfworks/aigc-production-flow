@@ -126,7 +126,11 @@ export default function App() {
       try {
         const blob = await packToZipBlob(pack);
         downloadBlob(blob, zipFilename(pack, !asDraft && complete));
-        showToast(asDraft ? "Draft zip downloaded." : "Pack zip downloaded.");
+        showToast(
+          asDraft
+            ? "Draft zip downloaded. Open in Studio → pick an episode → Import pack zip."
+            : "Pack zip downloaded. Open in Studio → pick an episode → Import pack zip.",
+        );
       } catch (error) {
         showToast(error instanceof Error ? error.message : "Export failed.");
       } finally {

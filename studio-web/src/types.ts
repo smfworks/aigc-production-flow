@@ -70,10 +70,21 @@ export type ReviewEvent = {
   created_at: string;
 };
 
+export type ReviewSignoff = {
+  id: string;
+  episode_id: string;
+  user_name: string;
+  role: OrgRole;
+  note: string;
+  created_at: string;
+};
+
 export type Review = {
   current: ReviewStateName;
   history: ReviewEvent[];
   latest_gates: GateSnapshot | null;
+  signoffs?: ReviewSignoff[];
+  signed_off?: boolean;
 };
 
 export type Comment = {
@@ -93,11 +104,12 @@ export type OrgRole = "producer" | "editor" | "reviewer" | "viewer";
 
 export type StudioUser = {
   name: string;
-  auth_mode: "local" | "forward-header";
+  auth_mode: "local" | "forward-header" | "oidc";
   sso: string;
   role: OrgRole | null;
   org_id: string | null;
   permissions: string[];
+  oidc_role?: OrgRole | null;
 };
 
 export type OrgMember = {
@@ -145,7 +157,7 @@ export type MediaAsset = {
 export type Meta = {
   name: string;
   phase: number;
-  auth_mode: "local" | "forward-header";
+  auth_mode: "local" | "forward-header" | "oidc";
   sso: string;
   pack_builder_url: string;
   docs: string;
@@ -161,6 +173,9 @@ export type Meta = {
   media_note?: string;
   presence_ttl_seconds?: number;
   roles?: string[];
+  celery_enabled?: boolean;
+  oidc_configured?: boolean;
+  oidc_apply_role_claim?: boolean;
 };
 
 export const REVIEW_COPY: Record<ReviewStateName, string> = {
@@ -168,7 +183,7 @@ export const REVIEW_COPY: Record<ReviewStateName, string> = {
   "needs-art": "Sheets or plates missing",
   "needs-edit": "Joins / verbs / takes still open",
   "preview-watched": "Hop-1 watched; not generate-ok yet",
-  "generate-ok": "All gates green AND hop-1 receipts watched — GPU spend allowed",
+  "generate-ok": "All gates green, hop-1 receipts watched, AND a reviewer/producer sign-off — GPU spend allowed",
 };
 
 export const SHOT_READINESS = ["draft", "candidates", "linked", "ready"] as const;

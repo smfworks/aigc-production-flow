@@ -28,7 +28,9 @@ class JobWorker:
     def enabled(self) -> bool:
         if self.force:
             return True
-        return (get_settings().job_worker or "thread").strip().lower() == "thread"
+        from .modes import WORKER_THREAD, normalize_worker
+
+        return normalize_worker(get_settings().job_worker) == WORKER_THREAD
 
     def start(self) -> None:
         if not self.enabled:
@@ -38,7 +40,11 @@ class JobWorker:
         self._stop.clear()
         self._thread = threading.Thread(target=self._loop, name="studio-job-worker", daemon=True)
         self._thread.start()
-        log.info("Studio job worker started (in-process thread). Celery is not running.")
+        log.info(
+            "Studio job worker started (in-process thread). "
+            "Celery is opt-in (STUDIO_JOB_WORKER=celery) and is not running in this process. "
+            "Do not also start a Celery worker against the same SQLite file."
+        )
 
     def stop(self) -> None:
         self._stop.set()
@@ -72,7 +78,10 @@ class JobWorker:
 
     def run_forever(self) -> None:
         self.force = True
-        log.info("Studio job worker polling (standalone). Celery upgrade: consume jobs from this table.")
+        log.info(
+            "Studio job worker polling (standalone thread). "
+            "Celery is a separate opt-in process — do not run both against the same SQLite file."
+        )
         try:
             self._loop()
         except KeyboardInterrupt:

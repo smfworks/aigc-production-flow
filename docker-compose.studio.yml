@@ -1,4 +1,4 @@
-# Phase 5 studio pack. Not production SSO. No secrets in this file.
+# Phase 6 studio pack. Not a production IdP. No secrets in this file.
 #
 #   docker compose -f docker-compose.studio.yml up --build
 #
@@ -7,12 +7,17 @@
 #   studio-web   5174  nginx SPA; /api proxies to studio-api
 #
 # Optional profiles (not started by default):
-#   --profile worker    standalone poller. Set STUDIO_JOB_WORKER=off on the API first.
+#   --profile worker    standalone thread poller. Set STUDIO_JOB_WORKER=off on the API first.
 #   --profile postgres  Postgres instead of the SQLite volume. Point STUDIO_DATABASE_URL at it.
 #   --profile minio     local object store. Set STUDIO_MEDIA_BACKEND=s3 + bucket/endpoint + credentials
 #                       in the *runtime environment* (do not commit them). Unset → local disk, honestly.
+#   --profile celery    Redis + Celery worker. Set STUDIO_JOB_WORKER=celery on the API.
+#                       Never run the thread worker and this Celery worker against the same SQLite file.
+#                       Prefer --profile postgres when using Celery.
 #
-# Celery and OIDC are not in this compose file.
+# OIDC is env-only (STUDIO_AUTH_MODE=oidc + issuer + audience). This file does not
+# enable it. Placeholders only — do not commit client secrets.
+
 
 services:
   studio-api:
@@ -33,7 +38,16 @@ services:
       STUDIO_PACK_BUILDER_URL: ${STUDIO_PACK_BUILDER_URL:-http://localhost:5173}
       STUDIO_CORS_ORIGINS: ${STUDIO_CORS_ORIGINS:-http://localhost:5174,http://127.0.0.1:5174,http://localhost:8000}
       STUDIO_JOB_WORKER: ${STUDIO_JOB_WORKER:-thread}
+      STUDIO_CELERY_BROKER_URL: ${STUDIO_CELERY_BROKER_URL:-}
       STUDIO_AUTH_MODE: ${STUDIO_AUTH_MODE:-local}
+      STUDIO_OIDC_ISSUER: ${STUDIO_OIDC_ISSUER:-}
+      STUDIO_OIDC_AUDIENCE: ${STUDIO_OIDC_AUDIENCE:-}
+      STUDIO_OIDC_CLIENT_ID: ${STUDIO_OIDC_CLIENT_ID:-}
+      STUDIO_OIDC_JWKS_URL: ${STUDIO_OIDC_JWKS_URL:-}
+      STUDIO_OIDC_NAME_CLAIM: ${STUDIO_OIDC_NAME_CLAIM:-preferred_username}
+      STUDIO_OIDC_ROLE_CLAIM: ${STUDIO_OIDC_ROLE_CLAIM:-}
+      STUDIO_OIDC_ROLE_MAP: ${STUDIO_OIDC_ROLE_MAP:-}
+      STUDIO_OIDC_APPLY_ROLE_CLAIM: ${STUDIO_OIDC_APPLY_ROLE_CLAIM:-false}
       STUDIO_STILL_ADAPTER: ${STUDIO_STILL_ADAPTER:-stub}
       STUDIO_CLIP_ADAPTER: ${STUDIO_CLIP_ADAPTER:-stub}
     volumes:
@@ -69,6 +83,36 @@ services:
     volumes:
       - studio-data:/data
     depends_on:
+      studio-api:
+        condition: service_started
+
+  redis:
+    profiles: ["celery"]
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  studio-celery:
+    profiles: ["celery"]
+    build:
+      context: ./studio
+    command: ["celery", "-A", "app.jobs.celery_app", "worker", "--loglevel=info"]
+    environment:
+      STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-sqlite:////data/studio.db}
+      STUDIO_MEDIA_ROOT: /data/media
+      STUDIO_MEDIA_BACKEND: ${STUDIO_MEDIA_BACKEND:-local}
+      STUDIO_S3_BUCKET: ${STUDIO_S3_BUCKET:-}
+      STUDIO_S3_ENDPOINT: ${STUDIO_S3_ENDPOINT:-}
+      STUDIO_S3_PREFIX: ${STUDIO_S3_PREFIX:-}
+      STUDIO_JOB_WORKER: celery
+      STUDIO_CELERY_BROKER_URL: ${STUDIO_CELERY_BROKER_URL:-redis://redis:6379/0}
+      STUDIO_STILL_ADAPTER: ${STUDIO_STILL_ADAPTER:-stub}
+      STUDIO_CLIP_ADAPTER: ${STUDIO_CLIP_ADAPTER:-stub}
+    volumes:
+      - studio-data:/data
+    depends_on:
+      redis:
+        condition: service_started
       studio-api:
         condition: service_started
 

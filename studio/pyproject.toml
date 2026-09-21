@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aigc-studio"
-version = "0.1.0"
-description = "Phase 5 studio spine for the AIGC production flow (RBAC, presence, comments, media adapters)."
+version = "0.6.0"
+description = "Phase 6 studio spine for the AIGC production flow (optional Celery/OIDC, review sign-off, pack bridge)."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
@@ -24,12 +24,19 @@ dependencies = [
 dev = [
   "pytest>=8.3.0",
   "httpx>=0.27.0",
+  "PyJWT[crypto]>=2.9.0",
 ]
 postgres = [
   "psycopg[binary]>=3.2.0",
 ]
 s3 = [
   "boto3>=1.35.0",
+]
+celery = [
+  "celery[redis]>=5.4.0",
+]
+oidc = [
+  "PyJWT[crypto]>=2.9.0",
 ]
 
 [tool.setuptools.packages.find]

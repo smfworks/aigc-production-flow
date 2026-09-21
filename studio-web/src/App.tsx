@@ -27,10 +27,15 @@ import { AuditLog } from "./AuditLog.tsx";
 import { MembersPanel } from "./MembersPanel.tsx";
 import { PresenceBar } from "./PresenceBar.tsx";
 import { AdapterStrip } from "./AdapterStrip.tsx";
-import { navigate, parseHash, type View } from "./nav.ts";
+import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
 
 function can(user: StudioUser | null, perm: string): boolean {
   return Boolean(user?.permissions?.includes(perm));
+}
+
+function copyShare(view: View): Promise<void> {
+  const href = shareUrl(view);
+  return navigator.clipboard.writeText(href);
 }
 
 function formatWhen(iso: string): string {
@@ -82,15 +87,15 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 5</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 6</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
           Projects, hop-1 preview desk, members, presence, and adapter health around the pack zip.
-          Jobs run in-process with adapter=<code>stub</code> unless a live hook is set. Budget
-          units are operator credits — not a cloud bill. Media is local disk unless S3 is
-          configured. Pack zip remains the contract.
+          Jobs default to an in-process thread worker; Celery is opt-in. Budget units are operator
+          credits — not a cloud bill. Media is local disk unless S3 is configured. OIDC is opt-in
+          and off by default. Pack zip remains the contract.
         </p>
         <nav className="mast-nav" aria-label="Studio">
           <button
@@ -148,13 +153,14 @@ export default function App() {
           </label>
           {me?.role ? <em className={`role-chip is-${me.role}`}>{me.role}</em> : <em className="role-chip">not a member</em>}
           <span className="hint">
-            Auth {meta?.auth_mode ?? "local"}. Roles are app-level. SSO/OIDC is not implemented —
-            docs/AUTH.md.
+            Auth {meta?.auth_mode ?? "local"}
+            {meta?.oidc_configured ? " (OIDC JWKS configured)" : " (OIDC off)"}. Roles are
+            app-level. docs/AUTH.md.
           </span>
           {meta?.still_adapter ? (
             <span className="hint">
-              still={meta.still_adapter} · clip={meta.clip_adapter} · worker={meta.job_worker} ·
-              media={meta.media_backend || "local"}
+              still={meta.still_adapter} · clip={meta.clip_adapter} · worker={meta.job_worker}
+              {meta.celery_enabled ? " (celery opt-in)" : ""} · media={meta.media_backend || "local"}
             </span>
           ) : null}
         </div>
@@ -169,6 +175,23 @@ export default function App() {
         <p className="banner banner-bad" role="alert">
           {error}
           <button type="button" className="text-btn" onClick={() => setError(null)}>
+            dismiss
+          </button>
+        </p>
+      ) : null}
+      {importHint() ? (
+        <p className="banner banner-ok" role="status">
+          Pack builder handoff: export a zip there, open a project/episode, then{" "}
+          <strong>Import pack zip</strong>. Deep links:{" "}
+          <code>#/projects/&lt;id&gt;/episodes/&lt;id&gt;</code>
+          <button
+            type="button"
+            className="text-btn"
+            onClick={() => {
+              clearImportHint();
+              setNotice("Import hint dismissed");
+            }}
+          >
             dismiss
           </button>
         </p>
@@ -524,6 +547,17 @@ function ProjectView({
         <button type="button" className="btn" onClick={() => navigate({ page: "audit", projectId })}>
           Audit
         </button>
+        <button
+          type="button"
+          className="btn"
+          onClick={() =>
+            void copyShare({ page: "project", projectId })
+              .then(() => onNotice("Copied project link"))
+              .catch(onError)
+          }
+        >
+          Copy project link
+        </button>
       </form>
       <p className="hint">
         Live slots (comfy-h3, comfy-qwen, webhook, cli) fall back to stub if the hook is unset.
@@ -620,6 +654,8 @@ function EpisodeView({
   const [selectedShotId, setSelectedShotId] = useState<string | null>(shotId ?? null);
   const [commentBody, setCommentBody] = useState("");
   const [note, setNote] = useState("");
+  const [signoffNote, setSignoffNote] = useState("");
+  const [overrideGenerate, setOverrideGenerate] = useState(false);
   const [kind, setKind] = useState("plate");
   const [entityType, setEntityType] = useState("");
   const [entity, setEntity] = useState("");
@@ -663,10 +699,12 @@ function EpisodeView({
 
   const gates = review?.latest_gates?.gates ?? [];
   const allGreen = review?.latest_gates?.all_green === true;
-  const generateBlocked = useMemo(
-    () => !allGreen || desk?.generate_ok_ready !== true,
-    [allGreen, desk],
-  );
+  const signedOff = review?.signed_off === true;
+  const generateBlocked = useMemo(() => {
+    if (!allGreen || desk?.generate_ok_ready !== true) return true;
+    if (signedOff) return false;
+    return !(overrideGenerate && me?.role === "producer");
+  }, [allGreen, desk, signedOff, overrideGenerate, me?.role]);
 
   useEffect(() => {
     const dirty = jobs.some((job) => job.status === "queued" || job.status === "running");
@@ -698,11 +736,28 @@ function EpisodeView({
 
   async function changeState(state: ReviewStateName) {
     try {
-      const next = await api.setReview(episodeId, state, note.trim());
+      const next = await api.setReview(
+        episodeId,
+        state,
+        note.trim(),
+        state === "generate-ok" && overrideGenerate && !signedOff,
+      );
       setReview(next);
       setEpisode((current) => (current ? { ...current, review_state: next.current } : current));
       setNote("");
+      setOverrideGenerate(false);
       onNotice(`Review → ${state}`);
+    } catch (err) {
+      onError(err);
+    }
+  }
+
+  async function submitSignoff() {
+    try {
+      const next = await api.signOff(episodeId, signoffNote.trim());
+      setReview(next);
+      setSignoffNote("");
+      onNotice("Signed off — generate-ok can proceed if gates and hop-1 receipts are ready");
     } catch (err) {
       onError(err);
     }
@@ -773,7 +828,7 @@ function EpisodeView({
         <div className="toolbar">
           <button
             type="button"
-            className="btn"
+            className={importHint() ? "btn btn-go" : "btn"}
             onClick={() => packRef.current?.click()}
             disabled={!can(me, "pack")}
           >
@@ -825,6 +880,17 @@ function EpisodeView({
           <a className="btn" href={packBuilderUrl} target="_blank" rel="noreferrer">
             Open pack builder
           </a>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              void copyShare({ page: "episode", projectId, episodeId, shotId: selectedShotId || undefined })
+                .then(() => onNotice("Copied episode/shot link"))
+                .catch(onError)
+            }
+          >
+            Copy episode link
+          </button>
           <button type="button" className="btn" onClick={() => setShowBuilder((value) => !value)}>
             {showBuilder ? "Hide builder iframe" : "Show builder iframe"}
           </button>
@@ -844,9 +910,14 @@ function EpisodeView({
           <p className="hint">
             Latest: {episode.latest_revision.filename}
             {episode.latest_revision.all_gates_green ? " · gates green" : " · not generate-ready"}
+            {" · "}
+            Share: {typeof window !== "undefined" ? shareUrl({ page: "episode", projectId, episodeId }) : ""}
           </p>
         ) : (
-          <p className="hint">No revision yet. Export from the builder at {packBuilderUrl}, then import here.</p>
+          <p className="hint">
+            No revision yet. Export from the builder at {packBuilderUrl}, then Import pack zip here
+            {importHint() ? " (handoff from the pack builder)." : "."}
+          </p>
         )}
         {showBuilder ? (
           <iframe
@@ -939,7 +1010,7 @@ function EpisodeView({
         <h3>Jobs</h3>
         <p className="hint">
           Path: green pack → batch-precheck → stub hop-1 → attach preview+receipt → preview-watched.
-          Adapter label is honest. This is not Celery.
+          Adapter label is honest. Default worker is thread. Celery is opt-in.
           {adapterHealth.some((row) => row.live && !row.ok)
             ? " Live adapters in the strip that are down will 409 on enqueue — use stub or fix the hook."
             : ""}
@@ -993,9 +1064,52 @@ function EpisodeView({
         <p className="hint">
           Current: <strong>{review?.current ?? "draft"}</strong>
           {generateBlocked
-            ? " — generate-ok refused while any gate is red or a required hop-1 lacks preview-watched + receipt."
+            ? " — generate-ok refused while any gate is red, a required hop-1 lacks preview-watched + receipt, or a reviewer/producer has not signed off."
             : ""}
         </p>
+        <div className="signoff-box">
+          <p>
+            Sign-off:{" "}
+            {signedOff
+              ? `${review?.signoffs?.[0]?.user_name ?? "someone"} (${review?.signoffs?.[0]?.role ?? ""})`
+              : "none yet — required before generate-ok"}
+          </p>
+          <label className="note-field">
+            Sign-off note
+            <input value={signoffNote} onChange={(event) => setSignoffNote(event.target.value)} />
+          </label>
+          <button
+            type="button"
+            className="btn btn-go"
+            disabled={!can(me, "signoff")}
+            onClick={() => void submitSignoff()}
+          >
+            Sign off
+          </button>
+          {!can(me, "signoff") ? (
+            <span className="hint">Reviewers and producers can sign off. Viewers cannot.</span>
+          ) : null}
+          {me?.role === "producer" && !signedOff ? (
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={overrideGenerate}
+                onChange={(event) => setOverrideGenerate(event.target.checked)}
+              />
+              Producer override (audited as review.override)
+            </label>
+          ) : null}
+          {review?.signoffs?.length ? (
+            <ul className="history">
+              {review.signoffs.map((row) => (
+                <li key={row.id}>
+                  <strong>{row.user_name}</strong> · {row.role} · {formatWhen(row.created_at)}
+                  {row.note ? ` — ${row.note}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
         <div className="states">
           {REVIEW_STATES.map((state) => (
             <button
@@ -1123,8 +1237,8 @@ function EpisodeView({
         </div>
       </section>
       <p className="hint">
-        Project {projectId}. Builder remains the four-stage walk. generate-ok needs every gate green
-        and hop-1 receipts watched.
+        Project {projectId}. Builder remains the four-stage walk. generate-ok needs every gate
+        green, hop-1 receipts watched, and a reviewer/producer sign-off.
       </p>
     </div>
   );
