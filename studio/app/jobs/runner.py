@@ -89,6 +89,16 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
         if result.media_bytes:
             asset = _store_media(session, job, episode, result)
             job.media_id = asset.id
+            if result.ok and job.job_type == "clip-hop1" and job.shot:
+                from ..preview import apply_receipt
+
+                apply_receipt(
+                    session,
+                    job.shot,
+                    user_name=job.created_by,
+                    media_id=asset.id,
+                    parse_media=True,
+                )
         if result.ok:
             job.status = "succeeded"
             job.progress = 100

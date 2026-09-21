@@ -129,8 +129,9 @@ export function PreviewDesk({
         <form className="stack" onSubmit={(event) => void submit(event, false)}>
           <p className="hint">
             Shot #{shot.sort_index + 1}.{" "}
-            {shot.preview?.blockers?.length
-              ? shot.preview.blockers.join(" ")
+            {!shot.preview || shot.preview.blockers.length
+              ? shot.preview?.blockers.join(" ") ||
+                "Attach hop-1 preview media and a continuity receipt, then mark preview-watched."
               : "Receipt complete — clip-extend and generate-ok can proceed if gates are green."}
           </p>
           <div className="create-row">

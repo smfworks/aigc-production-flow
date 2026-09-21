@@ -45,6 +45,14 @@ def test_path_green_precheck_stub_hop1_receipt_generate_ok(client, auth):
     dumped = str(hop["result"]).lower()
     assert "qwen ran" not in dumped
     assert "h3 ran" not in dumped
+    receipt = client.get(
+        f"/api/episodes/{episode['id']}/shots/{shot_id}/receipt",
+        headers=auth,
+    ).json()
+    assert receipt["media_id"] == hop["media_id"]
+    assert receipt["preview_watched"] is False
+    assert receipt["duration_s"] == 10.125
+    assert receipt["frames"] == 243
 
     precheck = client.post(
         "/api/jobs",
