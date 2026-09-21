@@ -2,7 +2,7 @@ from fastapi import APIRouter, status
 
 from ..adapters.catalog import require_slot
 from ..audit import PROJECT_CREATE, record
-from ..deps import DbDep, get_default_org
+from ..deps import DbDep, get_active_org
 from ..models import utcnow
 from ..rbac import MutateUser, ReadUser
 from ..schemas import ProjectFromTemplate, VerticalTemplateOut
@@ -48,7 +48,7 @@ def new_from_template(
 ) -> dict:
     still = require_slot(body.still_adapter, "still") if body.still_adapter else None
     clip = require_slot(body.clip_adapter, "clip") if body.clip_adapter else None
-    org = get_default_org(db)
+    org = get_active_org(db, user)
     from ..routers.projects import _unique_slug
 
     project, episode, revision = create_project_from_template(

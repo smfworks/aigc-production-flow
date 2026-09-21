@@ -2,30 +2,39 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
+from sqlalchemy import text
 
 from . import database as database_module
 from .adapters.catalog import CATALOG
+from .adapters.health import catalog_health
 from .adapters.registry import resolve_adapter_name
 from .auth import _mode, _sso_note
 from .budget import DISCLAIMER
 from .config import get_settings
 from .database import Base, get_db
-from .deps import DbDep, UserDep
+from .deps import DbDep, ScopedUserDep
 from .jobs.modes import WORKER_CELERY, normalize_worker
 from .jobs.worker import start_worker, stop_worker
-from .models import Organization
+from .models import Job
+from .notify import webhook_configured
+from .observability import StructuredLogMiddleware, prometheus_text
 from .oidc import oidc_configured
-from .rbac import attach_role
 from .routers import (
     adapters,
     audit,
+    backup,
     budget,
     comments,
+    continuity,
+    demo,
     episodes,
     export,
     jobs,
     media,
     members,
+    notifications,
+    orgs,
     packs,
     presence,
     preview,
@@ -35,7 +44,7 @@ from .routers import (
     shots,
     templates,
 )
-from .schemas import MetaOut, OrganizationOut, UserOut
+from .schemas import MetaOut, UserOut
 from .seed import seed_default_org
 from .store import active_backend, media_note, requested_backend, s3_ready
 
@@ -63,24 +72,26 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.6.0",
+        version="0.7.0",
         description=(
-            "Phase 6 studio spine for the AIGC production flow. "
+            "Phase 7 studio spine for the AIGC production flow. "
             "Pack zip remains the collaboration contract. "
+            "Multi-org lite: membership isolation, not SaaS billing, not SSO org mapping. "
             "App-level org roles (producer / editor / reviewer / viewer) sit on top of "
             "local-dev Bearer, optional X-Forwarded-User, or optional OIDC JWKS. "
             "OIDC and Celery are opt-in and off by default. This is not a production IdP. "
-            "This is not multi-tenant SaaS security. "
             "Default jobs run in-process (thread worker). "
             "Adapter catalog: stub plus documented slots (comfy-h3, comfy-qwen, webhook, cli). "
             "Budget units come from an operator rate table — not a cloud invoice. "
             "Media defaults to local disk; S3/MinIO is opt-in and never claimed live when unset. "
             "generate-ok requires gates + hop-1 receipts + a reviewer/producer sign-off "
-            "(producer override is audited)."
+            "(producer override is audited). "
+            "Optional notify webhook is unset by default. /metrics is a tiny Prometheus scrape, not APM."
         ),
         license_info={"name": "MIT", "identifier": "MIT"},
         lifespan=lifespan,
     )
+    application.add_middleware(StructuredLogMiddleware)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -105,6 +116,11 @@ def create_app() -> FastAPI:
     application.include_router(templates.router)
     application.include_router(members.router)
     application.include_router(presence.router)
+    application.include_router(orgs.router)
+    application.include_router(notifications.router)
+    application.include_router(continuity.router)
+    application.include_router(demo.router)
+    application.include_router(backup.router)
 
     @application.get("/", tags=["meta"])
     def root() -> dict:
@@ -112,21 +128,71 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 6,
+            "phase": 7,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",
             "sso": _sso_note(_mode(cfg.auth_mode)),
+            "multi_org": "lite — membership isolation, not SaaS billing",
             "job_worker": worker,
             "celery": worker == WORKER_CELERY,
             "adapters": [slot.id for slot in CATALOG],
             "media_backend": active_backend(cfg),
+            "notify_webhook_configured": webhook_configured(cfg),
             "budget": DISCLAIMER,
         }
 
     @application.get("/health", tags=["meta"])
     def health() -> dict:
         return {"ok": True}
+
+    @application.get("/healthz", tags=["meta"])
+    def healthz() -> dict:
+        return {"ok": True, "live": True}
+
+    @application.get("/readyz", tags=["meta"])
+    def readyz() -> dict:
+        cfg = get_settings()
+        worker = normalize_worker(cfg.job_worker)
+        db_ok = False
+        detail = ""
+        session = next(get_db())
+        try:
+            session.execute(text("SELECT 1"))
+            db_ok = True
+        except Exception as exc:  # noqa: BLE001 — readiness must not raise
+            detail = str(exc)
+        finally:
+            session.close()
+        body = {
+            "ok": db_ok,
+            "db": db_ok,
+            "job_worker": worker,
+            "celery": worker == WORKER_CELERY,
+            "note": "DB reachable + worker mode reported. Celery/S3/OIDC are not required for ready.",
+        }
+        if detail:
+            body["detail"] = detail
+        if not db_ok:
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse(status_code=503, content=body)
+        return body
+
+    @application.get("/metrics", tags=["meta"], response_class=PlainTextResponse)
+    def metrics() -> str:
+        session = next(get_db())
+        try:
+            queued = session.query(Job).filter(Job.status == "queued").count()
+            running = session.query(Job).filter(Job.status == "running").count()
+        finally:
+            session.close()
+        health_rows = catalog_health()
+        return prometheus_text(
+            job_queued=queued,
+            job_running=running,
+            adapter_health=health_rows,
+        )
 
     @application.get("/api/meta", response_model=MetaOut, tags=["meta"])
     def meta() -> MetaOut:
@@ -150,18 +216,13 @@ def create_app() -> FastAPI:
             celery_enabled=worker == WORKER_CELERY,
             oidc_configured=oidc_configured(cfg),
             oidc_apply_role_claim=bool(cfg.oidc_apply_role_claim),
+            notify_webhook_configured=webhook_configured(cfg),
+            multi_org=True,
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])
-    def me(user: UserDep, db: DbDep) -> UserOut:
-        return attach_role(user, db, required=False)
-
-    @application.get("/api/orgs", response_model=list[OrganizationOut], tags=["meta"])
-    def list_orgs(user: UserDep, db: DbDep) -> list[OrganizationOut]:
-        # Membership is not required to see the default org name; mutating it is.
-        _ = user
-        rows = db.query(Organization).order_by(Organization.created_at.asc()).all()
-        return [OrganizationOut.model_validate(row) for row in rows]
+    def me(user: ScopedUserDep) -> UserOut:
+        return user
 
     return application
 

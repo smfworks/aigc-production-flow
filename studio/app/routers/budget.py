@@ -9,8 +9,8 @@ router = APIRouter(tags=["budget"])
 
 
 @router.get("/api/budget", response_model=BudgetDashboardOut)
-def org_budget(_user: ReadUser, db: DbDep) -> BudgetDashboardOut:
-    return BudgetDashboardOut.model_validate(summarize(db))
+def org_budget(user: ReadUser, db: DbDep) -> BudgetDashboardOut:
+    return BudgetDashboardOut.model_validate(summarize(db, organization_id=user.org_id))
 
 
 @router.get("/api/projects/{project_id}/budget", response_model=BudgetDashboardOut)

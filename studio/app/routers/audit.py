@@ -10,7 +10,7 @@ router = APIRouter(tags=["audit"])
 
 @router.get("/api/audit", response_model=list[AuditEventOut])
 def get_audit(
-    _user: ReadUser,
+    user: ReadUser,
     db: DbDep,
     project_id: str | None = None,
     episode_id: str | None = None,
@@ -30,6 +30,7 @@ def get_audit(
             db,
             project_id=project_id,
             episode_id=episode_id,
+            organization_id=user.org_id,
             action=action,
             limit=limit,
         )

@@ -42,6 +42,8 @@ _ADDITIVE_COLUMNS = (
     ("comments", "resolved", "BOOLEAN DEFAULT 0"),
     ("comments", "resolved_by", "VARCHAR(120) DEFAULT ''"),
     ("comments", "resolved_at", "DATETIME"),
+    ("organizations", "is_default", "BOOLEAN DEFAULT 0"),
+    ("audit_events", "organization_id", "VARCHAR(36)"),
 )
 
 

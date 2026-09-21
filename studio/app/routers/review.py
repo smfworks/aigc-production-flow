@@ -54,6 +54,9 @@ def create_signoff(
     episode_id: str, body: ReviewSignoffCreate, user: SignoffUser, db: DbDep
 ) -> ReviewOut:
     episode = get_episode(db, episode_id)
+    from ..notify import blocker_codes, notify_blockers_cleared
+
+    before = blocker_codes(episode)
     row = add_signoff(
         db,
         episode,
@@ -72,6 +75,8 @@ def create_signoff(
         entity_id=episode.id,
         detail={"note": (body.note or "").strip(), "role": user.role, "signoff_id": row.id},
     )
+    db.flush()
+    notify_blockers_cleared(db, episode, before, blocker_codes(episode), actor=user.name)
     db.commit()
     db.refresh(episode)
     return _review_out(episode)
@@ -138,6 +143,10 @@ def set_review(episode_id: str, body: ReviewSet, user: ReviewUser, db: DbDep) ->
             entity_id=episode.id,
             detail={"state": body.state, "note": body.note.strip()},
         )
+    if body.state == "preview-watched":
+        from ..notify import notify_signoff_requested
+
+        notify_signoff_requested(db, episode, actor=user.name)
     db.commit()
     db.refresh(episode)
     return _review_out(episode)

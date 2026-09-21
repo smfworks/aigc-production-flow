@@ -113,17 +113,17 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
-## Studio spine (Phase 6) vs pack builder
+## Studio spine (Phase 7) vs pack builder
 
 Two pieces, one contract:
 
 | | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
 |---|---|---|
-| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. **Open in Studio** handoff. | Projects, episodes, pack revisions, review **sign-off**, comments, media, shots, job center, stub adapters, hop-1 desk, budget, audit, EDL, templates, RBAC lite, presence, adapter health. Optional Celery / OIDC. |
+| Job | Four-stage walk. Export markdown zip + `pack.json`. Entity schedule + lock-diff gates. List + canvas boards. **Open in Studio** handoff. | Projects, episodes, pack revisions, review **sign-off**, comments, media, shots, job center, stub adapters, hop-1 desk, budget, audit, EDL, templates, RBAC lite, presence, adapter health, **multi-org lite**, **notifications**, **continuity panel**, **demo seed**, **backup**. Optional Celery / OIDC. |
 | Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. Compose pack: `docker-compose.studio.yml`. |
-| Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles. Optional OIDC JWKS (**off by default**). [docs/AUTH.md](docs/AUTH.md). |
+| Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles. Optional OIDC JWKS (**off by default**). Multi-org lite is membership isolation, not SaaS. [docs/AUTH.md](docs/AUTH.md). |
 | Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green, hop-1 receipts are preview-watched, **and** a reviewer/producer has signed off. Default adapter=`stub`. Budget units are operator credits, not a cloud bill. Media is local disk unless S3 is configured. |
-| Not this | NLE, GPU, MP4. | Full NLE, CapCut clone, a generate API. Celery and OIDC stay opt-in. |
+| Not this | NLE, GPU, MP4. | Full NLE, CapCut clone, a generate API, SaaS billing. Celery and OIDC stay opt-in. |
 
 Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/STUDIO.md](docs/STUDIO.md).
 
@@ -134,7 +134,7 @@ Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/
 # Builder http://localhost:5173
 ```
 
-Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, or sign-off is missing.
+Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. Create a second org, switch, confirm the member cannot see it. Seed a demo episode. Open Continuity. Bell on a stub job. `/readyz` green. Download a backup zip. A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, or sign-off is missing.
 
 CI: GitHub Actions runs `studio` pytest, `app` `npm test`, and `studio-web` `tsc --noEmit` on every pull request and fails the PR on red.
 
@@ -156,8 +156,8 @@ data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 templates/verticals/     education / brand promo / short-drama empty packs
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 6 studio operator path (sign-off, celery/oidc opt-in, pack bridge)
-docs/AUTH.md             local / forward-header / optional OIDC — off by default, not a production IdP
+docs/STUDIO.md           Phase 7 studio operator path (multi-org lite, notifications, continuity, backup)
+docs/AUTH.md             local / forward-header / optional OIDC — multi-org lite, not SaaS or a production IdP
 docs/FRAMEWORK.md        why the pack looks like this
 docs/IMAGE-STILLS.md     still factory → clip factory (sheet vs plate)
 docs/HOW-TO.md           GitHub + local workflow, step by step

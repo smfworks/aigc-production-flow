@@ -75,6 +75,11 @@ def add_comment(
             "board_node_id": comment.board_node_id,
         },
     )
+    from ..notify import notify_comment
+
+    org_id = episode.project.organization_id if episode.project else user.org_id
+    if org_id:
+        notify_comment(db, comment, org_id=org_id)
     db.commit()
     db.refresh(comment)
     return _comment_out(comment)
@@ -85,6 +90,7 @@ def resolve_comment(comment_id: str, user: CommentUser, db: DbDep) -> CommentOut
     comment = db.get(Comment, comment_id)
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found.")
+    get_episode(db, comment.episode_id)
     if not comment.resolved:
         comment.resolved = True
         comment.resolved_by = user.name

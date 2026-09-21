@@ -112,6 +112,9 @@ def set_receipt(
     episode_id: str, shot_id: str, body: ReceiptSet, user: MutateUser, db: DbDep
 ) -> ContinuityReceiptOut:
     shot = _get_shot(db, episode_id, shot_id)
+    from ..notify import blocker_codes, notify_blockers_cleared
+
+    before = blocker_codes(shot.episode)
     receipt = apply_receipt(
         db,
         shot,
@@ -129,6 +132,8 @@ def set_receipt(
     )
     shot.episode.updated_at = utcnow()
     touch(shot.episode.project)
+    db.flush()
+    notify_blockers_cleared(db, shot.episode, before, blocker_codes(shot.episode), actor=user.name)
     db.commit()
     db.refresh(receipt)
     return receipt_out(receipt)  # type: ignore[return-value]
@@ -150,11 +155,16 @@ def set_preview_watched(
                 "message": "Attach hop-1 preview media and a continuity receipt before preview-watched.",
             },
         )
+    from ..notify import blocker_codes, notify_blockers_cleared
+
+    before = blocker_codes(shot.episode)
     receipt = mark_preview_watched(shot.receipt, user.name, body.watched)
     if body.note.strip():
         receipt.notes = (receipt.notes + "\n" + body.note.strip()).strip()
     shot.episode.updated_at = utcnow()
     touch(shot.episode.project)
+    db.flush()
+    notify_blockers_cleared(db, shot.episode, before, blocker_codes(shot.episode), actor=user.name)
     db.commit()
     db.refresh(receipt)
     return receipt_out(receipt)  # type: ignore[return-value]

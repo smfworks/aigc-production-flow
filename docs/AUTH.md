@@ -1,8 +1,10 @@
 # Auth (studio spine)
 
-Identity modes pick **who the process believes you are**. App-level **roles** (`producer` / `editor` / `reviewer` / `viewer`) sit on the default org after that.
+Identity modes pick **who the process believes you are**. App-level **roles** (`producer` / `editor` / `reviewer` / `viewer`) sit on each organization the user belongs to.
 
 **OIDC is opt-in and off by default.** This repo does not ship a production IdP. Local-dev remains the default. Do not treat a local token or a lab JWKS as multi-tenant SaaS security.
+
+**Multi-org lite (Phase 7):** a producer can create additional organizations. `GET /api/orgs` lists orgs the caller belongs to. Send `X-Org-Id` to switch the active org (studio-web chrome does this). Members and projects are scoped to that org; other orgs 404. Existing single-org databases keep the seeded default org (`SMF Works (local)`). This is **not** billing, **not** SSO org mapping, and **not** a SaaS tenancy model. Optional OIDC role claims still only upsert membership on the **default** org when `STUDIO_OIDC_APPLY_ROLE_CLAIM` is true.
 
 ## Identity modes (`STUDIO_AUTH_MODE`)
 
@@ -14,13 +16,13 @@ Use the named values `local` (default), `forward-header`, or `oidc`. Aliases for
 | `forward-header` | **Required** `X-Forwarded-User` (set by the reverse proxy after it authenticates the human) | Bearer token still required so scripts and the Vite shell keep working |
 | `oidc` | JWT claims (`preferred_username`, then `email`, then `name`, then `sub`) | Bearer JWT validated against the issuer JWKS. **Not configured** unless `STUDIO_OIDC_ISSUER` and `STUDIO_OIDC_AUDIENCE` are set |
 
-Local-dev token default: `local-dev-token`. There is a single default organization.
+Local-dev token default: `local-dev-token`. Multi-org lite isolates memberships; it is not SaaS security.
 
 `/api/me` reports `auth_mode`, `sso`, `role`, and `oidc_configured` on `/api/meta`. Meta `oidc_configured` is true only when issuer **and** audience are set. An empty issuer is not a live IdP.
 
-## App-level roles (Phase 5, unchanged)
+## App-level roles (Phase 5, still per-org in Phase 7)
 
-Seed on first boot: default org + current `STUDIO_DEFAULT_USER` as **producer**.
+Seed on first boot: default org + current `STUDIO_DEFAULT_USER` as **producer**. Extra orgs created later get the creating producer as their first member.
 
 | Role | Reads | Writes |
 |---|---|---|
@@ -99,4 +101,5 @@ Until that exists, use `local`. The studio shell still shows a token field and a
 - Not a promise that a production IdP is running
 - Not a confidential-client OAuth app (no client secret, no login page)
 - Not a promise that `X-Forwarded-User` is spoof-proof without a locked-down proxy
-- Not multi-tenant isolation
+- Not multi-tenant isolation beyond membership 404s
+- Not SaaS billing or SSO org mapping

@@ -2,16 +2,18 @@ from fastapi import APIRouter, HTTPException, status
 
 from ..audit import MEMBER_ADD, MEMBER_ROLE, record
 from ..deps import DbDep
-from ..models import OrgMember, utcnow
-from ..rbac import MembersUser, ReadUser, default_org, normalize_role
+from ..models import Organization, OrgMember, utcnow
+from ..rbac import MembersUser, ReadUser, normalize_role
 from ..schemas import MemberCreate, MemberOut, MemberUpdate
 
 router = APIRouter(tags=["members"])
 
 
-def _org_or_404(db, org_id: str):
-    org = default_org(db)
-    if org is None or org.id != org_id:
+def _org_or_404(db, org_id: str, user) -> Organization:
+    if not user.org_id or user.org_id != org_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    org = db.get(Organization, org_id)
+    if org is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
     return org
 
@@ -26,8 +28,8 @@ def _last_producer_count(db, org_id: str, exclude_id: str | None = None) -> int:
 
 
 @router.get("/api/orgs/{org_id}/members", response_model=list[MemberOut])
-def list_members(org_id: str, _user: ReadUser, db: DbDep) -> list[MemberOut]:
-    org = _org_or_404(db, org_id)
+def list_members(org_id: str, user: ReadUser, db: DbDep) -> list[MemberOut]:
+    org = _org_or_404(db, org_id, user)
     rows = (
         db.query(OrgMember)
         .filter(OrgMember.organization_id == org.id)
@@ -43,7 +45,7 @@ def list_members(org_id: str, _user: ReadUser, db: DbDep) -> list[MemberOut]:
     status_code=status.HTTP_201_CREATED,
 )
 def add_member(org_id: str, body: MemberCreate, user: MembersUser, db: DbDep) -> MemberOut:
-    org = _org_or_404(db, org_id)
+    org = _org_or_404(db, org_id, user)
     name = body.user_name.strip()
     if not name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="user_name is empty.")
@@ -67,6 +69,7 @@ def add_member(org_id: str, body: MemberCreate, user: MembersUser, db: DbDep) ->
         action=MEMBER_ADD,
         entity_type="member",
         entity_id=member.id,
+        organization_id=org.id,
         detail={"user_name": name, "role": role},
     )
     db.commit()
@@ -78,7 +81,7 @@ def add_member(org_id: str, body: MemberCreate, user: MembersUser, db: DbDep) ->
 def change_role(
     org_id: str, member_id: str, body: MemberUpdate, user: MembersUser, db: DbDep
 ) -> MemberOut:
-    org = _org_or_404(db, org_id)
+    org = _org_or_404(db, org_id, user)
     member = db.get(OrgMember, member_id)
     if not member or member.organization_id != org.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found.")
@@ -98,6 +101,7 @@ def change_role(
         action=MEMBER_ROLE,
         entity_type="member",
         entity_id=member.id,
+        organization_id=org.id,
         detail={"user_name": member.user_name, "from": previous, "to": role},
     )
     db.commit()
@@ -107,7 +111,7 @@ def change_role(
 
 @router.delete("/api/orgs/{org_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_member(org_id: str, member_id: str, user: MembersUser, db: DbDep) -> None:
-    org = _org_or_404(db, org_id)
+    org = _org_or_404(db, org_id, user)
     member = db.get(OrgMember, member_id)
     if not member or member.organization_id != org.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found.")

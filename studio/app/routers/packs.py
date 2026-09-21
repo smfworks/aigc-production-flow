@@ -70,6 +70,9 @@ async def import_pack(
     file: UploadFile = File(..., description="Pack zip exported from the builder (must include pack.json)."),
 ) -> PackRevisionOut:
     episode = get_episode(db, episode_id)
+    from ..notify import blocker_codes
+
+    before = blocker_codes(episode)
     data = await file.read()
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload.")
@@ -109,6 +112,10 @@ async def import_pack(
             "all_gates_green": revision.all_gates_green,
         },
     )
+    db.flush()
+    from ..notify import blocker_codes, notify_blockers_cleared
+
+    notify_blockers_cleared(db, episode, before, blocker_codes(episode), actor=user.name)
     db.commit()
     db.refresh(revision)
     return _revision_out(revision)

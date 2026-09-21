@@ -22,6 +22,10 @@ COMMENT_CREATE = "comment.create"
 COMMENT_RESOLVE = "comment.resolve"
 MEMBER_ADD = "member.add"
 MEMBER_ROLE = "member.role"
+ORG_CREATE = "org.create"
+BACKUP_EXPORT = "backup.export"
+BACKUP_RESTORE = "backup.restore"
+DEMO_SEED = "demo.seed"
 
 ACTIONS = (
     REVIEW_SET,
@@ -38,6 +42,10 @@ ACTIONS = (
     COMMENT_RESOLVE,
     MEMBER_ADD,
     MEMBER_ROLE,
+    ORG_CREATE,
+    BACKUP_EXPORT,
+    BACKUP_RESTORE,
+    DEMO_SEED,
 )
 
 
@@ -48,15 +56,26 @@ def record(
     action: str,
     project_id: str | None = None,
     episode_id: str | None = None,
+    organization_id: str | None = None,
     entity_type: str = "",
     entity_id: str = "",
     detail: dict[str, Any] | None = None,
 ) -> AuditEvent:
+    org_id = organization_id
+    if org_id is None and project_id:
+        project = db.get(Project, project_id)
+        if project:
+            org_id = project.organization_id
+    if org_id is None and episode_id:
+        episode = db.get(Episode, episode_id)
+        if episode and episode.project:
+            org_id = episode.project.organization_id
     event = AuditEvent(
         actor=actor or "local-dev",
         action=action,
         project_id=project_id,
         episode_id=episode_id,
+        organization_id=org_id,
         entity_type=entity_type or "",
         entity_id=entity_id or "",
         detail=detail if isinstance(detail, dict) else {},
@@ -70,6 +89,7 @@ def list_events(
     *,
     project_id: str | None = None,
     episode_id: str | None = None,
+    organization_id: str | None = None,
     action: str | None = None,
     limit: int = 200,
 ) -> list[AuditEvent]:
@@ -78,6 +98,16 @@ def list_events(
         query = query.filter(AuditEvent.episode_id == episode_id)
     if project_id:
         query = query.filter(AuditEvent.project_id == project_id)
+    if organization_id:
+        query = query.filter(
+            (AuditEvent.organization_id == organization_id)
+            | (
+                AuditEvent.organization_id.is_(None)
+                & AuditEvent.project_id.in_(
+                    db.query(Project.id).filter(Project.organization_id == organization_id)
+                )
+            )
+        )
     if action:
         query = query.filter(AuditEvent.action == action)
     return query.limit(max(1, min(limit, 500))).all()
@@ -88,6 +118,9 @@ def event_out(event: AuditEvent) -> dict[str, Any]:
     project: Project | None = event.project
     if project is None and episode is not None:
         project = episode.project
+    org_id = event.organization_id
+    if not org_id and project is not None:
+        org_id = project.organization_id
     return {
         "id": event.id,
         "actor": event.actor,
@@ -96,6 +129,7 @@ def event_out(event: AuditEvent) -> dict[str, Any]:
         "entity_id": event.entity_id,
         "project_id": event.project_id or (episode.project_id if episode else None),
         "episode_id": event.episode_id,
+        "organization_id": org_id,
         "project_name": project.name if project else "",
         "episode_title": episode.title if episode else "",
         "detail": event.detail if isinstance(event.detail, dict) else {},

@@ -115,6 +115,7 @@ def download_media(asset_id: str, _user: ReadUser, db: DbDep):
     asset = db.get(MediaAsset, asset_id)
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
+    get_episode(db, asset.episode_id)
     store = get_store()
     local = store.local_path(asset.path)
     if local is not None:
@@ -134,6 +135,7 @@ def delete_media(asset_id: str, _user: MediaUser, db: DbDep) -> None:
     asset = db.get(MediaAsset, asset_id)
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
+    get_episode(db, asset.episode_id)
     rel = asset.path
     episode = asset.episode
     for job in db.query(Job).filter(Job.media_id == asset.id).all():

@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     s3_access_key: str = ""
     s3_secret_key: str = ""
     presence_ttl_seconds: int = 60
+    notify_webhook_url: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

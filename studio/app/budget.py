@@ -206,6 +206,7 @@ def summarize(
     *,
     project_id: str | None = None,
     episode_id: str | None = None,
+    organization_id: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     cfg = settings or get_settings()
@@ -216,11 +217,19 @@ def summarize(
         query = query.join(Episode, Job.episode_id == Episode.id).filter(
             Episode.project_id == project_id
         )
+    elif organization_id:
+        query = (
+            query.join(Episode, Job.episode_id == Episode.id)
+            .join(Project, Episode.project_id == Project.id)
+            .filter(Project.organization_id == organization_id)
+        )
     jobs = query.all()
     spent, pending = spent_and_pending(jobs)
     projects_q = db.query(Project).order_by(Project.updated_at.desc())
     if project_id:
         projects_q = projects_q.filter(Project.id == project_id)
+    elif organization_id:
+        projects_q = projects_q.filter(Project.organization_id == organization_id)
     project_rows: list[dict[str, Any]] = []
     for project in projects_q.all():
         if episode_id and all(ep.id != episode_id for ep in project.episodes):
