@@ -3,13 +3,14 @@ from fastapi import APIRouter, HTTPException, status
 from ..deps import DbDep, UserDep, get_episode, latest_revision
 from ..models import Shot, ShotCandidate, utcnow
 from ..schemas import BoardOut, CandidateCreate, CandidateOut, CandidateUpdate, ShotOut, ShotReadinessSet
+from ..serializers import shot_out
 from .. import shots as shot_ops
 
 router = APIRouter(tags=["shots"])
 
 
 def _shot_out(shot: Shot) -> ShotOut:
-    return ShotOut.model_validate(shot)
+    return shot_out(shot)
 
 
 def _get_shot(db, episode_id: str, shot_id: str) -> Shot:

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -15,12 +15,15 @@ REVIEW_STATES = (
     "generate-ok",
 )
 
-MEDIA_KINDS = ("sheet", "plate", "costume", "other")
+MEDIA_KINDS = ("sheet", "plate", "costume", "preview", "other")
 ENTITY_TYPES = ("character", "prop", "scene", "costume")
 SHOT_READINESS = ("draft", "candidates", "linked", "ready")
 CANDIDATE_KINDS = ("character", "prop", "scene", "costume")
 CANDIDATE_STATUSES = ("pending", "accepted", "ignored", "linked")
 CANDIDATE_SOURCES = ("stub", "manual")
+JOB_TYPES = ("still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck")
+JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
+RECEIPT_SOURCES = ("manual", "parsed")
 
 
 def utcnow() -> datetime:
@@ -105,6 +108,17 @@ class Episode(Base):
         back_populates="episode",
         cascade="all, delete-orphan",
         order_by="Shot.sort_index.asc()",
+    )
+    jobs: Mapped[list["Job"]] = relationship(
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="Job.created_at.desc()",
+        foreign_keys="Job.episode_id",
+    )
+    receipts: Mapped[list["ContinuityReceipt"]] = relationship(
+        back_populates="episode",
+        cascade="all, delete-orphan",
+        order_by="ContinuityReceipt.created_at.asc()",
     )
 
 
@@ -200,6 +214,15 @@ class Shot(Base):
         cascade="all, delete-orphan",
         order_by="ShotCandidate.created_at.asc()",
     )
+    receipt: Mapped["ContinuityReceipt | None"] = relationship(
+        back_populates="shot",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    jobs: Mapped[list["Job"]] = relationship(
+        back_populates="shot",
+        foreign_keys="Job.shot_id",
+    )
 
 
 class ShotCandidate(Base):
@@ -220,4 +243,66 @@ class ShotCandidate(Base):
     )
 
     shot: Mapped[Shot] = relationship(back_populates="candidates")
+
+
+class Job(Base):
+    """Async still/clip/precheck work. In-process worker now; Celery later."""
+
+    __tablename__ = "jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    shot_id: Mapped[str | None] = mapped_column(ForeignKey("shots.id"), nullable=True)
+    media_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id"), nullable=True)
+    retry_of_id: Mapped[str | None] = mapped_column(ForeignKey("jobs.id"), nullable=True)
+    job_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="queued")
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str] = mapped_column(Text, default="")
+    adapter: Mapped[str] = mapped_column(String(80), default="stub")
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    result: Mapped[dict] = mapped_column(JSON, default=dict)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    episode: Mapped[Episode] = relationship(back_populates="jobs", foreign_keys=[episode_id])
+    shot: Mapped[Shot | None] = relationship(back_populates="jobs", foreign_keys=[shot_id])
+    media: Mapped[MediaAsset | None] = relationship(foreign_keys=[media_id])
+
+
+class ContinuityReceipt(Base):
+    """Hop-1 preview receipt: duration/frames, still-vs-lock, optional NG."""
+
+    __tablename__ = "continuity_receipts"
+    __table_args__ = (UniqueConstraint("shot_id", name="uq_receipt_shot"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    shot_id: Mapped[str] = mapped_column(ForeignKey("shots.id"), nullable=False)
+    media_id: Mapped[str | None] = mapped_column(ForeignKey("media_assets.id"), nullable=True)
+    duration_s: Mapped[float | None] = mapped_column(Float, nullable=True)
+    frames: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fps: Mapped[float | None] = mapped_column(Float, nullable=True)
+    still_vs_lock: Mapped[str] = mapped_column(Text, default="")
+    ng_reason: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(20), default="manual")
+    preview_watched: Mapped[bool] = mapped_column(Boolean, default=False)
+    watched_by: Mapped[str] = mapped_column(String(120), default="")
+    watched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    episode: Mapped[Episode] = relationship(back_populates="receipts")
+    shot: Mapped[Shot] = relationship(back_populates="receipt")
+    media: Mapped[MediaAsset | None] = relationship(foreign_keys=[media_id])
 

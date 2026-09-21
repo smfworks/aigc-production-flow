@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Start Phase 1 studio processes. From repo root:
-#   ./scripts/dev-studio.sh api|web|app|all
+# Start Phase 3 studio processes. From repo root:
+#   ./scripts/dev-studio.sh api|web|app|worker|all
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -12,6 +12,9 @@ export STUDIO_DATABASE_URL="${STUDIO_DATABASE_URL:-sqlite:///${ROOT}/data/studio
 export STUDIO_MEDIA_ROOT="${STUDIO_MEDIA_ROOT:-${ROOT}/data/media}"
 export STUDIO_API_TOKEN="${STUDIO_API_TOKEN:-local-dev-token}"
 export STUDIO_PACK_BUILDER_URL="${STUDIO_PACK_BUILDER_URL:-http://localhost:5173}"
+export STUDIO_JOB_WORKER="${STUDIO_JOB_WORKER:-thread}"
+export STUDIO_STILL_ADAPTER="${STUDIO_STILL_ADAPTER:-stub}"
+export STUDIO_CLIP_ADAPTER="${STUDIO_CLIP_ADAPTER:-stub}"
 
 mkdir -p "$ROOT/data/media"
 
@@ -25,8 +28,17 @@ ensure_studio_venv() {
 start_api() {
   ensure_studio_venv
   echo "Studio API  http://localhost:8000/docs  (token: $STUDIO_API_TOKEN)"
+  echo "Job worker  in-process (${STUDIO_JOB_WORKER}); adapter still=${STUDIO_STILL_ADAPTER} clip=${STUDIO_CLIP_ADAPTER}"
   cd "$ROOT/studio"
   exec "$ROOT/studio/.venv/bin/uvicorn" app.main:app --reload --host 0.0.0.0 --port 8000
+}
+
+start_worker() {
+  ensure_studio_venv
+  echo "Studio job poller (standalone). Set STUDIO_JOB_WORKER=off on the API so only this process dequeues."
+  echo "Celery is not running — this is the in-process worker extracted to its own loop."
+  cd "$ROOT/studio"
+  exec "$ROOT/studio/.venv/bin/python" -m app.jobs.worker
 }
 
 start_web() {
@@ -62,7 +74,7 @@ start_all() {
   }
   trap cleanup INT TERM EXIT
 
-  echo "API     http://localhost:8000/docs"
+  echo "API     http://localhost:8000/docs  (in-process job worker)"
   echo "Studio  http://localhost:5174"
   echo "Builder http://localhost:5173"
   echo "Token   $STUDIO_API_TOKEN"
@@ -79,9 +91,10 @@ case "$ROLE" in
   api) start_api ;;
   web) start_web ;;
   app) start_app ;;
+  worker) start_worker ;;
   all) start_all ;;
   *)
-    echo "Usage: $0 [api|web|app|all]" >&2
+    echo "Usage: $0 [api|web|app|worker|all]" >&2
     exit 1
     ;;
 esac

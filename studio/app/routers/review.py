@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from ..deps import DbDep, UserDep, get_episode, latest_revision, touch
 from ..models import ReviewState, utcnow
+from ..preview import generate_ok_blockers
 from ..schemas import GateSnapshotOut, ReviewOut, ReviewSet, ReviewStateOut
 
 router = APIRouter(tags=["review"])
@@ -25,23 +26,9 @@ def get_review(episode_id: str, _user: UserDep, db: DbDep) -> ReviewOut:
 def set_review(episode_id: str, body: ReviewSet, user: UserDep, db: DbDep) -> ReviewOut:
     episode = get_episode(db, episode_id)
     if body.state == "generate-ok":
-        revision = latest_revision(episode)
-        snapshot = revision.gate_snapshot if revision else None
-        gates = (snapshot or {}).get("gates") if isinstance(snapshot, dict) else None
-        all_green = bool(revision and revision.all_gates_green)
-        if not all_green:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "gates_not_green",
-                    "message": (
-                        "Refuse generate-ok until the latest pack revision shows all gates green "
-                        "(nine README gates plus entity-schedule and lock-diff). "
-                        "Do not skip the four-stage / gate order. Shot ready ≠ generating."
-                    ),
-                    "gates": gates or [],
-                },
-            )
+        blocked = generate_ok_blockers(episode)
+        if blocked:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blocked)
     event = ReviewState(
         episode_id=episode.id,
         state=body.state,

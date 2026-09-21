@@ -73,18 +73,25 @@ The pack builder already refuses export until gates are green. That is the v1 co
 - **Costume** — linkable media kind / entity type in the studio library.
 - **Storyboard canvas** — list (precision) + board of takes/edit rows with join types; join inspector highlights continue chains vs cut/fadeblack boundaries.
 
-Still deferred (Phase 3+):
+Still deferred (NLE / SSO):
 
-- **Preview receipt** — ffprobe + still-vs-lock + NG reason required before hop 2+
-- Async generate jobs with cancel/retry (Celery / GPU queue)
 - NLE, SSO / multi-tenant isolation
+
+**Phase 3 (this repo, delivered):**
+
+- **Preview receipt** — hop-1 preview desk: attach/upload preview media, duration/frames (manual or parsed JSON / ffprobe), still-vs-lock note, optional NG reason. Required before `generate-ok` and `clip-extend`
+- Async generate jobs with cancel/retry (in-process thread worker; Celery is the documented upgrade path, not this process)
+- Engine adapters: still + clip factory interface; default `adapter=stub` with fixture receipts; optional webhook/CLI live hook (unset → stub only)
+- `batch-precheck` job: gates green + shot ready + plates bound before hop-1 enqueue
 
 v2 leftover (platform, do not pretend we have it):
 
 - visual identity store (approved sheet + per-window plates), not a pasted wardrobe paragraph
-- async generate jobs with cancel/retry, one engine adapter at a time per GPU
+- Celery / GPU queue (Phase 3 jobs are in-process; one engine adapter at a time per GPU stays an ops pin)
 
-**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). `generate-ok` is refused unless that snapshot is all green. Auth is a local-dev API token — not SSO. Operator path: [STUDIO.md](STUDIO.md).
+**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). Auth is a local-dev API token — not SSO. Operator path: [STUDIO.md](STUDIO.md).
+
+**Phase 3 (this repo, jobs + desk):** `generate-ok` is refused unless that snapshot is all green **and** each required hop-1 is preview-watched with a continuity receipt. Stub jobs never stamp generate-ok.
 
 ## Multi-user collaboration
 
@@ -140,7 +147,7 @@ The flow is real when:
 3. Export still requires every gate green (nine README gates plus entity-schedule and lock-diff).
 4. A pack zip round-trips without a GPU.
 5. GPU spend still happens somewhere else, after preview.
-6. Studio `generate-ok` is refused unless the stored gate snapshot is all green. Shot `ready` is prepared, not generating.
+6. Studio `generate-ok` is refused unless the stored gate snapshot is all green **and** each required hop-1 has preview-watched + a continuity receipt. Shot `ready` is prepared, not generating. Stub jobs do not stamp generate-ok.
 
 ## Sources
 

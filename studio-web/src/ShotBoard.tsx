@@ -6,6 +6,8 @@ type Props = {
   shots: Shot[];
   media: MediaAsset[];
   packBuilderUrl: string;
+  selectedShotId?: string | null;
+  onSelectShot?: (shotId: string) => void;
   onExtract: () => void;
   onReadiness: (shotId: string, readiness: ShotReadiness) => void;
   onCandidate: (
@@ -30,20 +32,29 @@ export function ShotBoard({
   shots,
   media,
   packBuilderUrl,
+  selectedShotId,
+  onSelectShot,
   onExtract,
   onReadiness,
   onCandidate,
   onAddCandidate,
 }: Props) {
   const [view, setView] = useState<"list" | "canvas">("list");
-  const [selectedId, setSelectedId] = useState<string | null>(shots[0]?.id ?? null);
   const [kind, setKind] = useState<CandidateKind>("character");
   const [label, setLabel] = useState("");
-  const selected = shots.find((shot) => shot.id === selectedId) ?? shots[0] ?? null;
+  const selected =
+    shots.find((shot) => shot.id === selectedShotId) ??
+    shots.find((shot) => shot.hop1_required) ??
+    shots[0] ??
+    null;
   const inChain = useMemo(
     () => (selected ? continueChain(shots, selected.id) : new Set<string>()),
     [shots, selected],
   );
+
+  function select(shotId: string) {
+    onSelectShot?.(shotId);
+  }
 
   return (
     <section className="panel">
@@ -90,7 +101,7 @@ export function ShotBoard({
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                onClick={() => setSelectedId(shot.id)}
+                onClick={() => select(shot.id)}
               >
                 <span className="board-kicker">
                   #{shot.sort_index + 1} · {shot.readiness}
@@ -111,13 +122,15 @@ export function ShotBoard({
               <button
                 type="button"
                 className={selected?.id === shot.id ? "card-btn is-on" : "card-btn"}
-                onClick={() => setSelectedId(shot.id)}
+                onClick={() => select(shot.id)}
               >
                 <strong>
                   #{shot.sort_index + 1} · {shot.join || "no join"} · take {shot.take || "—"}
                 </strong>
                 <span>
                   <em className={`chip-status is-${shot.readiness}`}>{shot.readiness}</em>
+                  {shot.hop1_required ? " · hop-1" : ""}
+                  {shot.preview?.preview_watched ? " · watched" : ""}
                   {" · "}
                   {shot.action || "no action"}
                 </span>

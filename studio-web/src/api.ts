@@ -1,9 +1,12 @@
 import type {
   Board,
   Comment,
+  ContinuityReceipt,
   Episode,
+  Job,
   MediaAsset,
   Meta,
+  PreviewDesk,
   Project,
   Review,
   ReviewStateName,
@@ -131,6 +134,73 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }).then(() => request<Shot>(`/api/episodes/${episodeId}/shots/${shotId}`)),
+  jobs: (query: { episode_id?: string; status?: string; job_type?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (query.episode_id) params.set("episode_id", query.episode_id);
+    if (query.status) params.set("status", query.status);
+    if (query.job_type) params.set("job_type", query.job_type);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request<Job[]>(`/api/jobs${suffix}`);
+  },
+  episodeJobs: (episodeId: string) => request<Job[]>(`/api/episodes/${episodeId}/jobs`),
+  job: (jobId: string) => request<Job>(`/api/jobs/${jobId}`),
+  enqueueJob: (body: { episode_id: string; shot_id?: string; job_type: string; payload?: Record<string, unknown> }) =>
+    request<Job>("/api/jobs", { method: "POST", body: JSON.stringify(body) }),
+  cancelJob: (jobId: string) => request<Job>(`/api/jobs/${jobId}/cancel`, { method: "POST" }),
+  retryJob: (jobId: string) => request<Job>(`/api/jobs/${jobId}/retry`, { method: "POST" }),
+  previewDesk: (episodeId: string) => request<PreviewDesk>(`/api/episodes/${episodeId}/preview-desk`),
+  setReceipt: (
+    episodeId: string,
+    shotId: string,
+    body: {
+      media_id?: string;
+      duration_s?: number | null;
+      frames?: number | null;
+      fps?: number | null;
+      still_vs_lock?: string;
+      ng_reason?: string;
+      source?: string;
+      notes?: string;
+      watched?: boolean;
+    },
+  ) =>
+    request<ContinuityReceipt>(`/api/episodes/${episodeId}/shots/${shotId}/receipt`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  setPreviewWatched: (episodeId: string, shotId: string, watched: boolean, note = "") =>
+    request<ContinuityReceipt>(`/api/episodes/${episodeId}/shots/${shotId}/preview-watched`, {
+      method: "PUT",
+      body: JSON.stringify({ watched, note }),
+    }),
+  attachPreview: (
+    episodeId: string,
+    shotId: string,
+    fields: {
+      file?: File;
+      media_id?: string;
+      duration_s?: string;
+      frames?: string;
+      still_vs_lock?: string;
+      ng_reason?: string;
+      notes?: string;
+      watched?: boolean;
+    },
+  ) => {
+    const data = new FormData();
+    if (fields.file) data.append("file", fields.file);
+    if (fields.media_id) data.append("media_id", fields.media_id);
+    if (fields.duration_s) data.append("duration_s", fields.duration_s);
+    if (fields.frames) data.append("frames", fields.frames);
+    if (fields.still_vs_lock) data.append("still_vs_lock", fields.still_vs_lock);
+    if (fields.ng_reason) data.append("ng_reason", fields.ng_reason);
+    if (fields.notes) data.append("notes", fields.notes);
+    if (fields.watched) data.append("watched", "true");
+    return request<ContinuityReceipt>(`/api/episodes/${episodeId}/shots/${shotId}/preview`, {
+      method: "POST",
+      body: data,
+    });
+  },
 };
 
 async function saveDownload(response: Response, fallback: string): Promise<void> {

@@ -5,13 +5,14 @@ from fastapi.responses import FileResponse
 
 from ..config import get_settings
 from ..deps import DbDep, UserDep, get_episode, touch
-from ..models import ENTITY_TYPES, MEDIA_KINDS, MediaAsset, utcnow
+from ..models import ContinuityReceipt, ENTITY_TYPES, Job, MEDIA_KINDS, MediaAsset, utcnow
 from ..packzip import slugify, write_bytes
 from ..schemas import MediaAssetOut
 
 router = APIRouter(tags=["media"])
 
-ALLOWED_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".txt", ".md"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff", ".txt", ".md"}
+PREVIEW_SUFFIXES = IMAGE_SUFFIXES | {".json", ".mp4", ".webm", ".mov"}
 
 
 @router.get("/api/episodes/{episode_id}/media", response_model=list[MediaAssetOut])
@@ -39,7 +40,7 @@ async def upload_media(
     if kind not in MEDIA_KINDS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="kind must be sheet, plate, costume, or other.",
+            detail="kind must be sheet, plate, costume, preview, or other.",
         )
     entity_kind = entity_type.strip()
     if kind == "costume" and not entity_kind:
@@ -51,18 +52,24 @@ async def upload_media(
         )
     original = file.filename or "upload.bin"
     suffix = Path(original).suffix.lower()
-    if suffix and suffix not in ALLOWED_SUFFIXES:
+    allowed = PREVIEW_SUFFIXES if kind == "preview" else IMAGE_SUFFIXES
+    if suffix and suffix not in allowed:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Refusing this file type. Sheets/plates: png, jpg, webp, tiff. Notes: txt/md. No MP4s.",
+            detail=(
+                "Preview media may be json/txt receipts, images, or mp4/webm in the gitignored local store. "
+                "Do not commit engine MP4s."
+                if kind == "preview"
+                else "Refusing this file type. Sheets/plates: png, jpg, webp, tiff. Notes: txt/md. Use kind=preview for hop-1 watch files."
+            ),
         )
     data = await file.read()
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty upload.")
-    if suffix in {".mp4", ".mov"}:
+    if suffix in {".mp4", ".mov", ".webm"} and kind != "preview":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Do not store engine MP4s in this public flow.",
+            detail="Engine MP4s belong on the hop-1 preview desk (kind=preview), not the sheet/plate library. They stay gitignored.",
         )
     asset = MediaAsset(
         episode_id=episode.id,
@@ -110,6 +117,10 @@ def delete_media(asset_id: str, _user: UserDep, db: DbDep) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
     path = get_settings().media_path / asset.path
     episode = asset.episode
+    for job in db.query(Job).filter(Job.media_id == asset.id).all():
+        job.media_id = None
+    for receipt in db.query(ContinuityReceipt).filter(ContinuityReceipt.media_id == asset.id).all():
+        receipt.media_id = None
     db.delete(asset)
     episode.updated_at = utcnow()
     touch(episode.project)

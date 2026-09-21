@@ -94,4 +94,4 @@ Fill `continuity-log.md` from `sigils.jsonl` / Comfy history: seed, peak °C, ff
 
 ## Studio spine (optional, local)
 
-The pack builder is enough to fill and zip a bible. If you want projects, review states, comments, a sheet/plate/costume library, shot readiness, and a storyboard canvas around that zip, see [STUDIO.md](STUDIO.md). `generate-ok` cannot be stamped while any gate is red.
+The pack builder is enough to fill and zip a bible. If you want projects, review states, a job center, hop-1 preview receipts, and stub engine adapters around that zip, see [STUDIO.md](STUDIO.md). `generate-ok` cannot be stamped while any gate is red or a required hop-1 lacks a watched continuity receipt.
