@@ -22,6 +22,25 @@ from .models import (
 )
 
 
+def continue_chains(shots: list[Shot]) -> tuple[list[list[str]], list[dict[str, str]]]:
+    """Group edit-list rows into continue chains vs cut/fadeblack boundaries."""
+    chains: list[list[str]] = []
+    current: list[str] = []
+    boundaries: list[dict[str, str]] = []
+    for shot in shots:
+        if shot.join == "continue" and current:
+            current.append(shot.id)
+            continue
+        if current:
+            chains.append(current)
+        current = [shot.id]
+        if shot.join in {"cut", "fadeblack"}:
+            boundaries.append({"shot_id": shot.id, "join": shot.join})
+    if current:
+        chains.append(current)
+    return chains, boundaries
+
+
 def _shot_out_ready(shot: Shot) -> None:
     pending = [row for row in shot.candidates if row.status == "pending"]
     accepted = [row for row in shot.candidates if row.status == "accepted"]

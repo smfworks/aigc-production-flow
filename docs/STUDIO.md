@@ -1,8 +1,8 @@
-# Studio spine (Phase 3)
+# Studio spine (Phase 4)
 
-The pack builder in `app/` is still the four-stage walk. The local studio around it now covers projects, episodes, pack zip revisions, review, comments, sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, and a **hop-1 preview desk**.
+The pack builder in `app/` is still the four-stage walk. The local studio around it covers projects, episodes, pack zip revisions, review, comments, sheet/plate/costume/preview media, shot readiness, candidate confirm, a storyboard canvas, a **job center**, **engine adapters**, a **hop-1 preview desk**, a **budget dashboard**, an **audit log**, **retention**, **EDL / shot-playlist export**, and **vertical templates**.
 
-It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran.
+It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice.
 
 ## Ports (local)
 
@@ -19,109 +19,107 @@ Do not start `api` and `worker` together unless the API worker is off — both w
 
 ## Auth (honest)
 
-Local-dev only: `Authorization: Bearer $STUDIO_API_TOKEN`.
+Local-dev: `Authorization: Bearer $STUDIO_API_TOKEN` (default `local-dev-token`). Display name: `X-User-Name` or `STUDIO_DEFAULT_USER`.
 
-Default token: `local-dev-token` (`STUDIO_API_TOKEN`). Optional display name: header `X-User-Name` or `STUDIO_DEFAULT_USER` (default `local-dev`).
-
-**SSO is not in this phase.** Do not treat the token as multi-tenant SaaS security. There is a single default organization (`SMF Works (local)`). Postgres-ready `STUDIO_DATABASE_URL` is for *your* later ops deploy, not a pretend tenant switcher.
+`STUDIO_AUTH_MODE=local|forward-header`. Forward-header trusts `X-Forwarded-User` (reverse-proxy SSO **later**). **OIDC is not implemented.** See [AUTH.md](AUTH.md). Do not treat the token as multi-tenant SaaS security. There is a single default organization (`SMF Works (local)`).
 
 ## Database and files
 
 - Default DB: SQLite at `data/studio.db` (gitignored). Override with `STUDIO_DATABASE_URL` (Postgres URL works if you install `pip install -e "./studio[postgres]"`).
 - Media (sheets/plates/costumes/**hop-1 previews**) and stored pack zips: `data/media/` (gitignored). Do not commit likeness stills or engine MP4s. Preview MP4s are allowed **on disk** with `kind=preview` only.
 
-## Operator path (Phase 3)
+## Operator path (Phase 4)
 
 1. Start API + shell + builder: `./scripts/dev-studio.sh all`
-2. Fill Script → Assets → Storyboard → Preview in the builder; export pack zip (every gate green)
-3. Create a **project**, then an **episode**, **Import pack zip**
-4. Confirm candidates, set shots `ready` (prepared, not generating)
-5. **Task Center / episode Jobs:** enqueue `batch-precheck` (gates green + shot ready + plates bound)
-6. Enqueue stub `clip-hop1` — the job stores a JSON fixture receipt labeled `adapter=stub`
-7. On the **hop-1 preview desk**, attach that receipt (or upload a local preview), fill duration/frames + still-vs-lock, **Mark preview-watched**
-8. `generate-ok` and `clip-extend` stay 409 until every required hop-1 has preview-watched + receipt and no NG reason
-9. Cancel queued/running jobs; retry failed/cancelled. History lives in Task Center
-
-## Jobs
-
-Types: `still-sheet | still-plate | clip-hop1 | clip-extend | batch-precheck`
-
-Status: `queued | running | succeeded | failed | cancelled`
-
-| Endpoint | Action |
-|---|---|
-| `GET /api/jobs` | List (`episode_id`, `status`, `job_type` filters) |
-| `GET /api/jobs/{id}` | Get |
-| `POST /api/jobs` | Enqueue `{ episode_id, shot_id?, job_type, payload? }` |
-| `POST /api/jobs/{id}/cancel` | Cancel queued or running |
-| `POST /api/jobs/{id}/retry` | Clone a failed/cancelled job |
-
-`clip-hop1` requires `shot_id` and a green batch-precheck (gates + that shot `ready` + plates bound). `clip-extend` additionally requires that shot's hop-1 preview-watched + receipt with no NG.
-
-### Worker (in-process now, Celery later)
-
-Default: the API process runs a daemon **thread** that dequeues `Job` rows (`STUDIO_JOB_WORKER=thread`). Tests use `inline` (run on enqueue) or `off` (leave queued).
-
-```
-Job row is the source of truth.
-Today: FastAPI lifespan starts JobWorker (thread) → execute_job()
-Tomorrow: Celery task calls the same execute_job(); Redis/broker in SMF ops
-Do not claim Celery is running. The UI says in-process / stub.
-```
-
-Standalone poller for a split deploy:
-
-```bash
-STUDIO_JOB_WORKER=off ./scripts/dev-studio.sh api   # HTTP only
-./scripts/dev-studio.sh worker                      # poller
-```
+2. **New from template** (Education lesson / Brand promo / Short drama ep) **or** create a blank project
+3. Set **adapter defaults** (stub unless a live hook exists) and an optional **budget cap** + hard stop
+4. Fill Script → Assets → Storyboard → Preview in the builder; export pack zip (every gate green) and import — or fill the seeded template pack
+5. Confirm candidates, set shots `ready` (prepared, not generating)
+6. Enqueue stub jobs (batch-precheck → hop-1). Job rows store estimated/actual **cost units** from the operator rate table
+7. Open **Budget**: spend by episode/project, job counts, adapter mix
+8. **Audit** filter by project/episode (review, enqueue/cancel, pack import/export, media upload)
+9. Hop-1 preview desk → preview-watched → `generate-ok` still needs green gates + receipts
+10. **Export EDL** / **Export shot playlist** (metadata only; media paths when preview receipts exist)
+11. Retention dry-run / apply expires stub outputs / temp media after N days — **pack revisions are kept**
 
 ## Adapters
 
-Interface: still factory (`generate_sheet` / `generate_plate`) and clip factory (`hop1` / `extend`).
+Registry: `stub` (default, not live) plus documented slots `comfy-h3` (clip), `comfy-qwen` (still), `webhook`, `cli`. Per-project still/clip default. Unset live hooks **always** resolve to stub.
 
 | Env | Default | Notes |
 |---|---|---|
-| `STUDIO_STILL_ADAPTER` | `stub` | `stub` \| `webhook` \| `cli` |
-| `STUDIO_CLIP_ADAPTER` | `stub` | same |
-| `STUDIO_ADAPTER_WEBHOOK_URL` | empty | If unset while mode is webhook → **stub only** |
+| `STUDIO_STILL_ADAPTER` | `stub` | `stub` \| `comfy-qwen` \| `webhook` \| `cli` |
+| `STUDIO_CLIP_ADAPTER` | `stub` | `stub` \| `comfy-h3` \| `webhook` \| `cli` |
+| `STUDIO_ADAPTER_WEBHOOK_URL` | empty | Transport for live slots. Unset → stub only |
 | `STUDIO_ADAPTER_CLI` | empty | `{job_id} {job_type} {episode_id} {shot_id}` template; JSON on stdin |
 | `STUDIO_ADAPTER_TIMEOUT_SECONDS` | `60` | |
 
-The stub always labels `adapter=stub`, sets `engine: null`, and writes a JSON fixture (H3-measured 10.125 s / 243 f numbers as **documentation of the default window**, not a claim that H3 ran). Live hooks are optional; empty URL/CLI falls back to stub and records `live_hook: unset — stub only`.
+`GET /api/adapters` lists slots. Stub always labels `adapter=stub`, `engine: null`.
+
+## Budget
+
+Job rows store `estimated_cost_units` at enqueue and `actual_cost_units` on success (0 on fail/cancel). Units come from `STUDIO_COST_RATES` (default `stub:0.1,webhook:1,cli:1,comfy-h3:2,comfy-qwen:0.5`). `STUDIO_COST_CURRENCY` defaults to `credits`. Optional `STUDIO_COST_USD_PER_UNIT` is an estimate only.
+
+`STUDIO_BUDGET_CAP_UNITS` + `STUDIO_BUDGET_HARD_STOP` are env defaults; each project can override. Hard stop returns **409** `budget_cap` when spent + pending + new estimate would exceed the cap.
+
+This never claims a cloud bill was paid.
+
+## Audit + retention
+
+Audit table: `review.set`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `media.upload`, `project.create`, `retention.apply`. `GET /api/audit?project_id=&episode_id=&action=`.
+
+Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed. `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.**
+
+## Light timeline export
+
+From the edit list + continue chains (not an NLE):
+
+| Endpoint | File |
+|---|---|
+| `GET /api/episodes/{id}/export/edl` | CMX3600-ish EDL |
+| `GET /api/episodes/{id}/export/fcpxml` | FCP XML lite |
+| `GET /api/episodes/{id}/export/playlist` | Shot playlist JSON (Resolve/CapCut import) |
+
+Media paths appear when a hop-1 preview receipt is attached.
+
+## Vertical templates
+
+Empty structured packs under `templates/verticals/` (`education-lesson`, `brand-promo`, `short-drama-ep`). Studio **New from template** creates a project + Ep 1 + pack revision. Gates stay red. No fake generate.
+
+`GET /api/templates` · `POST /api/templates/{id}/projects`
+
+## Jobs (Phase 3, unchanged contract)
+
+Types: `still-sheet | still-plate | clip-hop1 | clip-extend | batch-precheck`
+
+Default worker: in-process **thread** (`STUDIO_JOB_WORKER=thread`). Celery is the documented upgrade path, not this process. Tests use `inline` or `off`.
 
 ## Hop-1 preview desk
 
-Required hop-1 = first edit-list row of each take with `hop1Planned`. Attach preview media (`kind=preview`: json/txt receipt, image, or local mp4/webm). Continuity receipt: duration and/or frames (manual or parsed from JSON / ffprobe), still-vs-lock note, optional NG reason. `PUT .../preview-watched` is refused until media + duration/frames + still-vs-lock exist.
-
-`PUT .../review` `generate-ok` returns **409** `gates_not_green` or `preview_incomplete`.
+Required hop-1 = first edit-list row of each take with `hop1Planned`. `generate-ok` and `clip-extend` stay 409 until every required hop-1 has preview-watched + receipt and no NG reason.
 
 ## API surface
 
 OpenAPI is canonical: http://localhost:8000/docs
 
-Phase 2 surface still applies (projects, episodes, pack zip, gates, review, comments, media, shots, candidates, board). Phase 3 adds:
+Phase 2–3 surface still applies. Phase 4 adds:
 
 | Area | Methods |
 |---|---|
-| Jobs | `GET /api/jobs`, `GET /api/episodes/{id}/jobs`, `POST /api/jobs`, `GET /api/jobs/{id}`, `POST .../cancel`, `POST .../retry` |
-| Preview desk | `GET /api/episodes/{id}/preview-desk` |
-| Receipts | `GET/PUT /api/episodes/{id}/shots/{id}/receipt`, `PUT .../preview-watched`, `POST .../preview` |
-
-Review states: `draft | needs-art | needs-edit | preview-watched | generate-ok`.
-
-Shot readiness: `draft | candidates | linked | ready`. `ready` is refused while candidates are still `pending` or `accepted` (unlinked). Prepared ≠ generating.
-
-Media kinds: `sheet | plate | costume | preview | other`.
+| Adapters | `GET /api/adapters` |
+| Budget | `GET /api/budget`, `GET /api/projects/{id}/budget`, `GET /api/episodes/{id}/budget` |
+| Audit | `GET /api/audit` |
+| Retention | `GET /api/retention`, `POST /api/retention`, `GET /api/retention/dry-run` |
+| Export | `GET /api/episodes/{id}/export/edl`, `.../fcpxml`, `.../playlist` |
+| Templates | `GET /api/templates`, `POST /api/templates/{id}/projects` |
+| Project settings | `PATCH /api/projects/{id}` still/clip adapter, budget cap, hard stop, retention days |
 
 ## Tests
 
 ```bash
-# studio API
 cd studio && python3 -m pip install -e ".[dev]"
 python3 -m pytest
 
-# pack builder (must still pass)
 cd app && npm test
 ```
 
@@ -135,9 +133,10 @@ API only (includes the in-process worker). The Vite apps stay on the host.
 
 ## What this phase is not
 
-- No NLE
+- No full NLE timeline editor (EDL/playlist assemble metadata only)
 - No Celery broker (documented upgrade only)
-- No SSO / multi-tenant isolation
+- No OIDC / full SSO (forward-header hook + [AUTH.md](AUTH.md) only)
 - No rewrite of the pack builder
 - No engine MP4s in git
-- No auto generate-ok from shot `ready`, candidate extract, or a succeeded stub job
+- No auto generate-ok from shot `ready`, candidate extract, a succeeded stub job, or a vertical template
+- No claim that budget units are a paid cloud invoice

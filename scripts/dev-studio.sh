@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start Phase 3 studio processes. From repo root:
+# Start Phase 4 studio processes. From repo root:
 #   ./scripts/dev-studio.sh api|web|app|worker|all
 set -euo pipefail
 

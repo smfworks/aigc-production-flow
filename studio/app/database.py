@@ -26,21 +26,45 @@ engine = make_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 
+_ADDITIVE_COLUMNS = (
+    ("media_assets", "entity_type", "VARCHAR(32) DEFAULT ''"),
+    ("projects", "still_adapter", "VARCHAR(80) DEFAULT 'stub'"),
+    ("projects", "clip_adapter", "VARCHAR(80) DEFAULT 'stub'"),
+    ("projects", "budget_cap_units", "FLOAT"),
+    ("projects", "budget_hard_stop", "BOOLEAN DEFAULT 0"),
+    ("projects", "retention_days", "INTEGER"),
+    ("jobs", "estimated_cost_units", "FLOAT DEFAULT 0"),
+    ("jobs", "actual_cost_units", "FLOAT"),
+    ("jobs", "cost_currency", "VARCHAR(32) DEFAULT 'credits'"),
+    ("jobs", "cost_note", "TEXT DEFAULT ''"),
+)
+
+
+def _add_column(target, table: str, name: str, ddl: str) -> None:
+    inspector = inspect(target)
+    tables = inspector.get_table_names()
+    if table not in tables:
+        return
+    cols = {column["name"] for column in inspector.get_columns(table)}
+    if name in cols:
+        return
+    with target.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+
 def ensure_schema(bind=None) -> None:
     """create_all plus additive columns for existing local SQLite files."""
     target = bind or engine
     Base.metadata.create_all(bind=target)
     try:
-        inspector = inspect(target)
-        tables = inspector.get_table_names()
+        inspect(target).get_table_names()
     except Exception:
         return
-    if "media_assets" not in tables:
-        return
-    cols = {column["name"] for column in inspector.get_columns("media_assets")}
-    if "entity_type" not in cols:
-        with target.begin() as conn:
-            conn.execute(text("ALTER TABLE media_assets ADD COLUMN entity_type VARCHAR(32) DEFAULT ''"))
+    for table, name, ddl in _ADDITIVE_COLUMNS:
+        try:
+            _add_column(target, table, name, ddl)
+        except Exception:
+            continue
 
 
 def get_db() -> Generator[Session, None, None]:

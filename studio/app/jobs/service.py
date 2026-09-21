@@ -9,6 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from ..adapters import resolve_adapter_name
+from ..budget import COST_NOTE, currency, estimate_units, refuse_if_over_cap
 from ..models import JOB_STATUSES, JOB_TYPES, Episode, Job, Shot, utcnow
 from ..precheck import hop1_enqueue_blockers
 from ..preview import extend_ok
@@ -51,6 +52,10 @@ def job_out(job: Job) -> JobOut:
         adapter=job.adapter or "stub",
         payload=job.payload if isinstance(job.payload, dict) else {},
         result=job.result if isinstance(job.result, dict) else {},
+        estimated_cost_units=float(job.estimated_cost_units or 0),
+        actual_cost_units=job.actual_cost_units,
+        cost_currency=job.cost_currency or "credits",
+        cost_note=job.cost_note or "",
         cancel_requested=bool(job.cancel_requested),
         created_by=job.created_by,
         created_at=job.created_at,
@@ -88,6 +93,7 @@ def enqueue_job(
     shot_id: str | None = None,
     payload: dict[str, Any] | None = None,
     retry_of_id: str | None = None,
+    adapter: str | None = None,
 ) -> Job:
     if job_type not in JOB_TYPES:
         raise HTTPException(
@@ -96,6 +102,7 @@ def enqueue_job(
         )
     shot = _require_shot(db, episode, shot_id, job_type)
     body = payload if isinstance(payload, dict) else {}
+    requested = adapter or (str(body.get("adapter") or "").strip() or None)
     if job_type == "clip-hop1":
         blocked = hop1_enqueue_blockers(episode, shot)
         if blocked:
@@ -121,26 +128,37 @@ def enqueue_job(
                 },
             )
 
-    adapter = "stub" if job_type == "batch-precheck" else resolve_adapter_name(job_type)
+    from ..config import get_settings
+
+    cfg = get_settings()
+    resolved = (
+        "stub"
+        if job_type == "batch-precheck"
+        else resolve_adapter_name(job_type, cfg, requested=requested, project=episode.project)
+    )
+    estimated = estimate_units(job_type, resolved, cfg)
+    refuse_if_over_cap(db, episode.project, estimated, cfg)
     job = Job(
         episode_id=episode.id,
         shot_id=shot.id if shot else None,
         job_type=job_type,
         status="queued",
         progress=0,
-        adapter=adapter,
+        adapter=resolved,
         payload=body,
         result={},
         retry_of_id=retry_of_id,
         created_by=user_name,
+        estimated_cost_units=estimated,
+        actual_cost_units=None,
+        cost_currency=currency(cfg),
+        cost_note=COST_NOTE,
     )
     db.add(job)
     db.commit()
     db.refresh(job)
 
-    from ..config import get_settings
-
-    mode = (get_settings().job_worker or "thread").strip().lower()
+    mode = (cfg.job_worker or "thread").strip().lower()
     if mode == "inline":
         execute_job(db, job.id)
         db.refresh(job)
@@ -165,6 +183,7 @@ def cancel_job(db: Session, job: Job) -> Job:
         job.status = "cancelled"
         job.finished_at = utcnow()
         job.error = job.error or "cancelled"
+        job.actual_cost_units = 0.0
         job.updated_at = utcnow()
         db.commit()
         db.refresh(job)
@@ -192,6 +211,7 @@ def retry_job(db: Session, job: Job, user_name: str) -> Job:
         shot_id=job.shot_id,
         payload=job.payload if isinstance(job.payload, dict) else {},
         retry_of_id=job.id,
+        adapter=job.adapter,
     )
 
 

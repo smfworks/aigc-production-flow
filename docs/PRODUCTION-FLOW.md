@@ -73,9 +73,10 @@ The pack builder already refuses export until gates are green. That is the v1 co
 - **Costume** — linkable media kind / entity type in the studio library.
 - **Storyboard canvas** — list (precision) + board of takes/edit rows with join types; join inspector highlights continue chains vs cut/fadeblack boundaries.
 
-Still deferred (NLE / SSO):
+Still deferred (NLE / full SSO):
 
-- NLE, SSO / multi-tenant isolation
+- Full NLE timeline editor (Phase 4 ships metadata-only EDL / FCP XML lite / shot playlist)
+- OIDC / multi-tenant isolation (Phase 4 ships `docs/AUTH.md` + `STUDIO_AUTH_MODE=forward-header`)
 
 **Phase 3 (this repo, delivered):**
 
@@ -84,14 +85,24 @@ Still deferred (NLE / SSO):
 - Engine adapters: still + clip factory interface; default `adapter=stub` with fixture receipts; optional webhook/CLI live hook (unset → stub only)
 - `batch-precheck` job: gates green + shot ready + plates bound before hop-1 enqueue
 
+**Phase 4 (this repo, delivered):**
+
+- Adapter **catalog** with documented slots `comfy-h3` / `comfy-qwen` / `webhook` / `cli` plus per-project default. Unset hooks still resolve to stub
+- Job **cost units** (estimated/actual) from an operator rate table; producer **Budget** dashboard; optional hard stop at a budget cap. Never a cloud invoice
+- **Audit log** (review, jobs, pack import/export, media upload) and **retention** dry-run/apply for stub/temp media (pack revisions kept)
+- Light **EDL / FCP XML lite / shot playlist** export from the edit list + continue chains
+- **Vertical templates** (education lesson, brand promo, short drama ep) — empty structured packs, no fake generate
+
 v2 leftover (platform, do not pretend we have it):
 
 - visual identity store (approved sheet + per-window plates), not a pasted wardrobe paragraph
 - Celery / GPU queue (Phase 3 jobs are in-process; one engine adapter at a time per GPU stays an ops pin)
 
-**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). Auth is a local-dev API token — not SSO. Operator path: [STUDIO.md](STUDIO.md).
+**Phase 1 (this repo, studio spine):** review states and a local media store for sheet/plate metadata + files are delivered. Pack zip import/export creates `PackRevision` rows (pack.json + gate snapshot). Auth is a local-dev API token plus an optional reverse-proxy identity hook — not OIDC. Operator path: [STUDIO.md](STUDIO.md). Auth stub: [AUTH.md](AUTH.md).
 
 **Phase 3 (this repo, jobs + desk):** `generate-ok` is refused unless that snapshot is all green **and** each required hop-1 is preview-watched with a continuity receipt. Stub jobs never stamp generate-ok.
+
+**Phase 4 (this repo, scale & polish):** set adapter defaults + budget cap → run stub jobs → see spend → audit trail → export EDL → create a project from a vertical template.
 
 ## Multi-user collaboration
 
@@ -124,7 +135,7 @@ The flow does not name a model. Adapters do.
 |---|---|---|
 | **Still factory** | Sheets + plates | Measured: Qwen-Image-2.1 INT8 ConvRot, native 1344×768 |
 | **Clip factory (default)** | Hop-1 I2VA / T2V + motion-context extend | Measured: Comfy native MiniMax H3 on spark-56bc |
-| Future clip adapters | Same joins, same plates, declare window length | Cloud Hailuo / Veo / Kling / etc. only after a hop-1 watch protocol exists |
+| Future clip adapters | Same joins, same plates, declare window length | Documented slots: `comfy-h3`, `webhook`, `cli`. Cloud Hailuo / Veo / Kling only after a hop-1 watch protocol exists |
 
 A pasted lock is not Ref2VA. Identity holds inside `continue`. Drift at `cut` / `fadeblack` is expected until a **plate** conditions hop-1.
 

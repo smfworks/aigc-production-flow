@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
+from ..audit import REVIEW_SET, record
 from ..deps import DbDep, UserDep, get_episode, latest_revision, touch
 from ..models import ReviewState, utcnow
 from ..preview import generate_ok_blockers
@@ -39,6 +40,16 @@ def set_review(episode_id: str, body: ReviewSet, user: UserDep, db: DbDep) -> Re
     episode.review_state = body.state
     episode.updated_at = utcnow()
     touch(episode.project)
+    record(
+        db,
+        actor=user.name,
+        action=REVIEW_SET,
+        project_id=episode.project_id,
+        episode_id=episode.id,
+        entity_type="episode",
+        entity_id=episode.id,
+        detail={"state": body.state, "note": body.note.strip()},
+    )
     db.commit()
     db.refresh(episode)
     revision = latest_revision(episode)

@@ -5,6 +5,7 @@ from ..models import Shot, ShotCandidate, utcnow
 from ..schemas import BoardOut, CandidateCreate, CandidateOut, CandidateUpdate, ShotOut, ShotReadinessSet
 from ..serializers import shot_out
 from .. import shots as shot_ops
+from ..shots import continue_chains
 
 router = APIRouter(tags=["shots"])
 
@@ -21,24 +22,6 @@ def _get_shot(db, episode_id: str, shot_id: str) -> Shot:
     return shot
 
 
-def _chains(shots: list[Shot]) -> tuple[list[list[str]], list[dict[str, str]]]:
-    chains: list[list[str]] = []
-    current: list[str] = []
-    boundaries: list[dict[str, str]] = []
-    for shot in shots:
-        if shot.join == "continue" and current:
-            current.append(shot.id)
-            continue
-        if current:
-            chains.append(current)
-        current = [shot.id]
-        if shot.join in {"cut", "fadeblack"}:
-            boundaries.append({"shot_id": shot.id, "join": shot.join})
-    if current:
-        chains.append(current)
-    return chains, boundaries
-
-
 @router.get("/api/episodes/{episode_id}/shots", response_model=list[ShotOut])
 def list_shots(episode_id: str, _user: UserDep, db: DbDep) -> list[ShotOut]:
     episode = get_episode(db, episode_id)
@@ -49,7 +32,7 @@ def list_shots(episode_id: str, _user: UserDep, db: DbDep) -> list[ShotOut]:
 def get_board(episode_id: str, _user: UserDep, db: DbDep) -> BoardOut:
     episode = get_episode(db, episode_id)
     shots = list(episode.shots)
-    chains, boundaries = _chains(shots)
+    chains, boundaries = continue_chains(shots)
     return BoardOut(
         shots=[_shot_out(row) for row in shots],
         continue_chains=chains,

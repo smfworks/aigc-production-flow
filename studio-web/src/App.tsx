@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, downloadMedia, downloadPack, getToken, setToken } from "./api.ts";
+import { api, downloadExport, downloadMedia, downloadPack, getToken, setToken } from "./api.ts";
 import type {
+  AdapterCatalog,
   Comment,
   Episode,
   Job,
@@ -8,15 +9,19 @@ import type {
   Meta,
   PreviewDesk,
   Project,
+  RetentionPreview,
   Review,
   ReviewStateName,
   Shot,
+  VerticalTemplate,
 } from "./types.ts";
 import { REVIEW_COPY, REVIEW_STATES } from "./types.ts";
 import { ShotBoard } from "./ShotBoard.tsx";
 import { TaskCenter } from "./TaskCenter.tsx";
 import { PreviewDesk as PreviewDeskPanel } from "./PreviewDesk.tsx";
 import { JobTable } from "./JobTable.tsx";
+import { BudgetDashboard } from "./BudgetDashboard.tsx";
+import { AuditLog } from "./AuditLog.tsx";
 import { navigate, parseHash, type View } from "./nav.ts";
 
 function formatWhen(iso: string): string {
@@ -63,14 +68,14 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · Studio spine · Phase 3</p>
+            <p className="eyebrow">SMF Works · Studio spine · Phase 4</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Projects, hop-1 preview desk, and a task center around the pack zip. Jobs run in-process
-          with adapter=<code>stub</code> unless a live hook is set. This shell does not claim H3 or
-          Qwen ran. Pack zip remains the contract.
+          Projects, hop-1 preview desk, task center, budget, audit, and EDL export around the pack
+          zip. Jobs run in-process with adapter=<code>stub</code> unless a live hook is set. Budget
+          units are operator credits — not a cloud bill. Pack zip remains the contract.
         </p>
         <nav className="mast-nav" aria-label="Studio">
           <button
@@ -87,6 +92,20 @@ export default function App() {
           >
             Task Center
           </button>
+          <button
+            type="button"
+            className={view.page === "budget" ? "btn btn-go" : "btn"}
+            onClick={() => navigate({ page: "budget" })}
+          >
+            Budget
+          </button>
+          <button
+            type="button"
+            className={view.page === "audit" ? "btn btn-go" : "btn"}
+            onClick={() => navigate({ page: "audit" })}
+          >
+            Audit
+          </button>
         </nav>
         <div className="auth-row">
           <label>
@@ -100,7 +119,9 @@ export default function App() {
               autoComplete="off"
             />
           </label>
-          <span className="hint">SSO later. This is not multi-tenant SaaS security.</span>
+          <span className="hint">
+            Auth {meta?.auth_mode ?? "local"}. SSO/OIDC is not implemented — docs/AUTH.md.
+          </span>
           {meta?.still_adapter ? (
             <span className="hint">
               still={meta.still_adapter} · clip={meta.clip_adapter} · worker={meta.job_worker}
@@ -155,6 +176,12 @@ export default function App() {
       {view.page === "tasks" ? (
         <TaskCenter jobId={view.jobId} onError={showError} onNotice={setNotice} />
       ) : null}
+      {view.page === "budget" ? (
+        <BudgetDashboard projectId={view.projectId} onError={showError} />
+      ) : null}
+      {view.page === "audit" ? (
+        <AuditLog projectId={view.projectId} episodeId={view.episodeId} onError={showError} />
+      ) : null}
     </div>
   );
 }
@@ -169,13 +196,20 @@ function ProjectList({
   onNotice: (msg: string) => void;
 }) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [templates, setTemplates] = useState<VerticalTemplate[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [templateId, setTemplateId] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setProjects(await api.projects());
+      const [nextProjects, nextTemplates] = await Promise.all([
+        api.projects(),
+        api.templates().catch(() => [] as VerticalTemplate[]),
+      ]);
+      setProjects(nextProjects);
+      setTemplates(nextTemplates);
     } catch (err) {
       onError(err);
     }
@@ -187,15 +221,32 @@ function ProjectList({
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() && !templateId) return;
     setBusy(true);
     try {
-      const project = await api.createProject({ name: name.trim(), description: description.trim() });
-      setName("");
-      setDescription("");
-      onNotice(`Created ${project.name}`);
-      await load();
-      onOpen(project.id);
+      if (templateId) {
+        const created = await api.createFromTemplate(templateId, {
+          name: name.trim() || undefined,
+          description: description.trim() || undefined,
+        });
+        setName("");
+        setDescription("");
+        setTemplateId("");
+        onNotice(
+          `Created ${created.project.name} from ${templateId} — gates ${
+            created.gates_green ? "green" : "red (fill the pack; no fake generate)"
+          }`,
+        );
+        await load();
+        onOpen(created.project.id);
+      } else {
+        const project = await api.createProject({ name: name.trim(), description: description.trim() });
+        setName("");
+        setDescription("");
+        onNotice(`Created ${project.name}`);
+        await load();
+        onOpen(project.id);
+      }
     } catch (err) {
       onError(err);
     } finally {
@@ -207,22 +258,30 @@ function ProjectList({
     <section className="panel">
       <div className="panel-head">
         <h2>Projects</h2>
-        <p>One title. Episodes are chapters. Pack zip is the collaboration object.</p>
+        <p>One title. Episodes are chapters. Pack zip is the collaboration object. New from template seeds an empty pack — gates stay red.</p>
       </div>
       <form className="create-row" onSubmit={create}>
         <input
           placeholder="Project name"
           value={name}
           onChange={(event) => setName(event.target.value)}
-          required
+          required={!templateId}
         />
         <input
           placeholder="Log line / description (optional)"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
+        <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+          <option value="">Blank project</option>
+          {templates.map((row) => (
+            <option key={row.id} value={row.id}>
+              New from template: {row.name}
+            </option>
+          ))}
+        </select>
         <button type="submit" className="btn btn-go" disabled={busy}>
-          New project
+          {templateId ? "New from template" : "New project"}
         </button>
       </form>
       {projects.length === 0 ? (
@@ -262,18 +321,34 @@ function ProjectView({
 }) {
   const [project, setProject] = useState<Project | null>(null);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [adapters, setAdapters] = useState<AdapterCatalog | null>(null);
   const [title, setTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
+  const [stillAdapter, setStillAdapter] = useState("stub");
+  const [clipAdapter, setClipAdapter] = useState("stub");
+  const [cap, setCap] = useState("");
+  const [hardStop, setHardStop] = useState(false);
+  const [retentionDays, setRetentionDays] = useState("");
+  const [retention, setRetention] = useState<RetentionPreview | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [nextProject, nextEpisodes] = await Promise.all([
+      const [nextProject, nextEpisodes, nextAdapters, nextRetention] = await Promise.all([
         api.project(projectId),
         api.episodes(projectId),
+        api.adapters().catch(() => null),
+        api.retentionPreview({ project_id: projectId }).catch(() => null),
       ]);
       setProject(nextProject);
       setEpisodes(nextEpisodes);
+      setAdapters(nextAdapters);
+      setStillAdapter(nextProject.still_adapter || "stub");
+      setClipAdapter(nextProject.clip_adapter || "stub");
+      setCap(nextProject.budget_cap_units == null ? "" : String(nextProject.budget_cap_units));
+      setHardStop(Boolean(nextProject.budget_hard_stop));
+      setRetentionDays(nextProject.retention_days == null ? "" : String(nextProject.retention_days));
+      setRetention(nextRetention);
     } catch (err) {
       onError(err);
     }
@@ -304,6 +379,51 @@ function ProjectView({
     }
   }
 
+  async function saveSettings(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const capValue = cap.trim() === "" ? null : Number(cap);
+      const daysValue = retentionDays.trim() === "" ? null : Number(retentionDays);
+      await api.updateProject(projectId, {
+        still_adapter: stillAdapter,
+        clip_adapter: clipAdapter,
+        budget_hard_stop: hardStop,
+        budget_cap_units: capValue,
+        clear_budget_cap: capValue == null,
+        retention_days: daysValue,
+        clear_retention_days: daysValue == null,
+      });
+      onNotice("Saved adapter defaults, budget cap, and retention");
+      await load();
+    } catch (err) {
+      onError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runRetention(apply: boolean) {
+    try {
+      const result = await api.retentionApply({
+        project_id: projectId,
+        dry_run: !apply,
+        confirm: apply ? "expire" : "",
+      });
+      setRetention(result);
+      onNotice(
+        apply
+          ? `Expired ${result.deleted_count ?? 0} stub/temp media. Pack revisions kept.`
+          : `Dry-run: ${result.candidates.length} ephemeral files older than ${result.retention_days} days.`,
+      );
+    } catch (err) {
+      onError(err);
+    }
+  }
+
+  const stillSlots = adapters?.adapters.filter((row) => row.kinds.includes("still")) ?? [];
+  const clipSlots = adapters?.adapters.filter((row) => row.kinds.includes("clip")) ?? [];
+
   return (
     <section className="panel">
       <button type="button" className="text-btn" onClick={onBack}>
@@ -312,6 +432,67 @@ function ProjectView({
       <div className="panel-head">
         <h2>{project?.name ?? "Project"}</h2>
         <p>{project?.description || "Episodes are chapters. Review state lives on each episode."}</p>
+      </div>
+      <form className="create-row" onSubmit={saveSettings}>
+        <select value={stillAdapter} onChange={(event) => setStillAdapter(event.target.value)}>
+          {(stillSlots.length ? stillSlots : [{ id: "stub", label: "stub" }]).map((row) => (
+            <option key={row.id} value={row.id}>
+              still: {row.label || row.id}
+            </option>
+          ))}
+        </select>
+        <select value={clipAdapter} onChange={(event) => setClipAdapter(event.target.value)}>
+          {(clipSlots.length ? clipSlots : [{ id: "stub", label: "stub" }]).map((row) => (
+            <option key={row.id} value={row.id}>
+              clip: {row.label || row.id}
+            </option>
+          ))}
+        </select>
+        <input
+          placeholder="Budget cap (credits, blank = none)"
+          value={cap}
+          onChange={(event) => setCap(event.target.value)}
+          inputMode="decimal"
+        />
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={hardStop}
+            onChange={(event) => setHardStop(event.target.checked)}
+          />
+          Hard stop
+        </label>
+        <input
+          placeholder="Retention days (blank = env)"
+          value={retentionDays}
+          onChange={(event) => setRetentionDays(event.target.value)}
+          inputMode="numeric"
+        />
+        <button type="submit" className="btn" disabled={busy}>
+          Save settings
+        </button>
+        <button type="button" className="btn" onClick={() => navigate({ page: "budget", projectId })}>
+          Budget
+        </button>
+        <button type="button" className="btn" onClick={() => navigate({ page: "audit", projectId })}>
+          Audit
+        </button>
+      </form>
+      <p className="hint">
+        Live slots (comfy-h3, comfy-qwen, webhook, cli) fall back to stub if the hook is unset.
+        Budget units are operator credits — not a cloud bill. Retention expires stub/temp media only;
+        pack revisions stay.
+        {retention
+          ? ` Dry-run candidates: ${retention.candidates.length} / revisions kept: ${retention.revision_count_kept}.`
+          : ""}
+      </p>
+      <div className="toolbar">
+        <button type="button" className="btn" onClick={() => void runRetention(false)}>
+          Retention dry-run
+        </button>
+        <button type="button" className="btn" onClick={() => void runRetention(true)}>
+          Apply retention
+        </button>
       </div>
       <form className="create-row" onSubmit={create}>
         <input
@@ -538,6 +719,46 @@ function EpisodeView({
           </button>
           <button type="button" className="btn" onClick={() => void exportPack()}>
             Export pack zip
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              void downloadExport(episodeId, "edl")
+                .then(() => onNotice("Exported CMX3600-ish EDL (metadata only)"))
+                .catch(onError)
+            }
+          >
+            Export EDL
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              void downloadExport(episodeId, "playlist")
+                .then(() => onNotice("Exported shot playlist JSON"))
+                .catch(onError)
+            }
+          >
+            Export shot playlist
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              void downloadExport(episodeId, "fcpxml")
+                .then(() => onNotice("Exported FCP XML lite"))
+                .catch(onError)
+            }
+          >
+            Export FCP XML
+          </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => navigate({ page: "audit", projectId, episodeId })}
+          >
+            Audit
           </button>
           <a className="btn" href={packBuilderUrl} target="_blank" rel="noreferrer">
             Open pack builder

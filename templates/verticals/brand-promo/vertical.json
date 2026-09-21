@@ -1,0 +1,8 @@
+{
+  "id": "brand-promo",
+  "name": "Brand promo",
+  "blurb": "Short product beat with a talent lock and one grade. Empty — no fake generate.",
+  "still_adapter": "stub",
+  "clip_adapter": "stub",
+  "stages": ["script", "assets", "storyboard", "preview"]
+}

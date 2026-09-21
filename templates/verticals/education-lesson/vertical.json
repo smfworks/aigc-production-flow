@@ -1,0 +1,8 @@
+{
+  "id": "education-lesson",
+  "name": "Education lesson",
+  "blurb": "Clocked lesson: hook, teach, check. Four stages, eleven gates. Empty — no fake generate.",
+  "still_adapter": "stub",
+  "clip_adapter": "stub",
+  "stages": ["script", "assets", "storyboard", "preview"]
+}

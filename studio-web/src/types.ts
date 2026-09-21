@@ -36,6 +36,11 @@ export type Project = {
   name: string;
   slug: string;
   description: string;
+  still_adapter: string;
+  clip_adapter: string;
+  budget_cap_units: number | null;
+  budget_hard_stop: boolean;
+  retention_days: number | null;
   episode_count: number;
   created_at: string;
   updated_at: string;
@@ -97,7 +102,7 @@ export type MediaAsset = {
 export type Meta = {
   name: string;
   phase: number;
-  auth_mode: "local-dev";
+  auth_mode: "local" | "forward-header";
   sso: string;
   pack_builder_url: string;
   docs: string;
@@ -105,6 +110,9 @@ export type Meta = {
   job_worker?: string;
   still_adapter?: string;
   clip_adapter?: string;
+  cost_currency?: string;
+  retention_days?: number;
+  budget_hard_stop?: boolean;
 };
 
 export const REVIEW_COPY: Record<ReviewStateName, string> = {
@@ -213,6 +221,10 @@ export type Job = {
   adapter: string;
   payload: Record<string, unknown>;
   result: Record<string, unknown>;
+  estimated_cost_units: number;
+  actual_cost_units: number | null;
+  cost_currency: string;
+  cost_note: string;
   cancel_requested: boolean;
   created_by: string;
   created_at: string;
@@ -239,4 +251,102 @@ export type PreviewDesk = {
     extend_ok: boolean;
     blockers: string[];
   }[];
+};
+
+export type AdapterSlot = {
+  id: string;
+  label: string;
+  kinds: string[];
+  live: boolean;
+  transport: string;
+  note: string;
+};
+
+export type AdapterCatalog = {
+  adapters: AdapterSlot[];
+  still_default: string;
+  clip_default: string;
+  note: string;
+};
+
+export type BudgetEpisodeRow = {
+  episode_id: string;
+  title: string;
+  chapter: number;
+  spent_units: number;
+  pending_units: number;
+  job_count: number;
+  succeeded: number;
+  failed: number;
+  cancelled: number;
+  adapter_mix: Record<string, number>;
+};
+
+export type BudgetProjectRow = {
+  project_id: string;
+  name: string;
+  slug: string;
+  spent_units: number;
+  pending_units: number;
+  cap_units: number | null;
+  hard_stop: boolean;
+  over_cap: boolean;
+  job_count: number;
+  adapter_mix: Record<string, number>;
+  still_adapter: string;
+  clip_adapter: string;
+  usd_estimate: number | null;
+  episodes: BudgetEpisodeRow[];
+};
+
+export type BudgetDashboard = {
+  currency: string;
+  usd_per_unit: number;
+  rates: Record<string, number>;
+  disclaimer: string;
+  spent_units: number;
+  pending_units: number;
+  usd_estimate: number | null;
+  cap_units: number | null;
+  hard_stop: boolean;
+  job_counts: Record<string, number>;
+  adapter_mix: Record<string, number>;
+  projects: BudgetProjectRow[];
+};
+
+export type AuditEvent = {
+  id: string;
+  actor: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  project_id: string | null;
+  episode_id: string | null;
+  project_name: string;
+  episode_title: string;
+  detail: Record<string, unknown>;
+  created_at: string;
+};
+
+export type VerticalTemplate = {
+  id: string;
+  name: string;
+  blurb: string;
+  still_adapter: string;
+  clip_adapter: string;
+  stages: string[];
+  gates_green: boolean;
+  fake_generate: boolean;
+};
+
+export type RetentionPreview = {
+  retention_days: number;
+  enabled: boolean;
+  keep_pack_revisions: boolean;
+  keep_note: string;
+  candidates: { id: string; kind: string; original_name: string; path: string }[];
+  revision_count_kept: number;
+  dry_run?: boolean;
+  applied?: boolean;
+  deleted_count?: number;
 };

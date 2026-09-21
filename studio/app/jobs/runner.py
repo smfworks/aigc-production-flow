@@ -34,6 +34,7 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
             job.status = "cancelled"
             job.finished_at = utcnow()
             job.error = job.error or "cancelled"
+            job.actual_cost_units = 0.0
             job.updated_at = utcnow()
             session.commit()
             return job
@@ -66,6 +67,7 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
         except Exception as exc:  # noqa: BLE001 — job row records the failure
             job.status = "failed"
             job.error = str(exc)
+            job.actual_cost_units = 0.0
             job.finished_at = utcnow()
             job.updated_at = utcnow()
             session.commit()
@@ -80,6 +82,7 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
         if result is None:
             job.status = "failed"
             job.error = "Adapter returned no result."
+            job.actual_cost_units = 0.0
             job.finished_at = utcnow()
             session.commit()
             return job
@@ -103,9 +106,11 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
             job.status = "succeeded"
             job.progress = 100
             job.error = ""
+            job.actual_cost_units = float(job.estimated_cost_units or 0)
         else:
             job.status = "failed"
             job.error = result.error or "Adapter failed."
+            job.actual_cost_units = 0.0
         job.finished_at = utcnow()
         job.updated_at = utcnow()
         episode.updated_at = utcnow()
@@ -122,6 +127,7 @@ def _cancel(job: Job) -> None:
     job.cancel_requested = True
     job.finished_at = utcnow()
     job.error = job.error or "cancelled"
+    job.actual_cost_units = 0.0
     job.updated_at = utcnow()
 
 
@@ -156,13 +162,13 @@ def _run(
             error="" if report.get("ok") else _precheck_error(report),
         )
     if job.job_type == "still-sheet":
-        return get_still_factory().generate_sheet(ctx)
+        return get_still_factory(requested=job.adapter).generate_sheet(ctx)
     if job.job_type == "still-plate":
-        return get_still_factory().generate_plate(ctx)
+        return get_still_factory(requested=job.adapter).generate_plate(ctx)
     if job.job_type == "clip-hop1":
-        return get_clip_factory().hop1(ctx)
+        return get_clip_factory(requested=job.adapter).hop1(ctx)
     if job.job_type == "clip-extend":
-        return get_clip_factory().extend(ctx)
+        return get_clip_factory(requested=job.adapter).extend(ctx)
     return AdapterResult(ok=False, adapter=job.adapter or "stub", error=f"Unknown job type {job.job_type}")
 
 

@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     adapter_webhook_url: str = ""
     adapter_cli: str = ""
     adapter_timeout_seconds: float = 60.0
+    auth_mode: str = "local"
+    cost_rates: str = "stub:0.1,webhook:1,cli:1,comfy-h3:2,comfy-qwen:0.5"
+    cost_currency: str = "credits"
+    cost_usd_per_unit: float = 0.0
+    budget_cap_units: float | None = None
+    budget_hard_stop: bool = False
+    retention_days: int = 30
+    templates_root: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

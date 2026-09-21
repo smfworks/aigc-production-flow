@@ -1,5 +1,8 @@
 import type {
+  AdapterCatalog,
+  AuditEvent,
   Board,
+  BudgetDashboard,
   Comment,
   ContinuityReceipt,
   Episode,
@@ -8,10 +11,12 @@ import type {
   Meta,
   PreviewDesk,
   Project,
+  RetentionPreview,
   Review,
   ReviewStateName,
   Shot,
   ShotReadiness,
+  VerticalTemplate,
 } from "./types.ts";
 
 const TOKEN_KEY = "smf.aigc-studio.token";
@@ -57,9 +62,28 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const api = {
   meta: () => request<Meta>("/api/meta"),
   projects: () => request<Project[]>("/api/projects"),
-  createProject: (body: { name: string; description?: string }) =>
-    request<Project>("/api/projects", { method: "POST", body: JSON.stringify(body) }),
+  createProject: (body: {
+    name: string;
+    description?: string;
+    still_adapter?: string;
+    clip_adapter?: string;
+    budget_cap_units?: number | null;
+    budget_hard_stop?: boolean;
+  }) => request<Project>("/api/projects", { method: "POST", body: JSON.stringify(body) }),
   project: (id: string) => request<Project>(`/api/projects/${id}`),
+  updateProject: (
+    id: string,
+    body: {
+      still_adapter?: string;
+      clip_adapter?: string;
+      budget_cap_units?: number | null;
+      budget_hard_stop?: boolean;
+      retention_days?: number | null;
+      clear_budget_cap?: boolean;
+      clear_retention_days?: boolean;
+      description?: string;
+    },
+  ) => request<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   episodes: (projectId: string) => request<Episode[]>(`/api/projects/${projectId}/episodes`),
   createEpisode: (projectId: string, body: { title: string; synopsis?: string }) =>
     request<Episode>(`/api/projects/${projectId}/episodes`, {
@@ -201,6 +225,35 @@ export const api = {
       body: data,
     });
   },
+  adapters: () => request<AdapterCatalog>("/api/adapters"),
+  templates: () => request<VerticalTemplate[]>("/api/templates"),
+  createFromTemplate: (templateId: string, body: { name?: string; description?: string }) =>
+    request<{ project: Project; episode: Episode; gates_green: boolean; template_id: string }>(
+      `/api/templates/${templateId}/projects`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+  budget: (query: { project_id?: string; episode_id?: string } = {}) => {
+    if (query.episode_id) return request<BudgetDashboard>(`/api/episodes/${query.episode_id}/budget`);
+    if (query.project_id) return request<BudgetDashboard>(`/api/projects/${query.project_id}/budget`);
+    return request<BudgetDashboard>("/api/budget");
+  },
+  audit: (query: { project_id?: string; episode_id?: string; action?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (query.project_id) params.set("project_id", query.project_id);
+    if (query.episode_id) params.set("episode_id", query.episode_id);
+    if (query.action) params.set("action", query.action);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request<AuditEvent[]>(`/api/audit${suffix}`);
+  },
+  retentionPreview: (query: { project_id?: string; episode_id?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (query.project_id) params.set("project_id", query.project_id);
+    if (query.episode_id) params.set("episode_id", query.episode_id);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    return request<RetentionPreview>(`/api/retention${suffix}`);
+  },
+  retentionApply: (body: { project_id?: string; episode_id?: string; dry_run?: boolean; confirm?: string }) =>
+    request<RetentionPreview>("/api/retention", { method: "POST", body: JSON.stringify(body) }),
 };
 
 async function saveDownload(response: Response, fallback: string): Promise<void> {
@@ -224,6 +277,15 @@ export async function downloadPack(episodeId: string): Promise<void> {
   });
   if (!response.ok) throw new Error(await parseError(response));
   await saveDownload(response, "pack.zip");
+}
+
+export async function downloadExport(episodeId: string, kind: "edl" | "playlist" | "fcpxml"): Promise<void> {
+  const fallback = kind === "edl" ? "episode.edl" : kind === "fcpxml" ? "episode.xml" : "playlist.json";
+  const response = await fetch(`/api/episodes/${episodeId}/export/${kind}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  await saveDownload(response, fallback);
 }
 
 export async function downloadMedia(assetId: string, filename: string): Promise<void> {
