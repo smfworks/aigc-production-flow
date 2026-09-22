@@ -75,6 +75,9 @@ def execute_job(db: Session | None, job_id: str) -> Job | None:
 
             notify_job_finished(session, job)
             session.commit()
+            from ..agentrun import note_agent_job_finished
+
+            note_agent_job_finished(session, job)
             return job
 
         session.refresh(job)
@@ -178,6 +181,9 @@ def _finish_adapter_result(session: Session, job: Job, episode: Episode, result:
 
         notify_job_finished(session, job)
         session.commit()
+        from ..agentrun import note_agent_job_finished
+
+        note_agent_job_finished(session, job)
     return job
 
 
@@ -299,6 +305,10 @@ def _run(
         return get_clip_factory(requested=job.adapter).hop1(ctx)
     if job.job_type == "clip-extend":
         return get_clip_factory(requested=job.adapter).extend(ctx)
+    if job.job_type == "stitch":
+        from ..stitch import run_stitch
+
+        return run_stitch(job, episode, set_progress)
     return AdapterResult(ok=False, adapter=job.adapter or "stub", error=f"Unknown job type {job.job_type}")
 
 

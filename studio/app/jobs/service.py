@@ -84,86 +84,12 @@ def _require_shot(db: Session, episode: Episode, shot_id: str | None, job_type: 
     return shot
 
 
-def enqueue_job(
-    db: Session,
-    *,
-    episode: Episode,
-    user_name: str,
-    job_type: str,
-    shot_id: str | None = None,
-    payload: dict[str, Any] | None = None,
-    retry_of_id: str | None = None,
-    adapter: str | None = None,
-) -> Job:
-    if job_type not in JOB_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"job_type must be one of: {', '.join(JOB_TYPES)}",
-        )
-    shot = _require_shot(db, episode, shot_id, job_type)
-    body = payload if isinstance(payload, dict) else {}
-    requested = adapter or (str(body.get("adapter") or "").strip() or None)
-    if job_type == "clip-hop1":
-        blocked = hop1_enqueue_blockers(episode, shot)
-        if blocked:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blocked)
-    if job_type == "clip-extend":
-        if shot is None or not extend_ok(shot.receipt):
-            blockers = []
-            if shot is None:
-                blockers = ["clip-extend requires a shot."]
-            else:
-                from ..preview import receipt_blockers
-
-                blockers = receipt_blockers(shot.receipt, for_extend=True)
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "preview_incomplete",
-                    "message": (
-                        "Refuse clip-extend until this shot's hop-1 is preview-watched with a "
-                        "continuity receipt and no NG reason."
-                    ),
-                    "blockers": blockers,
-                },
-            )
-
+def dispatch_job(db: Session, job: Job) -> Job:
+    """Run or wake a queued job. Inline mode finishes before return."""
     from ..config import get_settings
-
-    cfg = get_settings()
-    resolved = (
-        "stub"
-        if job_type == "batch-precheck"
-        else resolve_adapter_name(job_type, cfg, requested=requested, project=episode.project)
-    )
-    if resolved != "stub":
-        from ..adapters.health import refuse_if_unhealthy
-
-        refuse_if_unhealthy(resolved, cfg)
-    estimated = estimate_units(job_type, resolved, cfg)
-    refuse_if_over_cap(db, episode.project, estimated, cfg)
-    job = Job(
-        episode_id=episode.id,
-        shot_id=shot.id if shot else None,
-        job_type=job_type,
-        status="queued",
-        progress=0,
-        adapter=resolved,
-        payload=body,
-        result={},
-        retry_of_id=retry_of_id,
-        created_by=user_name,
-        estimated_cost_units=estimated,
-        actual_cost_units=None,
-        cost_currency=currency(cfg),
-        cost_note=COST_NOTE,
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-
     from .modes import WORKER_CELERY, WORKER_INLINE, WORKER_THREAD, normalize_worker
 
+    cfg = get_settings()
     mode = normalize_worker(cfg.job_worker)
     if mode == WORKER_INLINE:
         execute_job(db, job.id)
@@ -198,6 +124,97 @@ def enqueue_job(
                 },
             ) from exc
     return job
+
+
+def enqueue_job(
+    db: Session,
+    *,
+    episode: Episode,
+    user_name: str,
+    job_type: str,
+    shot_id: str | None = None,
+    payload: dict[str, Any] | None = None,
+    retry_of_id: str | None = None,
+    adapter: str | None = None,
+    allow_stub_fixture: bool = False,
+    autocommit: bool = True,
+) -> Job:
+    if job_type not in JOB_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"job_type must be one of: {', '.join(JOB_TYPES)}",
+        )
+    shot = _require_shot(db, episode, shot_id, job_type)
+    body = dict(payload) if isinstance(payload, dict) else {}
+    requested = adapter or (str(body.get("adapter") or "").strip() or None)
+    from ..config import get_settings
+
+    cfg = get_settings()
+    if job_type == "stitch":
+        resolved = "stitch"
+    elif job_type == "batch-precheck":
+        resolved = "stub"
+    else:
+        resolved = resolve_adapter_name(job_type, cfg, requested=requested, project=episode.project)
+    if job_type == "clip-hop1":
+        stub_fixture = allow_stub_fixture and resolved == "stub"
+        if stub_fixture:
+            body["fixture_only"] = True
+            body["stamps_generate_ok"] = False
+        else:
+            blocked = hop1_enqueue_blockers(episode, shot)
+            if blocked:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=blocked)
+    if job_type == "clip-extend":
+        if shot is None or not extend_ok(shot.receipt):
+            blockers = []
+            if shot is None:
+                blockers = ["clip-extend requires a shot."]
+            else:
+                from ..preview import receipt_blockers
+
+                blockers = receipt_blockers(shot.receipt, for_extend=True)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "preview_incomplete",
+                    "message": (
+                        "Refuse clip-extend until this shot's hop-1 is preview-watched with a "
+                        "continuity receipt and no NG reason."
+                    ),
+                    "blockers": blockers,
+                },
+            )
+
+    if resolved not in {"stub", "stitch"}:
+        from ..adapters.health import refuse_if_unhealthy
+
+        refuse_if_unhealthy(resolved, cfg)
+    estimated = estimate_units(job_type, "stub" if job_type == "stitch" else resolved, cfg)
+    refuse_if_over_cap(db, episode.project, estimated, cfg)
+    job = Job(
+        episode_id=episode.id,
+        shot_id=shot.id if shot else None,
+        job_type=job_type,
+        status="queued",
+        progress=0,
+        adapter=resolved,
+        payload=body,
+        result={},
+        retry_of_id=retry_of_id,
+        created_by=user_name,
+        estimated_cost_units=estimated,
+        actual_cost_units=None,
+        cost_currency=currency(cfg),
+        cost_note=COST_NOTE,
+    )
+    db.add(job)
+    db.flush()
+    if not autocommit:
+        return job
+    db.commit()
+    db.refresh(job)
+    return dispatch_job(db, job)
 
 
 def cancel_job(db: Session, job: Job) -> Job:

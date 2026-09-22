@@ -1,6 +1,8 @@
-# Studio shell (Phase 11)
+# Studio shell (Phase 12)
 
-Vite + React UI for one AIGC Studio. **Start here** creates a project and pack (blank, template, or brain dump). The episode embeds the pack builder’s four stages (Script → Assets → Storyboard → Preview) and autosaves revisions. **Export for agent** downloads the handoff zip. Zip import and the optional builder window stay secondary.
+Vite + React UI for one AIGC Studio. **New creation** is the home screen: a prompt, a short wizard, then **Send to Hermes**. The agent-run strip polls still / plate / clip / stitch and says when the result is a fixture or awaiting stitch. **Download agent zip** is secondary.
+
+Projects still has blank pack, template, and brain dump. The episode embeds the pack builder’s four stages (Script → Assets → Storyboard → Preview) and autosaves revisions. Zip import and the optional builder window stay secondary.
 
 The pack builder source stays in `../app/` and is reused by the episode stages. Hermes `smf-h3-capture` is unchanged.
 

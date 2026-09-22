@@ -202,6 +202,80 @@ export type MediaAsset = {
   approved?: boolean;
 };
 
+export type EngineHonesty = {
+  still_preference: string;
+  clip_preference: string;
+  still_resolved: string;
+  clip_resolved: string;
+  still_label: string;
+  clip_label: string;
+  still_live: boolean;
+  clip_live: boolean;
+  called_comfy: boolean;
+  note: string;
+};
+
+export type WizardSession = {
+  id: string;
+  status: string;
+  step: string;
+  steps: string[];
+  answers: Record<string, unknown>;
+  project_id: string | null;
+  episode_id: string | null;
+  revision_id: string | null;
+  agent_run_id: string | null;
+  gates_green: boolean;
+  generate_ready: boolean;
+  engines: EngineHonesty;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AgentStep = {
+  order: number;
+  kind: string;
+  subject: string;
+  take: string;
+  status: string;
+  job_id: string;
+  shot_id: string;
+  adapter: string;
+  adapter_label: string;
+  note: string;
+  error: string;
+  claim: string;
+  called_comfy: boolean;
+  produced_mp4: boolean;
+  stitch_state: string;
+};
+
+export type AgentRun = {
+  id: string;
+  wizard_id: string | null;
+  project_id: string;
+  episode_id: string;
+  revision_id: string;
+  status: string;
+  stitch_state: string;
+  deep_link: string;
+  drop_dir: string;
+  called_comfy: boolean;
+  hermes_ran: boolean;
+  honesty_note: string;
+  steps: AgentStep[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type HermesHandoff = {
+  wizard_id: string;
+  deep_link: string;
+  drop_dir: string;
+  payload: Record<string, unknown>;
+  run: AgentRun;
+};
+
 export type Meta = {
   name: string;
   phase: number;
@@ -319,6 +393,7 @@ export const JOB_TYPES = [
   "clip-hop1",
   "clip-extend",
   "batch-precheck",
+  "stitch",
 ] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 

@@ -94,4 +94,4 @@ Fill `continuity-log.md` from `sigils.jsonl` / Comfy history: seed, peak °C, ff
 
 ## Studio spine (optional, local)
 
-The pack builder is enough to fill and zip a bible. Studio is the primary place to **create** that pack (blank, template, or brain dump) and edit the four stages without a zip. Export for agent hands the zip to Hermes, OpenClaw, or a Grok bot for Comfy MCP (stills, then clips). See [STUDIO.md](STUDIO.md). Auth modes: [AUTH.md](AUTH.md). `generate-ok` cannot be stamped while any gate is red, a required hop-1 lacks a watched continuity receipt, or a reviewer/producer has not signed off.
+The pack builder is enough to fill and zip a bible. Studio is the primary place to **create** that pack. Open Studio and use the wizard (prompt, then the few questions it asks). **Send to Hermes** writes the brief; the zip is the fallback. Blank, template, and brain dump remain on Projects. The four stages still edit the episode. See [STUDIO.md](STUDIO.md). Auth modes: [AUTH.md](AUTH.md). `generate-ok` cannot be stamped while any gate is red, a required hop-1 lacks a watched continuity receipt, or a reviewer/producer has not signed off.

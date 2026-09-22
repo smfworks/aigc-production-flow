@@ -33,6 +33,9 @@ import type {
   StudioOrg,
   StudioUser,
   VerticalTemplate,
+  AgentRun,
+  HermesHandoff,
+  WizardSession,
 } from "./types.ts";
 
 const TOKEN_KEY = "smf.aigc-studio.token";
@@ -455,6 +458,22 @@ export const api = {
   },
   retentionApply: (body: { project_id?: string; episode_id?: string; dry_run?: boolean; confirm?: string }) =>
     request<RetentionPreview>("/api/retention", { method: "POST", body: JSON.stringify(body) }),
+  startWizard: (prompt: string) =>
+    request<WizardSession>("/api/create/wizard", {
+      method: "POST",
+      body: JSON.stringify({ prompt }),
+    }),
+  wizard: (wizardId: string) => request<WizardSession>(`/api/create/wizard/${wizardId}`),
+  patchWizard: (wizardId: string, body: { step?: string; answers?: Record<string, unknown> }) =>
+    request<WizardSession>(`/api/create/wizard/${wizardId}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+  finishWizard: (wizardId: string) =>
+    request<WizardSession>(`/api/create/wizard/${wizardId}/finish`, { method: "POST" }),
+  handoffHermes: (wizardId: string) =>
+    request<HermesHandoff>(`/api/create/wizard/${wizardId}/handoff/hermes`, { method: "POST" }),
+  agentRun: (runId: string) => request<AgentRun>(`/api/agent-runs/${runId}`),
 };
 
 async function saveDownload(response: Response, fallback: string): Promise<void> {

@@ -1,6 +1,12 @@
-# Studio spine (Phase 11)
+# Studio spine (Phase 12)
 
-Studio is the primary create surface. Projects, Task Center, Budget, and Audit chrome can start a pack: **New project**, **New blank pack**, **New from template**, or a **brain dump**. The four stages (Script → Assets → Storyboard → Preview) edit inside the episode. **Export for agent** downloads a zip an agent (Hermes, OpenClaw, or a Grok bot) can feed to Comfy MCP — still sheets and plates, then hop-1 clips. Pack zip remains the collaboration/export contract. It is not CapCut and not a generate API that invents MP4s.
+**Start here:** open Studio. The home screen asks what you want to make. Finish the wizard. **Send to Hermes** writes a brief. Download agent zip is the fallback.
+
+The wizard (seven steps) fills a draft pack: format, length, tone, cast, audio, engines. Cast notes become identity **drafts**, not approvals. Gates stay red. No model is claimed. Unset Comfy lanes stay stub, and the handoff says so.
+
+**Send to Hermes** does not invoke Hermes and does not call Comfy. It writes `data/handoff/<run-id>/` (or `STUDIO_HANDOFF_ROOT`) plus `latest.json`, and returns a `hermes://aigc/brief?run=` link and a copyable payload. The brief orders **sheets → plates → hop-1 clips → stitch**. The agent-run panel polls those jobs. Stub lanes return fixture receipts. Stitch writes an MP4 only when local ffmpeg can concat real video files; otherwise the run stays **awaiting stitch**. See [AGENTS.md](../AGENTS.md).
+
+Projects, Task Center, Budget, and Audit stay on the desk. **New blank pack**, **New from template**, and **brain dump** remain on the Projects page. The four stages (Script → Assets → Storyboard → Preview) still edit inside the episode. **Export for agent** downloads the same zip. Pack zip remains the collaboration contract. It is not CapCut and not a generate API that invents MP4s.
 
 The Hermes plugin `smf-h3-capture` can stay. It is not required to create a pack. Import zip and Open in Studio remain secondary paths.
 
@@ -10,6 +16,8 @@ Brain dump is stub/local only. `STUDIO_LLM_BASE_URL` may point at a local or Ope
 
 | Env | Default | Notes |
 |---|---|---|
+| `STUDIO_HANDOFF_ROOT` | beside the media dir (`./data/handoff`) | Hermes brief drop. `latest.json` is the pane watch file |
+| `STUDIO_HERMES_DROP` | empty | Optional second copy, for example `~/.hermes/aigc`. Unset does not write outside the handoff root |
 | `STUDIO_LLM_BASE_URL` | empty | Optional `…/v1` or full `…/chat/completions` URL. Unset → deterministic brain dump |
 | `STUDIO_LLM_MODEL` | `local` when a URL is set | Model name sent to that endpoint |
 | `STUDIO_LLM_API_KEY` | empty | Optional bearer for that endpoint. Stays in the process environment, not git |

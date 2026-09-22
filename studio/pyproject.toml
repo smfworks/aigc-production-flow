@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aigc-studio"
-version = "0.11.0"
-description = "Phase 11 studio: native ComfyUI Qwen-Image stills and MiniMax H3 clips, plus in-app pack create."
+version = "0.12.0"
+description = "Phase 12 studio: Create wizard, Hermes handoff, agent-run status, and stitch. Comfy lanes stay opt-in."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

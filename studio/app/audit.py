@@ -35,6 +35,9 @@ DEMO_SEED = "demo.seed"
 PACK_SAVE = "pack.save"
 BRAIN_DUMP = "brain.dump"
 AGENT_EXPORT = "agent.export"
+WIZARD_START = "wizard.start"
+WIZARD_FINISH = "wizard.finish"
+HERMES_HANDOFF = "hermes.handoff"
 
 ACTIONS = (
     REVIEW_SET,
@@ -64,6 +67,9 @@ ACTIONS = (
     PACK_SAVE,
     BRAIN_DUMP,
     AGENT_EXPORT,
+    WIZARD_START,
+    WIZARD_FINISH,
+    HERMES_HANDOFF,
 )
 
 

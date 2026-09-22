@@ -67,7 +67,7 @@ test("demo seed shows continuity and identity signals, then stub precheck", asyn
 });
 
 test("new project opens pack stages without a zip", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/projects");
   const start = page.getByTestId("start-here");
   await start.getByLabel("Project name").fill("Phase 10 hallway");
   await start.getByRole("button", { name: "New project" }).click();

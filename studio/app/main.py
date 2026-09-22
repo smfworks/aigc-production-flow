@@ -47,6 +47,7 @@ from .routers import (
     review,
     shots,
     templates,
+    wizard,
 )
 from .schemas import MetaOut, UserOut
 from .seed import seed_default_org
@@ -76,8 +77,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.11.0",
+        version="0.12.0",
         description=(
+            "Phase 12 studio: Create wizard, Hermes handoff drop, agent-run status, and a stitch job. "
+            "The wizard is the front door. It writes a draft pack and a brief "
+            "(sheets, plates, hop-1 clips, then stitch). Send to Hermes writes a local drop "
+            "and a hermes:// link. Studio does not invoke Hermes and does not call Comfy from the handoff. "
+            "Unset Comfy lanes stay stub. Stitch writes an MP4 only when ffmpeg can concat real video files. "
             "Phase 11 studio: native ComfyUI still and clip engines when lanes are set. "
             "Phase 10 studio: one app to create the pack. "
             "New project, blank pack, vertical template, or brain dump — no zip required. "
@@ -116,6 +122,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    application.include_router(wizard.router)
     application.include_router(create.router)
     application.include_router(projects.router)
     application.include_router(episodes.router)
@@ -148,7 +155,7 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 11,
+            "phase": 12,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",
@@ -248,7 +255,7 @@ def create_app() -> FastAPI:
                     "Set STUDIO_LLM_BASE_URL for an optional local/OpenAI-compatible endpoint."
                 )
             ),
-            primary_create="studio",
+            primary_create="wizard",
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])
