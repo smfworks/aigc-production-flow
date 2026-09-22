@@ -28,5 +28,5 @@
     }
   },
   "include": ["src", "../app/src"],
-  "exclude": ["../app/src/**/*.test.ts"]
+  "exclude": ["../app/src/**/*.test.ts", "src/**/*.test.ts"]
 }

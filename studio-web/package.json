@@ -12,6 +12,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "test": "node --experimental-strip-types --test src/*.test.ts",
     "e2e": "node scripts/e2e.mjs"
   },
   "dependencies": {
