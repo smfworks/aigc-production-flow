@@ -1,4 +1,5 @@
 export type View =
+  | { page: "create"; wizardId?: string }
   | { page: "projects" }
   | { page: "project"; projectId: string }
   | { page: "episode"; projectId: string; episodeId: string; shotId?: string; identityId?: string }
@@ -9,6 +10,9 @@ export type View =
 export function parseHash(hash = window.location.hash): View {
   const raw = hash.replace(/^#/, "");
   const parts = raw.split("/").filter(Boolean);
+  if (parts[0] === "create") {
+    return { page: "create", wizardId: parts[1] };
+  }
   if (parts[0] === "tasks") {
     return { page: "tasks", jobId: parts[1] };
   }
@@ -34,6 +38,9 @@ export function parseHash(hash = window.location.hash): View {
 }
 
 export function viewToHash(view: View): string {
+  if (view.page === "create") {
+    return view.wizardId ? `#/create/${view.wizardId}` : "#/create";
+  }
   if (view.page === "tasks") {
     return view.jobId ? `#/tasks/${view.jobId}` : "#/tasks";
   }

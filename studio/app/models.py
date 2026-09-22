@@ -35,7 +35,7 @@ SHOT_READINESS = ("draft", "candidates", "linked", "ready")
 CANDIDATE_KINDS = ("character", "prop", "scene", "costume")
 CANDIDATE_STATUSES = ("pending", "accepted", "ignored", "linked")
 CANDIDATE_SOURCES = ("stub", "manual")
-JOB_TYPES = ("still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck")
+JOB_TYPES = ("still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck", "stitch")
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
 RECEIPT_SOURCES = ("manual", "parsed")
 ADAPTER_IDS = ("stub", "comfy-h3", "comfy-qwen", "webhook", "cli")
@@ -517,4 +517,51 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     organization: Mapped[Organization] = relationship(back_populates="notifications")
+
+
+class WizardSession(Base):
+    """Create-wizard answers. Refresh reads this row. Not a generate."""
+
+    __tablename__ = "wizard_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    step: Mapped[str] = mapped_column(String(32), default="prompt")
+    answers: Mapped[dict] = mapped_column(JSON, default=dict)
+    project_id: Mapped[str | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    episode_id: Mapped[str | None] = mapped_column(ForeignKey("episodes.id"), nullable=True)
+    revision_id: Mapped[str | None] = mapped_column(String(36), default="")
+    agent_run_id: Mapped[str | None] = mapped_column(String(36), default="")
+    created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class AgentRun(Base):
+    """Hermes handoff plus the ordered still / plate / clip / stitch jobs. Studio does not invoke Hermes."""
+
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), nullable=False)
+    wizard_id: Mapped[str | None] = mapped_column(ForeignKey("wizard_sessions.id"), nullable=True)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    revision_id: Mapped[str] = mapped_column(String(36), default="")
+    status: Mapped[str] = mapped_column(String(32), default="queued")
+    drop_dir: Mapped[str] = mapped_column(Text, default="")
+    deep_link: Mapped[str] = mapped_column(String(300), default="")
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    plan: Mapped[dict] = mapped_column(JSON, default=dict)
+    called_comfy: Mapped[bool] = mapped_column(Boolean, default=False)
+    hermes_ran: Mapped[bool] = mapped_column(Boolean, default=False)
+    stitch_state: Mapped[str] = mapped_column(String(32), default="pending")
+    created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
 

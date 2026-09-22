@@ -30,6 +30,7 @@ JOB_MULTIPLIERS = {
     "still-plate": 1.0,
     "clip-hop1": 1.0,
     "clip-extend": 0.75,
+    "stitch": 0.25,
 }
 
 COST_NOTE = "operator rate table — not a cloud bill"

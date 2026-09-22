@@ -22,14 +22,15 @@ This archive is the handoff for Hermes, OpenClaw, or a Grok bot. Studio did **no
 
 ## Order
 
-1. Read `agent-brief.json`. Jobs are ordered **still sheets, then still plates, then hop-1 clips**.
+1. Read `agent-brief.json`. Jobs are ordered **still sheets, then still plates, then hop-1 clips, then stitch**.
 2. Feed the still factory first (documented slot `comfy-qwen`, canvas 1344×768). Sheets are the bible. Plates are the first frame of a window. Do not stretch 1024².
 3. After plates exist, feed hop-1 clips (documented slot `comfy-h3`). Measured window on that slot: **10.125 s / 243 f @ 24 fps**. One hop-1 per take. Watch it before any extend.
 4. `continue` keeps the motion-context latent (no new plate on hop 2+). `cut` and `fadeblack` need a new plate.
+5. **Stitch** is the last job. Concat the shot playlist / EDL lite. If the clip files are fixture receipts, leave **awaiting stitch**. Do not invent an MP4. Local ffmpeg may concat only real video files that exist.
 
 ## Honesty
 
-- `honesty.called_comfy` is false. Export does not generate. A later option may run live jobs and then export; this zip does not.
+- `honesty.called_comfy` is false. Export does not generate. A later option may run live jobs and then export; this zip does not. The stitch job does not write an MP4 from this export.
 - Adapter labels say **stub** or **live**. Unset `STUDIO_COMFY_STILL_LANES` / `STUDIO_COMFY_CLIP_LANES` (and unset webhook/CLI hooks) means the live slot is **not live** and enqueue resolves to stub. Do not tell anyone H3 or Qwen ran.
 - `generate_ready` is false here. `generate-ok` still needs green gates, hop-1 receipts, and a reviewer/producer sign-off.
 - Approved identity plates are what plate-bind counts. Draft sheets do not.
@@ -166,6 +167,23 @@ def build_agent_brief(episode: Episode, revision: PackRevision) -> dict[str, Any
         )
         order += 1
 
+    jobs.append(
+        _job(
+            order,
+            stage="stitch",
+            kind="stitch",
+            adapter_slot="stitch",
+            adapter_label="awaiting stitch",
+            produced_mp4=False,
+            called_comfy=False,
+            note=(
+                "Final job after hop-1 clips. Build a concat plan from the shot playlist / EDL lite. "
+                "Prefer local ffmpeg when every input is a real video file. "
+                "Otherwise leave awaiting stitch and do not invent an MP4."
+            ),
+        )
+    )
+
     binds: list[dict[str, Any]] = []
     for asset in episode.media or []:
         if not isinstance(asset, MediaAsset):
@@ -235,10 +253,12 @@ def build_agent_brief(episode: Episode, revision: PackRevision) -> dict[str, Any
             "all_gates_green": bool(revision.all_gates_green),
             "draft": meta.get("status") == "draft" or not revision.all_gates_green,
             "model_ran": bool(meta.get("model_ran")),
+            "stitch": "plan only — no MP4 is written by this export",
             "note": (
-                "Export does not call Comfy. An agent feeds ComfyUI stills (Qwen-Image) then "
-                "hop-1 clips (MiniMax H3). Optional later: run live Studio jobs, then export. "
-                "This export does not. Stub labels mean lanes are unset or this project is on the stub adapter."
+                "Export does not call Comfy. An agent feeds ComfyUI stills (Qwen-Image), then "
+                "hop-1 clips (MiniMax H3), then stitch. Optional later: run live Studio jobs, then export. "
+                "This export does not. Stub labels mean lanes are unset or this project is on the stub adapter. "
+                "Stitch stays awaiting until real clip files exist."
             ),
         },
     }

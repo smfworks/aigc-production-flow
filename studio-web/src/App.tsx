@@ -38,6 +38,7 @@ import { PlaylistScrubber } from "./PlaylistScrubber.tsx";
 import { PackDiffPanel } from "./PackDiffPanel.tsx";
 import { PackStage } from "./PackStage.tsx";
 import { StartHere } from "./StartHere.tsx";
+import { CreateWizard } from "./CreateWizard.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
 import {
@@ -66,7 +67,13 @@ function formatWhen(iso: string): string {
 }
 
 export default function App() {
-  const [view, setView] = useState<View>(() => parseHash());
+  const [view, setView] = useState<View>(() => {
+    if (!window.location.hash) {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has("import")) return { page: "create" };
+    }
+    return parseHash();
+  });
   const [token, setTokenState] = useState(getToken);
   const [userName, setUserNameState] = useState(getUserName);
   const [error, setError] = useState<string | null>(null);
@@ -124,7 +131,10 @@ export default function App() {
   useEffect(() => {
     const onHash = () => setView(parseHash());
     window.addEventListener("hashchange", onHash);
-    if (!window.location.hash) navigate({ page: "projects" });
+    if (!window.location.hash) {
+      const params = new URLSearchParams(window.location.search);
+      navigate(params.has("import") ? { page: "projects" } : { page: "create" });
+    }
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
@@ -141,29 +151,23 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · AIGC Studio · Phase 11</p>
+            <p className="eyebrow">SMF Works · AIGC Studio · Phase 12</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          One app for the pack. Start a project here — blank, template, or brain dump — then edit
-          Script → Assets → Storyboard → Preview on the episode. Export for an agent feeds Comfy
-          MCP (stills, then clips). Pack zip stays the collaboration contract. Import is optional.
-          Hermes <code>smf-h3-capture</code> can stay; Studio is the create surface. Jobs default
-          to stub. Unset comfy hooks are not live. No model is claimed unless one is configured.
+          Type what you want to make. The wizard fills a draft pack. Send to Hermes writes a brief
+          — sheets, plates, hop-1 clips, then stitch — into a local drop. The zip is the fallback.
+          Projects, Task Center, Budget, and Audit stay here for the desk. Unset Comfy lanes stay
+          stub. Studio does not claim Hermes ran, and it does not invent an MP4.
         </p>
         <nav className="mast-nav" aria-label="Studio">
           <button
             type="button"
-            className="btn btn-go"
-            onClick={() => {
-              navigate({ page: "projects" });
-              window.setTimeout(() => {
-                document.getElementById("start-here")?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }, 50);
-            }}
+            className={view.page === "create" ? "btn btn-go" : "btn"}
+            onClick={() => navigate({ page: "create" })}
           >
-            New project
+            New creation
           </button>
           <button
             type="button"
@@ -310,6 +314,16 @@ export default function App() {
         </p>
       ) : null}
 
+      {view.page === "create" ? (
+        <CreateWizard
+          wizardId={view.wizardId}
+          me={me}
+          onWizard={(id) => navigate(id ? { page: "create", wizardId: id } : { page: "create" })}
+          onOpenEpisode={(projectId, episodeId) => navigate({ page: "episode", projectId, episodeId })}
+          onError={showError}
+          onNotice={setNotice}
+        />
+      ) : null}
       {view.page === "projects" ? (
         <ProjectList
           me={me}
@@ -411,7 +425,9 @@ function ProjectList({
       </div>
       {projects.length === 0 ? (
         <div className="empty-tip">
-          <p className="empty">Start here — new project, blank pack, template, or a brain dump. A zip is optional.</p>
+          <p className="empty">
+            New creation is the front door. Blank pack, template, and brain dump stay on this page. A zip is optional.
+          </p>
           <p className="hint">
             First-run: <strong>Seed demo episode</strong> uses the short-drama-ep template plus JSON fixture
             metadata — no likeness still, no engine MP4, gates stay red.

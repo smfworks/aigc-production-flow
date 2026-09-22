@@ -118,6 +118,15 @@ OIDC and Celery are **optional in Phase 6** and **off by default**. They are not
 - **Builder → studio auto-import** — Open in Studio stages the zip (`POST /api/handoffs`) when `VITE_STUDIO_URL` is set (CORS/token documented). Pick project/episode → import uses the handed-off zip (no re-choose file). Failure modes: studio down, auth. Never auto-generate
 - **Measured live Comfy hooks** — `comfy-h3` declares hop-1 **10.125 s / 243 f @ 24 fps**; `comfy-qwen` declares canvas **1344×768**. Health/dry-run include config schema validation. Unset env is **not live** and still resolves to stub. Hop-1 watch protocol remains required; live adapters must not skip it. Stub remains default. No Hailuo/Veo/Kling in this phase
 
+**Phase 12 (this repo, Create wizard → Hermes handoff → status → stitch):**
+
+- **Create wizard** is the home screen when no project is open. One prompt, then format, length, tone, cast, audio, and engine preference. Answers persist on the wizard row. Refresh does not drop them. Blank pack, template, and brain dump stay on Projects
+- Finish creates the project, episode, and pack revision. Cast names are identity drafts (`approval_status=draft`). Nothing is approved. Gates stay red. No fake generate
+- **Send to Hermes** (`POST /api/create/wizard/{id}/handoff/hermes`) writes `pack.json`, `gate-snapshot.json`, and `agent-brief.json` under the handoff root, plus `latest.json` and a `hermes://aigc/brief?run=` payload. Export zip stays the secondary button. `called_comfy` and `hermes_ran` stay false — Studio did not invoke Hermes or Comfy
+- Brief jobs stay ordered: still sheets, still plates, hop-1 clips, **stitch**. Measured window metadata is unchanged. Unset `comfy-qwen` / `comfy-h3` lanes are labeled stub. The handoff tells Hermes to use stub receipts or refuse a live generate
+- **Agent run** (`GET /api/agent-runs/{id}`) is the status strip. Stub jobs return fixture receipts and do not stamp `generate-ok`. A live clip lane is not called while gates are red
+- **Stitch** is a real job type. It builds a concat plan from the shot playlist / EDL lite. Local ffmpeg concat runs only when every input is a video file that exists. Otherwise the state is **awaiting stitch** and no MP4 is written. Contract for the companion pane: [AGENTS.md](../AGENTS.md)
+
 **Phase 11 (this repo, native ComfyUI engines):**
 
 - **Qwen-Image stills** and **MiniMax H3 clips** run through Studio's Python Comfy client when `STUDIO_COMFY_STILL_LANES` / `STUDIO_COMFY_CLIP_LANES` are set. Empty lanes stay stub and **not live**. Busy lanes refuse instead of queueing behind a long render. Clip jobs return a job id and ETA, then an mp4 path. Hop-1 watch is still required. Export for agent does not call Comfy. No Hailuo / Veo / Kling. MIT notice for the upstream behavior notes: [NOTICE](../NOTICE)

@@ -1,6 +1,8 @@
-# AIGC studio API (Phase 11)
+# AIGC studio API (Phase 12)
 
-FastAPI spine. Create a pack without a zip (`POST /api/studio/start`: blank, template, or brain dump). Edit it with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) that lists still jobs before hop-1 clips and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
+FastAPI spine. The front door is the Create wizard (`POST /api/create/wizard`, patch answers, `POST …/finish`). **Send to Hermes** (`POST /api/create/wizard/{id}/handoff/hermes`) writes a brief under the handoff root and returns a `hermes://` payload. It does not invoke Hermes or call Comfy. `GET /api/agent-runs/{id}` polls sheets, plates, hop-1 clips, and stitch. Stitch does not invent an MP4.
+
+`POST /api/studio/start` (blank, template, or brain dump) stays. Edit with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) lists still jobs, then hop-1 clips, then stitch, and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
 
 Native ComfyUI: set `STUDIO_COMFY_STILL_LANES` (Qwen-Image) and `STUDIO_COMFY_CLIP_LANES` (MiniMax H3) to private URLs. Empty lanes stay stub / not live. Example names: `comfy.example.json`. MIT notice: [../NOTICE](../NOTICE).
 

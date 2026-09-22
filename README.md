@@ -113,9 +113,15 @@ Open the Vite URL (default http://localhost:5173). First visit loads the Sigils 
 
 Vercel can host `app/` (set the project Root Directory to `app`). `npm test` covers gate/validation helpers; `npm run build` typechecks and bundles.
 
-## Studio spine (Phase 11) vs pack builder
+## Start here
 
-One app. Open Studio → **New project** → brain dump, blank pack, or template → edit the four stages on the episode → **Export for agent**. The brief lists still jobs, then hop-1 clip jobs. Zip import is optional.
+Open Studio and answer **What do you want to make?** The wizard writes a draft pack. **Send to Hermes** drops a brief (sheets, plates, hop-1 clips, then stitch) in `data/handoff/` and a `hermes://` link. Download agent zip is the fallback. Stub lanes return fixture receipts. Stitch stays **awaiting stitch** until real clip files exist — Studio does not invent an MP4, does not call Comfy from the handoff, and does not claim Hermes ran.
+
+Blank pack, template, and brain dump remain on the Projects page. The four stages still edit the episode. Details: [docs/STUDIO.md](docs/STUDIO.md) and [AGENTS.md](AGENTS.md).
+
+## Studio spine (Phase 12) vs pack builder
+
+One app. Open Studio → type a prompt → finish the wizard → **Send to Hermes**. The brief lists still jobs, then hop-1 clip jobs, then stitch. Zip import is optional.
 
 Hermes `smf-h3-capture` can stay. Studio is the primary create surface. The pack builder remains the zip round-trip, not a second ritual you must finish before Studio starts.
 
@@ -123,7 +129,7 @@ Two pieces, one contract:
 
 | | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
 |---|---|---|
-| Job | Four-stage walk and zip round-trip. Export markdown zip + `pack.json`. **Open in Studio** is optional. | Create the pack here: blank, template, or brain dump. Edit the four stages on the episode. **Export for agent** (stills then clips). Plus pack diff, identity, sign-off, jobs, playlist scrubber, budget, audit, roles, multi-org lite. Optional Celery / OIDC / local LLM endpoint. |
+| Job | Four-stage walk and zip round-trip. Export markdown zip + `pack.json`. **Open in Studio** is optional. | Create wizard is the front door. Blank, template, and brain dump stay available. Edit the four stages on the episode. **Send to Hermes** (stills, clips, stitch) with zip export as fallback. Plus pack diff, identity, sign-off, jobs, playlist scrubber, budget, audit, roles, multi-org lite. Optional Celery / OIDC / local LLM endpoint. |
 | Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. Compose pack: `docker-compose.studio.yml`. |
 | Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles (`writer` / `art` plus the Phase 5 four). Optional OIDC JWKS (**off by default**). Roles stay app-level unless the OIDC claim map is on. Multi-org lite is membership isolation, not SaaS. [docs/AUTH.md](docs/AUTH.md). |
 | Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green, hop-1 receipts are preview-watched, **and** a reviewer/producer has signed off. Default adapter=`stub`. Budget units are operator credits, not a cloud bill. Media is local disk unless S3 is configured. |
@@ -153,14 +159,15 @@ docker compose -f docker-compose.studio.yml up --build
 ```
 app/                     client-side pack builder (Vite + React) — do not rewrite
 studio/                  FastAPI spine (SQLite default, Postgres-ready URL)
-studio-web/              studio shell (create pack, four stages, agent export, review, jobs, budget, audit)
+studio-web/              studio shell (create wizard, Hermes handoff, four stages, agent export, review, jobs, budget, audit)
 docker-compose.studio.yml  API + studio-web (optional worker / postgres / minio / celery profiles)
 scripts/dev-studio.sh    local API + studio + builder
 data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 templates/verticals/     education / brand promo / short-drama empty packs
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 11 studio operator path (ComfyUI lanes, create in-app, agent export)
+docs/STUDIO.md           Phase 12 studio operator path (Create wizard, Hermes drop, stitch)
+AGENTS.md                Hermes handoff contract for the companion pane
 NOTICE                   MIT notice for the Comfy still/clip behavior port
 THIRD_PARTY.md           upstream attribution; SMF does not own MiniMax, Qwen, or ComfyUI
 docs/AUTH.md             local / forward-header / optional OIDC — multi-org lite, not SaaS or a production IdP

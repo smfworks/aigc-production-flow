@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_model: str = ""
     llm_api_key: str = ""
+    # Hermes brief drop. Empty uses <media parent>/handoff (./data/handoff next to ./data/media).
+    handoff_root: str = ""
+    # Optional second copy, for example ~/.hermes/aigc. Empty does not write outside the handoff root.
+    hermes_drop: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

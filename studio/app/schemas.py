@@ -15,7 +15,7 @@ ReviewStateName = Literal[
 
 MediaKind = Literal["sheet", "plate", "costume", "preview", "other"]
 ApprovalStatus = Literal["draft", "approved"]
-JobType = Literal["still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck"]
+JobType = Literal["still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck", "stitch"]
 JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 ReceiptSource = Literal["manual", "parsed"]
 EntityType = Literal["character", "prop", "scene", "costume", ""]
@@ -40,7 +40,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 11
+    phase: int = 12
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -73,7 +73,7 @@ class MetaOut(BaseModel):
         "No model configured. Brain dump uses a deterministic template expansion. "
         "Set STUDIO_LLM_BASE_URL for an optional local/OpenAI-compatible endpoint."
     )
-    primary_create: str = "studio"
+    primary_create: str = "wizard"
 
 
 class RoleMatrixRow(BaseModel):
@@ -903,6 +903,89 @@ class PackHandoffOut(BaseModel):
     episode_id: str | None = None
     honesty: str
     auto_generate: bool = False
+
+
+class EngineHonestyOut(BaseModel):
+    still_preference: str
+    clip_preference: str
+    still_resolved: str
+    clip_resolved: str
+    still_label: str
+    clip_label: str
+    still_live: bool = False
+    clip_live: bool = False
+    called_comfy: bool = False
+    note: str = ""
+
+
+class WizardStartIn(BaseModel):
+    prompt: str = Field(default="", max_length=4000)
+
+
+class WizardPatchIn(BaseModel):
+    step: str | None = None
+    answers: dict[str, Any] = Field(default_factory=dict)
+
+
+class WizardOut(BaseModel):
+    id: str
+    status: str
+    step: str
+    steps: list[str]
+    answers: dict[str, Any] = Field(default_factory=dict)
+    project_id: str | None = None
+    episode_id: str | None = None
+    revision_id: str | None = None
+    agent_run_id: str | None = None
+    gates_green: bool = False
+    generate_ready: bool = False
+    engines: EngineHonestyOut
+    created_at: datetime
+    updated_at: datetime
+
+
+class AgentStepOut(BaseModel):
+    order: int
+    kind: str
+    subject: str = ""
+    take: str = ""
+    status: str
+    job_id: str = ""
+    shot_id: str = ""
+    adapter: str = ""
+    adapter_label: str = ""
+    note: str = ""
+    error: str = ""
+    claim: str = ""
+    called_comfy: bool = False
+    produced_mp4: bool = False
+    stitch_state: str = ""
+
+
+class AgentRunOut(BaseModel):
+    id: str
+    wizard_id: str | None = None
+    project_id: str
+    episode_id: str
+    revision_id: str = ""
+    status: str
+    stitch_state: str = "pending"
+    deep_link: str = ""
+    drop_dir: str = ""
+    called_comfy: bool = False
+    hermes_ran: bool = False
+    honesty_note: str = ""
+    steps: list[AgentStepOut] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class HermesHandoffOut(BaseModel):
+    wizard_id: str
+    deep_link: str
+    drop_dir: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    run: AgentRunOut
 
 
 UserOut.model_rebuild()
