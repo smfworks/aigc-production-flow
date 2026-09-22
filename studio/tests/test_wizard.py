@@ -60,7 +60,7 @@ def test_wizard_creates_draft_pack_and_keeps_answers(client, auth):
     assert full.status_code == 200, full.text
     pack = full.json()["pack"]
     names = [row["name"] for row in pack["characters"]]
-    assert "Mara" in names
+    assert names == ["Mara"]
     assert all(not row.get("lockParagraph") for row in pack["characters"])
     assert len(pack["editList"]) == 2
     assert pack["studioMeta"]["source"] == "wizard"

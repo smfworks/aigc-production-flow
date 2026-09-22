@@ -62,6 +62,11 @@ def parse_people(cast_notes: str) -> list[dict[str, str]]:
         if lower.startswith("character:"):
             add(row.split(":", 1)[1])
             continue
+        # "Mara — lead, tired eyes" is one person. A comma list is only
+        # "Mara, Jonah" when the line has no role dash.
+        if any(sep in row for sep in ("—", "–", " - ")):
+            add(row)
+            continue
         if "," in row and len(row) < 180 and not row.endswith("."):
             for part in row.split(","):
                 add(part)
