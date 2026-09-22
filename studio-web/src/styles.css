@@ -1011,7 +1011,8 @@ a.btn {
 
 .wizard textarea,
 .wizard input[type="text"],
-.wizard input[type="number"] {
+.wizard input[type="number"],
+.wizard select {
   width: 100%;
   background: #0c1428;
   color: var(--ink);
@@ -1106,6 +1107,56 @@ a.btn {
   padding: 2px 8px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.recipe-row,
+.task-tree,
+.checkpoint-list {
+  display: grid;
+  gap: 8px;
+}
+
+.task-tree,
+.checkpoint-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.task-tree li,
+.checkpoint-list li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.task-tree li.is-off {
+  opacity: 0.55;
+}
+
+.task-tree label,
+.checkpoint-list li {
+  display: grid;
+  gap: 2px;
+  justify-content: start;
+}
+
+.checkpoint-list li[data-cleared="false"] {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.checkpoint-list li[data-cleared="true"] {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.wizard fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .agent-steps {

@@ -1,6 +1,6 @@
-# AIGC studio API (Phase 12)
+# AIGC studio API (Phase 13)
 
-FastAPI spine. The front door is the Create wizard (`POST /api/create/wizard`, patch answers, `POST …/finish`). **Send to Hermes** (`POST /api/create/wizard/{id}/handoff/hermes`) writes a brief under the handoff root and returns a `hermes://` payload. It does not invoke Hermes or call Comfy. `GET /api/agent-runs/{id}` polls sheets, plates, hop-1 clips, and stitch. Stitch does not invent an MP4.
+FastAPI spine. The front door is the Create wizard (`POST /api/create/wizard`, patch answers, `POST …/finish`). Scope, a prunable task tree, craft-lane labels, and director checkpoints are part of that door. Local recipes are `POST /api/create/recipes` and `recipe_id` on start. **Send to Hermes** (`POST /api/create/wizard/{id}/handoff/hermes`) writes a brief under the handoff root and returns a `hermes://` payload. It does not invoke Hermes or call Comfy. `GET /api/agent-runs/{id}` polls sheets, plates, hop-1 clips, and stitch. Disabled tree branches are skipped. Stitch does not invent an MP4.
 
 `POST /api/studio/start` (blank, template, or brain dump) stays. Edit with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) lists still jobs, then hop-1 clips, then stitch, and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
 

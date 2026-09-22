@@ -1,17 +1,21 @@
 """Create wizard, Hermes handoff, and agent-run status."""
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, HTTPException, status
 
 from ..agentrun import honesty_note
 from ..audit import HERMES_HANDOFF, PROJECT_CREATE, WIZARD_FINISH, WIZARD_START, record
 from ..deps import DbDep, get_active_org
 from ..models import AgentRun, PackRevision, utcnow
 from ..rbac import JobsUser, MutateUser, ReadUser
+from ..recipes import list_recipes, read_recipe, save_recipe
 from ..schemas import (
     AgentRunOut,
     AgentStepOut,
     EngineHonestyOut,
     HermesHandoffOut,
+    RecipeOut,
+    RecipeSaveIn,
+    RecipeSummaryOut,
     WizardOut,
     WizardPatchIn,
     WizardStartIn,
@@ -19,6 +23,7 @@ from ..schemas import (
 from ..wizardflow import (
     WIZARD_STEPS,
     create_session,
+    director_for_session,
     engine_for,
     finish_session,
     get_session,
@@ -57,6 +62,7 @@ def _wizard_out(db, wizard) -> WizardOut:
         gates_green=gates,
         generate_ready=False,
         engines=engines,
+        director=director_for_session(db, wizard),
         created_at=wizard.created_at,
         updated_at=wizard.updated_at,
     )
@@ -105,7 +111,14 @@ def _run_out(run: AgentRun) -> AgentRunOut:
 @router.post("/api/create/wizard", response_model=WizardOut, status_code=status.HTTP_201_CREATED)
 def start_wizard(body: WizardStartIn, user: MutateUser, db: DbDep) -> WizardOut:
     org = get_active_org(db, user)
-    wizard = create_session(db, org_id=org.id, user_name=user.name, prompt=body.prompt)
+    recipe = read_recipe(org.id, body.recipe_id) if (body.recipe_id or "").strip() else None
+    wizard = create_session(
+        db,
+        org_id=org.id,
+        user_name=user.name,
+        prompt=body.prompt,
+        recipe=recipe,
+    )
     record(
         db,
         actor=user.name,
@@ -118,6 +131,29 @@ def start_wizard(body: WizardStartIn, user: MutateUser, db: DbDep) -> WizardOut:
     db.commit()
     db.refresh(wizard)
     return _wizard_out(db, wizard)
+
+
+@router.get("/api/create/recipes", response_model=list[RecipeSummaryOut])
+def get_recipes(user: ReadUser, db: DbDep) -> list[RecipeSummaryOut]:
+    org = get_active_org(db, user)
+    return [RecipeSummaryOut.model_validate(row) for row in list_recipes(org.id)]
+
+
+@router.post("/api/create/recipes", response_model=RecipeOut, status_code=status.HTTP_201_CREATED)
+def post_recipe(body: RecipeSaveIn, user: MutateUser, db: DbDep) -> RecipeOut:
+    org = get_active_org(db, user)
+    if not (body.wizard_id or "").strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Save a recipe from a wizard.")
+    wizard = get_session(db, body.wizard_id, org.id)
+    answers = wizard.answers if isinstance(wizard.answers, dict) else {}
+    saved = save_recipe(org.id, body.name, answers)
+    return RecipeOut.model_validate(saved)
+
+
+@router.get("/api/create/recipes/{recipe_id}", response_model=RecipeOut)
+def get_recipe(recipe_id: str, user: ReadUser, db: DbDep) -> RecipeOut:
+    org = get_active_org(db, user)
+    return RecipeOut.model_validate(read_recipe(org.id, recipe_id))
 
 
 @router.get("/api/create/wizard/open", response_model=WizardOut | None)

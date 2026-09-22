@@ -10,6 +10,7 @@ from .adapters.registry import resolve_adapter_name
 from .agentbrief import _label
 from .blankpack import empty_pack, empty_prop_fields, studio_meta
 from .config import get_settings
+from .director import normalize_scope, normalize_stored_tree, public_director, scope_note, tree_for
 
 FORMATS = ("short-drama", "vertical-ad", "music-video", "custom")
 FORMAT_LABELS = {
@@ -251,7 +252,7 @@ def normalize_answers(raw: dict[str, Any] | None) -> dict[str, Any]:
         clip_pref = "comfy-h3"
     shot_count = _bounded_int(src.get("shot_count"), 0, 0, 24)
     length = src.get("target_length_s")
-    return {
+    body = {
         "prompt": str(src.get("prompt") or "").strip()[:4000],
         "format": fmt,
         "shot_count": shot_count,
@@ -263,6 +264,9 @@ def normalize_answers(raw: dict[str, Any] | None) -> dict[str, Any]:
         "still_pref": still_pref,
         "clip_pref": clip_pref,
     }
+    body.update(normalize_scope(src))
+    body["task_tree"] = normalize_stored_tree(src.get("task_tree"), body)
+    return body
 
 
 def missing_answers(answers: dict[str, Any]) -> list[str]:
@@ -278,8 +282,11 @@ def missing_answers(answers: dict[str, Any]) -> list[str]:
     return missing
 
 
-def pack_from_answers(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]]]:
+def pack_from_answers(
+    raw: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, str]], dict[str, Any]]:
     answers = normalize_answers(raw)
+    answers["task_tree"] = tree_for(answers)
     prompt = answers["prompt"]
     fmt = answers["format"] or "custom"
     shot_count = int(answers["shot_count"] or 0)
@@ -350,6 +357,21 @@ def pack_from_answers(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         "still_pref": answers["still_pref"],
         "clip_pref": answers["clip_pref"],
     }
+    scope = {
+        "must_nots": answers["must_nots"],
+        "platform_formats": answers["platform_formats"],
+        "claim_bans": answers["claim_bans"],
+    }
+    meta["notes"] = scope_note(scope)
+    pack["studioMeta"] = meta
+    director = public_director(
+        answers,
+        pack=pack,
+        approved_sheets=0,
+        draft_sheets=len(people),
+        signed_off=False,
+    )
+    meta["director"] = director
     pack["studioMeta"] = meta
     honesty = {
         "model_ran": False,
@@ -358,7 +380,7 @@ def pack_from_answers(raw: dict[str, Any]) -> tuple[dict[str, Any], dict[str, An
         "note": WIZARD_NOTE,
         "generate_ready": False,
     }
-    return pack, honesty, people
+    return pack, honesty, people, answers
 
 
 def engine_report(raw: dict[str, Any] | None, project=None) -> dict[str, Any]:

@@ -55,6 +55,7 @@ _ADDITIVE_COLUMNS = (
     ("episodes", "log_line", "TEXT DEFAULT ''"),
     ("episodes", "map_notes", "TEXT DEFAULT ''"),
     ("episodes", "dialogue", "TEXT DEFAULT ''"),
+    ("projects", "director_state", "TEXT"),
 )
 
 

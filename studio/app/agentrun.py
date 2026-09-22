@@ -47,6 +47,14 @@ def build_steps(episode: Episode, brief: dict[str, Any]) -> list[dict[str, Any]]
             "produced_mp4": False,
             "stitch_state": "pending" if kind == "stitch" else "",
         }
+        if job.get("enabled") is False:
+            step["status"] = "skipped"
+            step["called_comfy"] = False
+            step["produced_mp4"] = False
+            if kind == "stitch":
+                step["stitch_state"] = "pending"
+            steps.append(step)
+            continue
         if kind == "clip-hop1":
             wanted = step["take"]
             match = next((row for row in unused if wanted and row.take == wanted), None)

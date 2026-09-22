@@ -105,6 +105,7 @@ class Project(Base):
     budget_cap_units: Mapped[float | None] = mapped_column(Float, nullable=True)
     budget_hard_stop: Mapped[bool] = mapped_column(Boolean, default=False)
     retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    director_state: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

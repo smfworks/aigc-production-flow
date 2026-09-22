@@ -67,3 +67,13 @@ The last job is `kind: stitch`. Concat the playlist in order.
 4. Show stub vs live from the brief. Do not show a finished film unless `produced_mp4` is true and the file is on disk.
 
 No Studio endpoint posts to X or starts Hermes.
+
+## Director front door (Phase 13)
+
+Create can show a prunable task tree (script/beats → identity sheets → plates → hop-1 → stitch → review gates), four craft-lane labels (Writer, Art, Picture, Sound), director checkpoints, and optional scope (must-nots, platform formats, claim bans).
+
+- The tree is a plan. Disabling a branch skips that brief job. It does not call Comfy or start Hermes.
+- `director.craft_lanes` in `agent-brief.json` are routing labels. `director.agents_ran` stays false.
+- Checkpoints repeat the real gates (log line through lock-diff, plus draft identities, missing plates, unwatched hop-1, and missing sign-off). They do not turn gates green.
+- Scope is copied into pack notes and `director.scope`.
+- Saved Create recipes are local JSON under `data/recipes/` (`skill_<name>_v0.1.json`, or `STUDIO_RECIPE_ROOT`). They prefill the wizard. There is no plaza.

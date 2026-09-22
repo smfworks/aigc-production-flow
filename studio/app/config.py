@@ -87,6 +87,8 @@ class Settings(BaseSettings):
     handoff_root: str = ""
     # Optional second copy, for example ~/.hermes/aigc. Empty does not write outside the handoff root.
     hermes_drop: str = ""
+    # Local Create recipes. Empty uses <media parent>/recipes (./data/recipes next to ./data/media).
+    recipe_root: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:

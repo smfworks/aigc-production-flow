@@ -10,6 +10,7 @@ from typing import Any
 from .adapters.catalog import H3_FPS, H3_FRAMES, H3_WINDOW_S, QWEN_CANVAS, SLOT_BY_ID
 from .adapters.registry import resolve_adapter_name
 from .config import get_settings
+from .director import job_enabled, lane_for_kind
 from .models import Episode, MediaAsset, PackRevision
 from .packzip import safe_filename, slugify
 from .store import get_store
@@ -35,6 +36,7 @@ This archive is the handoff for Hermes, OpenClaw, or a Grok bot. Studio did **no
 - `generate_ready` is false here. `generate-ok` still needs green gates, hop-1 receipts, and a reviewer/producer sign-off.
 - Approved identity plates are what plate-bind counts. Draft sheets do not.
 - The Hermes plugin `smf-h3-capture` can stay. Studio is the primary place to create the pack.
+- `director.craft_lanes` (Writer, Art, Picture, Sound) are routing labels. `director.agents_ran` is false. A task tree may disable a branch; disabled jobs are skipped and do not call Comfy. `director.scope` holds must-nots, platform formats, and claim bans. Checkpoints repeat the real gates. They do not approve identities or turn gates green.
 
 ## Files
 
@@ -184,6 +186,19 @@ def build_agent_brief(episode: Episode, revision: PackRevision) -> dict[str, Any
         )
     )
 
+    meta = pack.get("studioMeta") if isinstance(pack.get("studioMeta"), dict) else {}
+    director_meta = meta.get("director") if isinstance(meta.get("director"), dict) else {}
+    tree = director_meta.get("task_tree") if isinstance(director_meta.get("task_tree"), list) else []
+    for job in jobs:
+        kind = str(job.get("kind") or "")
+        enabled = job_enabled(tree, kind=kind, take=str(job.get("take") or "")) if tree else True
+        job["enabled"] = enabled
+        job["lane"] = lane_for_kind(kind)
+        if not enabled:
+            job["note"] = (
+                "Disabled on the director task tree. Studio did not run it. " + str(job.get("note") or "")
+            )
+
     binds: list[dict[str, Any]] = []
     for asset in episode.media or []:
         if not isinstance(asset, MediaAsset):
@@ -216,8 +231,7 @@ def build_agent_brief(episode: Episode, revision: PackRevision) -> dict[str, Any
             }
         )
 
-    meta = pack.get("studioMeta") if isinstance(pack.get("studioMeta"), dict) else {}
-    return {
+    brief = {
         "episode_id": episode.id,
         "project_id": episode.project_id,
         "episode_title": episode.title,
@@ -262,6 +276,25 @@ def build_agent_brief(episode: Episode, revision: PackRevision) -> dict[str, Any
             ),
         },
     }
+    if director_meta:
+        brief["director"] = {
+            "craft_lanes": director_meta.get("craft_lanes") or [],
+            "task_tree": tree,
+            "scope": director_meta.get("scope") or {},
+            "scope_note": director_meta.get("scope_note") or meta.get("notes") or "",
+            "checkpoints": director_meta.get("checkpoints") or {},
+            "agents_ran": False,
+            "called_comfy": False,
+            "hermes_ran": False,
+            "produced_mp4": False,
+            "executes": False,
+            "note": director_meta.get("note")
+            or (
+                "Craft lanes are routing labels. They are not four cloud agents. "
+                "Disabled task-tree branches are skipped. Comfy was not called."
+            ),
+        }
+    return brief
 
 
 def agent_zip_bytes(episode: Episode, revision: PackRevision) -> tuple[bytes, str]:
