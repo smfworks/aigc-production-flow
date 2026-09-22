@@ -215,6 +215,76 @@ export type EngineHonesty = {
   note: string;
 };
 
+export type TaskNode = {
+  id: string;
+  kind: string;
+  label: string;
+  lane: string;
+  depends_on: string[];
+  enabled: boolean;
+  deleted: boolean;
+  take?: string;
+  note?: string;
+  prunable?: boolean;
+  executes?: boolean;
+  order?: number;
+};
+
+export type CraftLane = {
+  id: string;
+  label: string;
+  covers: string;
+  routing: string;
+  enabled: boolean;
+  ran: boolean;
+};
+
+export type DirectorCheckpoint = {
+  id: string;
+  label: string;
+  cleared: boolean;
+  detail: string;
+};
+
+export type DirectorView = {
+  scope: { must_nots: string; platform_formats: string[]; claim_bans: string; };
+  scope_note?: string;
+  task_tree: TaskNode[];
+  craft_lanes: CraftLane[];
+  checkpoints: {
+    items: DirectorCheckpoint[];
+    gates: { id: string; n?: number; label: string; ok: boolean; detail: string }[];
+    all_gates_green: boolean;
+    generate_ready: boolean;
+    note: string;
+  };
+  agents_ran: boolean;
+  called_comfy: boolean;
+  hermes_ran: boolean;
+  produced_mp4: boolean;
+  executes?: boolean;
+  note: string;
+};
+
+export type CreateRecipe = {
+  id: string;
+  filename: string;
+  name: string;
+  version: string;
+  kind: string;
+  saved_at: string;
+  format?: string;
+  honesty: {
+    called_comfy: boolean;
+    hermes_ran: boolean;
+    produced_mp4: boolean;
+    agents_ran: boolean;
+    note: string;
+  };
+  answers?: Record<string, unknown>;
+  task_tree?: TaskNode[];
+};
+
 export type WizardSession = {
   id: string;
   status: string;
@@ -228,6 +298,7 @@ export type WizardSession = {
   gates_green: boolean;
   generate_ready: boolean;
   engines: EngineHonesty;
+  director: DirectorView;
   created_at: string;
   updated_at: string;
 };

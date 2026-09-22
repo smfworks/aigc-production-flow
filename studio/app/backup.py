@@ -117,6 +117,7 @@ def export_org_backup(db: Session, org: Organization) -> bytes:
                 "budget_cap_units": project.budget_cap_units,
                 "budget_hard_stop": project.budget_hard_stop,
                 "retention_days": project.retention_days,
+                "director_state": project.director_state if isinstance(project.director_state, dict) else {},
                 "created_at": _iso(project.created_at),
             }
         )
@@ -407,6 +408,7 @@ def restore_backup(
             budget_cap_units=row.get("budget_cap_units"),
             budget_hard_stop=bool(row.get("budget_hard_stop")),
             retention_days=row.get("retention_days"),
+            director_state=row.get("director_state") if isinstance(row.get("director_state"), dict) else {},
         )
         if old_id:
             project.id = old_id

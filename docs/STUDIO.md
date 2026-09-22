@@ -1,8 +1,10 @@
-# Studio spine (Phase 12)
+# Studio spine (Phase 13)
 
 **Start here:** open Studio. The home screen asks what you want to make. Finish the wizard. **Send to Hermes** writes a brief. Download agent zip is the fallback.
 
-The wizard (seven steps) fills a draft pack: format, length, tone, cast, audio, engines. Cast notes become identity **drafts**, not approvals. Gates stay red. No model is claimed. Unset Comfy lanes stay stub, and the handoff says so.
+The wizard fills a draft pack: format, length, tone, deliverable scope, cast, audio, engines, a prunable task tree, then director checkpoints. Cast notes become identity **drafts**, not approvals. Gates stay red. No model is claimed. Unset Comfy lanes stay stub, and the handoff says so.
+
+The task tree follows script/beats → identity sheets → plates → hop-1 → stitch → review gates. Disable or delete a branch you will not use. That skip is written into the brief. The tree does not call Comfy or start Hermes. Writer, Art, Picture, and Sound are routing labels on the crew brief, not four agents that ran. Checkpoints list the real gates (log line through lock-diff) plus draft identities, missing plates, unwatched hop-1, and missing sign-off. Must-nots, platform formats, and claim bans are optional and land in pack notes and `agent-brief.json`. **Save recipe** writes local JSON (`skill_<name>_v0.1.json` under `data/recipes/` or `STUDIO_RECIPE_ROOT`). Load recipe prefills Create. There is no plaza.
 
 **Send to Hermes** does not invoke Hermes and does not call Comfy. It writes `data/handoff/<run-id>/` (or `STUDIO_HANDOFF_ROOT`) plus `latest.json`, and returns a `hermes://aigc/brief?run=` link and a copyable payload. The brief orders **sheets → plates → hop-1 clips → stitch**. The agent-run panel polls those jobs. Stub lanes return fixture receipts. Stitch writes an MP4 only when local ffmpeg can concat real video files; otherwise the run stays **awaiting stitch**. See [AGENTS.md](../AGENTS.md).
 
@@ -18,6 +20,7 @@ Brain dump is stub/local only. `STUDIO_LLM_BASE_URL` may point at a local or Ope
 |---|---|---|
 | `STUDIO_HANDOFF_ROOT` | beside the media dir (`./data/handoff`) | Hermes brief drop. `latest.json` is the pane watch file |
 | `STUDIO_HERMES_DROP` | empty | Optional second copy, for example `~/.hermes/aigc`. Unset does not write outside the handoff root |
+| `STUDIO_RECIPE_ROOT` | beside the media dir (`./data/recipes`) | Local Create recipes. Not a marketplace |
 | `STUDIO_LLM_BASE_URL` | empty | Optional `…/v1` or full `…/chat/completions` URL. Unset → deterministic brain dump |
 | `STUDIO_LLM_MODEL` | `local` when a URL is set | Model name sent to that endpoint |
 | `STUDIO_LLM_API_KEY` | empty | Optional bearer for that endpoint. Stays in the process environment, not git |

@@ -34,6 +34,7 @@ import type {
   StudioUser,
   VerticalTemplate,
   AgentRun,
+  CreateRecipe,
   HermesHandoff,
   WizardSession,
 } from "./types.ts";
@@ -458,10 +459,16 @@ export const api = {
   },
   retentionApply: (body: { project_id?: string; episode_id?: string; dry_run?: boolean; confirm?: string }) =>
     request<RetentionPreview>("/api/retention", { method: "POST", body: JSON.stringify(body) }),
-  startWizard: (prompt: string) =>
+  startWizard: (prompt: string, recipeId = "") =>
     request<WizardSession>("/api/create/wizard", {
       method: "POST",
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, recipe_id: recipeId }),
+    }),
+  recipes: () => request<CreateRecipe[]>("/api/create/recipes"),
+  saveRecipe: (body: { name: string; wizard_id: string }) =>
+    request<CreateRecipe>("/api/create/recipes", {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
   wizard: (wizardId: string) => request<WizardSession>(`/api/create/wizard/${wizardId}`),
   patchWizard: (wizardId: string, body: { step?: string; answers?: Record<string, unknown> }) =>

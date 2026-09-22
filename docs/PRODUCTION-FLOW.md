@@ -118,6 +118,14 @@ OIDC and Celery are **optional in Phase 6** and **off by default**. They are not
 - **Builder → studio auto-import** — Open in Studio stages the zip (`POST /api/handoffs`) when `VITE_STUDIO_URL` is set (CORS/token documented). Pick project/episode → import uses the handed-off zip (no re-choose file). Failure modes: studio down, auth. Never auto-generate
 - **Measured live Comfy hooks** — `comfy-h3` declares hop-1 **10.125 s / 243 f @ 24 fps**; `comfy-qwen` declares canvas **1344×768**. Health/dry-run include config schema validation. Unset env is **not live** and still resolves to stub. Hop-1 watch protocol remains required; live adapters must not skip it. Stub remains default. No Hailuo/Veo/Kling in this phase
 
+**Phase 13 (this repo, director front door on Create):**
+
+- Task tree after the creative answers: script/beats → identity sheets → plates → hop-1 → stitch → review gates. The operator can disable or delete a branch. The tree is stored on the wizard and the project. It does not run Comfy or Hermes
+- Writer, Art, Picture, and Sound are routing labels in `agent-brief.json`. `agents_ran` stays false
+- Director checkpoints show the real gates plus draft identities, missing plates, unwatched hop-1, and missing sign-off. Standards are unchanged
+- Optional must-nots, platform formats, and claim bans go to pack notes and the brief
+- Saved Create recipes are local JSON (`skill_<name>_v0.1.json`). No plaza
+
 **Phase 12 (this repo, Create wizard → Hermes handoff → status → stitch):**
 
 - **Create wizard** is the home screen when no project is open. One prompt, then format, length, tone, cast, audio, and engine preference. Answers persist on the wizard row. Refresh does not drop them. Blank pack, template, and brain dump stay on Projects

@@ -77,8 +77,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.12.0",
+        version="0.13.0",
         description=(
+            "Phase 13 studio: director front door on the Create wizard. "
+            "A prunable task tree, Writer/Art/Picture/Sound routing labels, director checkpoints, "
+            "deliverable scope, and local Create recipes. The tree does not run Comfy or Hermes. "
+            "Craft lanes are labels in the brief, not claims that four agents ran. "
+            "Recipes are local JSON, not a plaza. "
             "Phase 12 studio: Create wizard, Hermes handoff drop, agent-run status, and a stitch job. "
             "The wizard is the front door. It writes a draft pack and a brief "
             "(sheets, plates, hop-1 clips, then stitch). Send to Hermes writes a local drop "
@@ -155,7 +160,7 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 12,
+            "phase": 13,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",

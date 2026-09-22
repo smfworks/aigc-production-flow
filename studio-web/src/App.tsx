@@ -151,13 +151,14 @@ export default function App() {
         <div className="mast-brand">
           <div className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">SMF Works · AIGC Studio · Phase 12</p>
+            <p className="eyebrow">SMF Works · AIGC Studio · Phase 13</p>
             <h1>AIGC Studio</h1>
           </div>
         </div>
         <p className="lede">
-          Type what you want to make. The wizard fills a draft pack. Send to Hermes writes a brief
-          — sheets, plates, hop-1 clips, then stitch — into a local drop. The zip is the fallback.
+          Type what you want to make. The wizard fills a draft pack, then a task tree and checkpoints.
+          Send to Hermes writes a brief — sheets, plates, hop-1 clips, then stitch — into a local drop.
+          The zip is the fallback.
           Projects, Task Center, Budget, and Audit stay here for the desk. Unset Comfy lanes stay
           stub. Studio does not claim Hermes ran, and it does not invent an MP4.
         </p>

@@ -1,6 +1,6 @@
-# Studio shell (Phase 12)
+# Studio shell (Phase 13)
 
-Vite + React UI for one AIGC Studio. **New creation** is the home screen: a prompt, a short wizard, then **Send to Hermes**. The agent-run strip polls still / plate / clip / stitch and says when the result is a fixture or awaiting stitch. **Download agent zip** is secondary.
+Vite + React UI for one AIGC Studio. **New creation** is the home screen: a prompt, scope, a prunable task tree, director checkpoints, then **Send to Hermes**. Craft lanes are labels. Saved recipes are local. The agent-run strip polls still / plate / clip / stitch and says when the result is a fixture or awaiting stitch. **Download agent zip** is secondary.
 
 Projects still has blank pack, template, and brain dump. The episode embeds the pack builder’s four stages (Script → Assets → Storyboard → Preview) and autosaves revisions. Zip import and the optional builder window stay secondary.
 

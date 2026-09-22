@@ -47,6 +47,7 @@ def project_out(project: Project) -> ProjectOut:
         budget_cap_units=project.budget_cap_units,
         budget_hard_stop=bool(project.budget_hard_stop),
         retention_days=project.retention_days,
+        director_state=project.director_state if isinstance(project.director_state, dict) else {},
         episode_count=len(project.episodes),
         created_at=project.created_at,
         updated_at=project.updated_at,

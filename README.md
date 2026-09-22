@@ -115,11 +115,11 @@ Vercel can host `app/` (set the project Root Directory to `app`). `npm test` cov
 
 ## Start here
 
-Open Studio and answer **What do you want to make?** The wizard writes a draft pack. **Send to Hermes** drops a brief (sheets, plates, hop-1 clips, then stitch) in `data/handoff/` and a `hermes://` link. Download agent zip is the fallback. Stub lanes return fixture receipts. Stitch stays **awaiting stitch** until real clip files exist — Studio does not invent an MP4, does not call Comfy from the handoff, and does not claim Hermes ran.
+Open Studio and answer **What do you want to make?** The wizard writes a draft pack. Before send, prune the task tree, read the Writer / Art / Picture / Sound labels, and check the director gates. Optional must-nots and platform formats ride along in the pack notes. **Send to Hermes** drops a brief (sheets, plates, hop-1 clips, then stitch) in `data/handoff/` and a `hermes://` link. Download agent zip is the fallback. Stub lanes return fixture receipts. Stitch stays **awaiting stitch** until real clip files exist — Studio does not invent an MP4, does not call Comfy from the handoff, and does not claim Hermes ran. Saved Create recipes are local JSON, not a marketplace.
 
 Blank pack, template, and brain dump remain on the Projects page. The four stages still edit the episode. Details: [docs/STUDIO.md](docs/STUDIO.md) and [AGENTS.md](AGENTS.md).
 
-## Studio spine (Phase 12) vs pack builder
+## Studio spine (Phase 13) vs pack builder
 
 One app. Open Studio → type a prompt → finish the wizard → **Send to Hermes**. The brief lists still jobs, then hop-1 clip jobs, then stitch. Zip import is optional.
 
@@ -129,7 +129,7 @@ Two pieces, one contract:
 
 | | Pack builder (`app/`) | Studio spine (`studio/` + `studio-web/`) |
 |---|---|---|
-| Job | Four-stage walk and zip round-trip. Export markdown zip + `pack.json`. **Open in Studio** is optional. | Create wizard is the front door. Blank, template, and brain dump stay available. Edit the four stages on the episode. **Send to Hermes** (stills, clips, stitch) with zip export as fallback. Plus pack diff, identity, sign-off, jobs, playlist scrubber, budget, audit, roles, multi-org lite. Optional Celery / OIDC / local LLM endpoint. |
+| Job | Four-stage walk and zip round-trip. Export markdown zip + `pack.json`. **Open in Studio** is optional. | Create wizard is the front door: scope, a prunable task tree, craft-lane labels, checkpoints, then **Send to Hermes** (stills, clips, stitch) with zip export as fallback. Local Create recipes prefill the wizard. Blank, template, and brain dump stay available. Plus pack diff, identity, sign-off, jobs, playlist scrubber, budget, audit, roles, multi-org lite. Optional Celery / OIDC / local LLM endpoint. |
 | Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. Compose pack: `docker-compose.studio.yml`. |
 | Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles (`writer` / `art` plus the Phase 5 four). Optional OIDC JWKS (**off by default**). Roles stay app-level unless the OIDC claim map is on. Multi-org lite is membership isolation, not SaaS. [docs/AUTH.md](docs/AUTH.md). |
 | Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green, hop-1 receipts are preview-watched, **and** a reviewer/producer has signed off. Default adapter=`stub`. Budget units are operator credits, not a cloud bill. Media is local disk unless S3 is configured. |
@@ -166,7 +166,7 @@ data/                    local DB + media (gitignored)
 templates/               blank cards (copy these) — source of truth
 templates/verticals/     education / brand promo / short-drama empty packs
 docs/PRODUCTION-FLOW.md  four stages, consistency, collaboration, adapters
-docs/STUDIO.md           Phase 12 studio operator path (Create wizard, Hermes drop, stitch)
+docs/STUDIO.md           Phase 13 studio operator path (Create wizard, director plan, Hermes drop, stitch)
 AGENTS.md                Hermes handoff contract for the companion pane
 NOTICE                   MIT notice for the Comfy still/clip behavior port
 THIRD_PARTY.md           upstream attribution; SMF does not own MiniMax, Qwen, or ComfyUI

@@ -91,6 +91,20 @@ def write_drop(
         },
         "stitch_contract": HERMES_STITCH_CONTRACT,
     }
+    director = brief.get("director") if isinstance(brief.get("director"), dict) else None
+    if director:
+        payload["director"] = {
+            "craft_lanes": director.get("craft_lanes") or [],
+            "scope": director.get("scope") or {},
+            "scope_note": director.get("scope_note") or "",
+            "task_tree": director.get("task_tree") or [],
+            "agents_ran": False,
+            "called_comfy": False,
+            "hermes_ran": False,
+            "produced_mp4": False,
+            "executes": False,
+            "note": director.get("note") or "",
+        }
     readme = (
         README
         + "\n## Drop folder\n\n"

@@ -40,7 +40,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 12
+    phase: int = 13
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -142,6 +142,7 @@ class ProjectOut(BaseModel):
     budget_cap_units: float | None = None
     budget_hard_stop: bool = False
     retention_days: int | None = None
+    director_state: dict[str, Any] = Field(default_factory=dict)
     episode_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -920,6 +921,7 @@ class EngineHonestyOut(BaseModel):
 
 class WizardStartIn(BaseModel):
     prompt: str = Field(default="", max_length=4000)
+    recipe_id: str = ""
 
 
 class WizardPatchIn(BaseModel):
@@ -940,8 +942,30 @@ class WizardOut(BaseModel):
     gates_green: bool = False
     generate_ready: bool = False
     engines: EngineHonestyOut
+    director: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
+
+
+class RecipeSaveIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    wizard_id: str = ""
+
+
+class RecipeSummaryOut(BaseModel):
+    id: str
+    filename: str
+    name: str
+    version: str
+    kind: str = "aigc-create-recipe"
+    saved_at: str = ""
+    format: str = ""
+    honesty: dict[str, Any] = Field(default_factory=dict)
+
+
+class RecipeOut(RecipeSummaryOut):
+    answers: dict[str, Any] = Field(default_factory=dict)
+    task_tree: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AgentStepOut(BaseModel):
