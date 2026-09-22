@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { api, downloadExport, downloadMedia, downloadPack, downloadBackup, getOrgId, getToken, getUserName, setOrgId, setToken, setUserName } from "./api.ts";
+import {
+  api,
+  downloadExport,
+  downloadMedia,
+  downloadPack,
+  downloadBackup,
+  getOrgId,
+  getToken,
+  getUserName,
+  isMissingOrgMessage,
+  noticeForMissingOrg,
+  onStaleOrgCleared,
+  setOrgId,
+  setToken,
+  setUserName,
+  STALE_ORG_NOTICE,
+} from "./api.ts";
 import type {
   AdapterCatalog,
   AdapterHealth,
@@ -89,7 +105,19 @@ export default function App() {
     meta?.pack_builder_url || import.meta.env.VITE_PACK_BUILDER_URL || "http://localhost:5173";
 
   const showError = useCallback((err: unknown) => {
+    const recovered = noticeForMissingOrg(err);
+    if (recovered) {
+      setNotice(recovered);
+      return;
+    }
     setError(err instanceof Error ? err.message : String(err));
+  }, []);
+
+  useEffect(() => {
+    return onStaleOrgCleared(() => {
+      setNotice(STALE_ORG_NOTICE);
+      setError((current) => (current && isMissingOrgMessage(current) ? null : current));
+    });
   }, []);
 
   useEffect(() => {

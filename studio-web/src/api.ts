@@ -44,7 +44,7 @@ const USER_KEY = "smf.aigc-studio.user";
 const ORG_KEY = "smf.aigc-studio.org";
 
 export function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) || import.meta.env.VITE_API_TOKEN || "local-dev-token";
+  return localStorage.getItem(TOKEN_KEY) || import.meta.env?.VITE_API_TOKEN || "local-dev-token";
 }
 
 export function setToken(token: string): void {
@@ -66,6 +66,76 @@ export function getOrgId(): string {
 export function setOrgId(orgId: string): void {
   if (orgId) localStorage.setItem(ORG_KEY, orgId);
   else localStorage.removeItem(ORG_KEY);
+}
+
+export const STALE_ORG_NOTICE = "Saved organization was missing — cleared and retrying.";
+
+const MISSING_ORG = "Organization not found";
+const STALE_ORG_WINDOW_MS = 8000;
+
+let staleOrgClearedAt = 0;
+const staleOrgListeners = new Set<() => void>();
+
+export function isMissingOrgMessage(message: string): boolean {
+  return message.includes(MISSING_ORG);
+}
+
+export function isMissingOrgError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  return isMissingOrgMessage(message);
+}
+
+function staleOrgClearedRecently(): boolean {
+  return staleOrgClearedAt > 0 && Date.now() - staleOrgClearedAt < STALE_ORG_WINDOW_MS;
+}
+
+export function noticeForMissingOrg(err: unknown): string | null {
+  if (!isMissingOrgError(err) || !staleOrgClearedRecently()) return null;
+  return STALE_ORG_NOTICE;
+}
+
+export function onStaleOrgCleared(listener: () => void): () => void {
+  staleOrgListeners.add(listener);
+  return () => {
+    staleOrgListeners.delete(listener);
+  };
+}
+
+function noteStaleOrgCleared(): void {
+  staleOrgClearedAt = Date.now();
+  for (const listener of staleOrgListeners) listener();
+}
+
+export function resetStaleOrgRecoveryForTests(): void {
+  staleOrgClearedAt = 0;
+  staleOrgListeners.clear();
+}
+
+// A saved org id that the API no longer has makes /api/me and /api/orgs 404.
+// Drop that id and retry those two calls once with no X-Org-Id. The retry
+// returns whatever the server resolves. This client does not create an org.
+export async function withStaleOrgRetry<T>(
+  run: () => Promise<T>,
+  hooks: {
+    getOrgId?: () => string;
+    setOrgId?: (orgId: string) => void;
+    onCleared?: () => void;
+  } = {},
+): Promise<T> {
+  const read = hooks.getOrgId ?? getOrgId;
+  const write = hooks.setOrgId ?? setOrgId;
+  const onCleared = hooks.onCleared ?? noteStaleOrgCleared;
+  const hadOrg = read().trim();
+  try {
+    return await run();
+  } catch (err) {
+    if (!hadOrg || !isMissingOrgError(err)) throw err;
+    if (read().trim() === hadOrg) {
+      write("");
+      onCleared();
+    }
+    return await run();
+  }
 }
 
 async function parseError(response: Response): Promise<string> {
@@ -108,8 +178,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   meta: () => request<Meta>("/api/meta"),
-  me: () => request<StudioUser>("/api/me"),
-  orgs: () => request<StudioOrg[]>("/api/orgs"),
+  me: () => withStaleOrgRetry(() => request<StudioUser>("/api/me")),
+  orgs: () => withStaleOrgRetry(() => request<StudioOrg[]>("/api/orgs")),
   createOrg: (name: string) =>
     request<StudioOrg>("/api/orgs", { method: "POST", body: JSON.stringify({ name }) }),
   notifications: (unread = false) =>
