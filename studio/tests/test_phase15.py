@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 from app.clipbridge import (
     SPEC_PATH,
@@ -246,10 +249,13 @@ def test_ffmpeg_extracts_a_real_frame_and_the_script_refuses_a_missing_file(tmp_
     assert proc.returncode == 2
     assert not dest.exists()
     assert "No frame was invented" in proc.stderr
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        pytest.skip("ffmpeg is not on PATH")
     src = tmp_path / "clip.mp4"
     built = subprocess.run(
         [
-            "ffmpeg",
+            ffmpeg,
             "-y",
             "-f",
             "lavfi",
