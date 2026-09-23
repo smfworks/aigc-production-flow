@@ -102,3 +102,14 @@ Role-tagged Comfy workflows, prompt preview, shot coverage, and continue-from-pr
 - `called_comfy` stays false until a live lane accepts a prompt. Unset Comfy lanes stay stub.
 - ffmpeg helpers extract a last frame and trim a held tail only when a real local video exists. Otherwise the run stays awaiting conform. No invented MP4.
 - This does not start Hermes, does not ship a second CLIP_BRIDGE app, and does not add CapCut, Skill Square, or a workflow marketplace.
+
+## CLIP_BRIDGE Comfy stubs (Phase 16)
+
+`docs/CLIP_BRIDGE_COMFY.md` is the Comfy stub guide. The API graphs are in `studio/fixtures/clip_bridge/workflows/`. `_clip_bridge.inject` is the writable path list. Role-tag titles stay the Phase 14 contract. These stubs are not retitled.
+
+- Qwen T2I and Edit stay steps 25, cfg 1, sampler euler, scheduler simple. Edit `TextEncodeQwenImage21.resolution` stays 0.
+- Prefer `h3_fl2va_api` for production. That node is `MinimaxHailuo03FirstLastFrameNode`, duration 10, resolution 2K. `h3_fl2va_native` is the local graph: `MiniMaxH3ImageToVideo`, 1344×768, length 243.
+- Edit API JSON uses `images.image_1` (and so on). Prompt text still uses `<image1>` from CLIP_BRIDGE.
+- If a stub fails to queue, import the official template named in the guide and patch widgets only.
+- Extract and stitch stay on ffmpeg (`studio/scripts/clip_bridge_conform.sh`, CLIP_BRIDGE §12). They are not Comfy nodes.
+- A stub file is not a render. Filling inject paths does not POST `/prompt`. `called_comfy` stays false until a live lane accepts a prompt. No invented MP4.

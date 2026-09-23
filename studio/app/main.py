@@ -79,8 +79,11 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.15.0",
+        version="0.16.0",
         description=(
+            "Phase 16 studio: CLIP_BRIDGE Comfy API stubs. Inject paths fill a copy of the graph. "
+            "Qwen stays steps 25, cfg 1, euler, simple. H3 API stays duration 10 and resolution 2K. "
+            "Extract and stitch stay on ffmpeg. These stubs are not queued. "
             "Phase 15 studio: CLIP_BRIDGE long-form continuity. "
             "Prompt preview fills H3 and Qwen slots from docs/CLIP_BRIDGE.md. "
             "Locked start_state and end_state strings are copied, not paraphrased. "

@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from .adapters.role_workflow import RoleWorkflowError, fill_workflow, parse_workflow, values_from_payload
+from .clipbridge_workflows import is_clip_bridge_graph, role_registry_refusal
 from .config import get_settings
 from .packzip import slugify
 
@@ -79,6 +80,8 @@ def list_workflows() -> list[dict[str, Any]]:
     for path in sorted(builtin_dir().glob("*.json")):
         workflow_id = path.stem
         graph = _load_file(path)
+        if is_clip_bridge_graph(graph):
+            continue
         found[workflow_id] = _summary(workflow_id, graph, source="builtin")
     root = workflow_root()
     for path in sorted(root.glob("*.json")):
@@ -86,6 +89,8 @@ def list_workflows() -> list[dict[str, Any]]:
         if not _ID.match(workflow_id):
             continue
         graph = _load_file(path)
+        if is_clip_bridge_graph(graph):
+            continue
         found[workflow_id] = _summary(workflow_id, graph, source="registered")
     return [found[key] for key in sorted(found)]
 
@@ -103,7 +108,11 @@ def _path_for(workflow_id: str) -> tuple[Path, str] | None:
 
 
 def get_workflow(workflow_id: str) -> dict[str, Any]:
-    found = _path_for((workflow_id or "").strip())
+    raw = (workflow_id or "").strip()
+    refusal = role_registry_refusal(raw)
+    if refusal:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=refusal)
+    found = _path_for(raw)
     if found is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

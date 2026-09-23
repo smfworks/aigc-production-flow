@@ -763,4 +763,32 @@ so a failed clip can be retried in isolation.
 
 ---
 
+## 20. ComfyUI workflow stubs
+
+API-format graphs live in `comfy/` next to this file. Hermes POSTs them to `COMFY/prompt`. Do not POST official UI template JSON (those contain subgraphs and positions).
+
+| File | Step |
+|---|---|
+| `comfy/CLIP_BRIDGE_COMFY.md` | Wiring, injection map, preflight |
+| `comfy/qwen_t2i_sheet.json` | Q1 character sheet |
+| `comfy/qwen_edit_start.json` | Q2 START still |
+| `comfy/qwen_edit_end.json` | Q3 END still |
+| `comfy/h3_fl2va_api.json` | Animate 10s 2K (preferred) |
+| `comfy/h3_fl2va_native.json` | Local-GPU fallback only |
+| `comfy/resize_lock.json` | Force 2560×1440 before H3 |
+
+Gotchas the caller must not miss:
+
+- Edit refs in API format are `images.image_1`, not `image_1`. Prompt text still says `<image1>`.
+- `CLIPLoader.type` is `qwen_image`.
+- `TextEncodeQwenImage21.resolution = 0` on edit graphs.
+- H3 API duration is integer seconds (`10`). Local `MiniMaxH3ImageToVideo.length` is frames on the 17k+5 grid (`243` ≈ 10.125s). Prefer the API node for exact 10.00s 2K.
+- Both H3 frames must be the same pixel size. Run `resize_lock.json` first.
+
+Official UI templates if a stub fails to queue:
+
+- https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_t2i.json
+- https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2_1_image_edit.json
+- https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/api_minimax_h3_flf2v.json
+
 End of spec. Implement from this file.

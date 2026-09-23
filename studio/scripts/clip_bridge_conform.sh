@@ -1,6 +1,7 @@
 #!/bin/sh
 # CLIP_BRIDGE conform helpers (docs/CLIP_BRIDGE.md §12).
 # Extract the rendered last frame, drop the held tail frame, hard-cut concat.
+# Extract and stitch stay on ffmpeg. They are not Comfy nodes.
 # A missing video exits without writing a stand-in frame or MP4.
 set -eu
 

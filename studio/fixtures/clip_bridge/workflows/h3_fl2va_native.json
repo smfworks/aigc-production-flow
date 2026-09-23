@@ -1,0 +1,93 @@
+{
+  "_clip_bridge": {
+    "id": "h3_fl2va_native",
+    "step": "animate_local",
+    "purpose": "Local-GPU MiniMax H3 FL2VA. Native short-edge 768. length 243 ≈ 10.125s at 24fps (17k+5 grid). Use only when hosted API is unavailable.",
+    "official_template": "video_minimax_h3_i2v.json",
+    "inject": [
+      "1.inputs.image",
+      "2.inputs.image",
+      "10.inputs.prompt",
+      "10.inputs.width",
+      "10.inputs.height",
+      "10.inputs.length",
+      "30.inputs.seed",
+      "50.inputs.filename_prefix"
+    ]
+  },
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "start.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "end_designed.png"
+    }
+  },
+  "3": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    }
+  },
+  "6": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+    }
+  },
+  "7": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "10": {
+    "class_type": "MiniMaxH3ImageToVideo",
+    "inputs": {
+      "clip": ["3", 0],
+      "vae": ["6", 0],
+      "first_frame": ["1", 0],
+      "last_frame": ["2", 0],
+      "prompt": "How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot 1) aligns with the 10.00-second mark of the target video.\n\nintegrated_multimodal_description: [Shot 1] photoreal cinematic, live-action. Begin exactly from Picture 1. Hold the first second. One continuous uncut shot. Toward the end the differences narrow until Picture 2 at the 10.00-second mark.\n\noverall_soundscape: room tone and action foley only\nnon_diegetic_music: N/A",
+      "width": 1344,
+      "height": 768,
+      "length": 243
+    }
+  },
+  "30": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["7", 0],
+      "positive": ["10", 0],
+      "negative": ["10", 0],
+      "latent_image": ["10", 1],
+      "seed": 42,
+      "steps": 20,
+      "cfg": 1,
+      "sampler_name": "res_multistep",
+      "scheduler": "simple",
+      "denoise": 1
+    }
+  },
+  "31": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["30", 0],
+      "vae": ["6", 0]
+    }
+  },
+  "50": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["31", 0],
+      "filename_prefix": "clipbridge/01/native_frames"
+    }
+  }
+}

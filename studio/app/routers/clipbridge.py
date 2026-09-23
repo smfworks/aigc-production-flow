@@ -21,6 +21,7 @@ from ..clipbridge import (
     project_dir,
     retry_clip,
 )
+from ..clipbridge_workflows import ClipBridgeWorkflowError, apply_inject, catalog, detail
 from ..deps import DbDep, get_episode
 from ..rbac import EditUser, ReadUser
 from ..serializers import shot_out
@@ -49,6 +50,11 @@ class ConformIn(BaseModel):
 
 class RetryIn(BaseModel):
     clip_id: str = Field(min_length=1)
+
+
+class WorkflowInjectIn(BaseModel):
+    model_config = {"extra": "forbid"}
+    values: dict[str, object] = Field(default_factory=dict)
 
 
 def _public(episode_id: str, lock: dict, clips: list, issues: list, shots: list | None = None) -> dict:
@@ -187,6 +193,44 @@ def post_conform(episode_id: str, body: ConformIn, user: EditUser, db: DbDep) ->
             "No MP4 was invented."
         )
     return plan
+
+
+@router.get("/api/clip-bridge/workflows")
+def list_stub_workflows(_user: ReadUser) -> dict:
+    return catalog()
+
+
+@router.get("/api/clip-bridge/workflows/{workflow_id}")
+def get_stub_workflow(workflow_id: str, _user: ReadUser) -> dict:
+    try:
+        return detail(workflow_id)
+    except ClipBridgeWorkflowError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/api/clip-bridge/workflows/{workflow_id}/inject")
+def inject_stub_workflow(workflow_id: str, body: WorkflowInjectIn, _user: ReadUser) -> dict:
+    """Fill inject paths on a copy of the stub. Does not POST /prompt."""
+    try:
+        graph = apply_inject(workflow_id, body.values)
+    except ClipBridgeWorkflowError as exc:
+        missing = "No CLIP_BRIDGE stub" in str(exc)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND if missing else status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return {
+        "id": workflow_id,
+        "graph": graph,
+        "called_comfy": False,
+        "hermes_ran": False,
+        "produced_mp4": False,
+        "conform": "ffmpeg",
+        "honesty": (
+            "Inject wrote a copy of the CLIP_BRIDGE stub. Comfy was not called. "
+            "Extract and stitch stay on ffmpeg. No MP4 was invented."
+        ),
+    }
 
 
 def json_equal(before: str, after: dict) -> bool:

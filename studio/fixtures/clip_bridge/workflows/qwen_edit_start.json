@@ -1,0 +1,109 @@
+{
+  "_clip_bridge": {
+    "id": "qwen_edit_start",
+    "step": "Q2",
+    "purpose": "START still. image_1=character sheet, image_2=previous end_extracted (or location plate on clip 1), image_3=optional location plate.",
+    "inject": [
+      "1.inputs.image",
+      "2.inputs.image",
+      "3.inputs.image",
+      "10.inputs.prompt",
+      "10.inputs.negative_prompt",
+      "14.inputs.width",
+      "14.inputs.height",
+      "20.inputs.filename_prefix",
+      "30.inputs.seed"
+    ]
+  },
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "character_sheet.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "prev_end_extracted.png"
+    }
+  },
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "location_plate.png"
+    }
+  },
+  "4": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "qwen_image_2.1_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "5": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    }
+  },
+  "6": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+    }
+  },
+  "10": {
+    "class_type": "TextEncodeQwenImage21",
+    "inputs": {
+      "clip": ["5", 0],
+      "vae": ["6", 0],
+      "images.image_1": ["1", 0],
+      "images.image_2": ["2", 0],
+      "images.image_3": ["3", 0],
+      "prompt": "Using <image1> as identity lock and <image2> as the previous clip last frame: generate the OPENING still of this clip. Keep face, wardrobe, body, palette, and lighting direction from the lock. Change only pose, location, camera, and prop state as specified. Photoreal cinematic still, not a video. No motion blur. No text.",
+      "negative_prompt": "no face morph, no extra people, no text, no logos, no watermark, no motion blur",
+      "resolution": 0
+    }
+  },
+  "14": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["31", 0],
+      "upscale_method": "lanczos",
+      "width": 2560,
+      "height": 1440,
+      "crop": "center"
+    }
+  },
+  "30": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["4", 0],
+      "positive": ["10", 0],
+      "negative": ["10", 1],
+      "latent_image": ["10", 2],
+      "seed": 42,
+      "steps": 25,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1
+    }
+  },
+  "31": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["30", 0],
+      "vae": ["6", 0]
+    }
+  },
+  "20": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["14", 0],
+      "filename_prefix": "clipbridge/01/start"
+    }
+  }
+}
