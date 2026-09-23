@@ -138,6 +138,7 @@ def enqueue_job(
     adapter: str | None = None,
     allow_stub_fixture: bool = False,
     autocommit: bool = True,
+    fixture_without_preview: bool = False,
 ) -> Job:
     if job_type not in JOB_TYPES:
         raise HTTPException(
@@ -161,8 +162,6 @@ def enqueue_job(
             body["continue_from"] = consumed["continue_from"] or "previous"
         if not adapter:
             adapter = consumed["adapter"] or None
-    else:
-        require_preview_or_raise(body, job_type)
     requested = adapter or (str(body.get("adapter") or "").strip() or None)
     from ..config import get_settings
 
@@ -173,6 +172,10 @@ def enqueue_job(
         resolved = "stub"
     else:
         resolved = resolve_adapter_name(job_type, cfg, requested=requested, project=episode.project)
+    # Desk Generate stays behind a prompt preview. The Hermes agent run may
+    # waive that only for a stub fixture. A live lane still has to preview.
+    if not preview_id and not (fixture_without_preview and resolved == "stub"):
+        require_preview_or_raise(body, job_type)
     from ..promptpreview import continue_decision
 
     if str(body.get("continue_from") or "").strip() or body.get("continue"):

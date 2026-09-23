@@ -268,6 +268,39 @@ def test_prompt_preview_draft_rewrite_and_no_blind_enqueue(client, auth, monkeyp
     get_settings.cache_clear()
 
 
+def test_hermes_handoff_keeps_stub_fixtures_when_preview_is_required(client, auth, monkeypatch):
+    """Send to Hermes is not Generate. Stub receipts still run. A blind job does not."""
+    monkeypatch.setenv("STUDIO_REQUIRE_PROMPT_PREVIEW", "true")
+    get_settings.cache_clear()
+    done = _ready_wizard(client, auth)
+    sent = client.post(f"/api/create/wizard/{done['id']}/handoff/hermes", headers=auth)
+    assert sent.status_code == 201, sent.text
+    body = sent.json()
+    assert body["deep_link"].startswith("hermes://aigc/brief?run=")
+    assert body["run"]["called_comfy"] is False
+    assert body["run"]["hermes_ran"] is False
+    assert body["payload"]["honesty"]["called_comfy"] is False
+    assert body["payload"]["honesty"]["produced_mp4"] is False
+    assert body["payload"]["honesty"]["episode_completed"] is False
+    stills = [step for step in body["run"]["steps"] if step["kind"] == "still-sheet"]
+    plates = [step for step in body["run"]["steps"] if step["kind"] == "still-plate"]
+    clips = [step for step in body["run"]["steps"] if step["kind"] == "clip-hop1"]
+    assert stills and all(step["status"] == "succeeded" and step["called_comfy"] is False for step in stills)
+    assert plates and all(step["status"] == "succeeded" and step["called_comfy"] is False for step in plates)
+    assert clips and all(step["called_comfy"] is False for step in clips)
+    assert body["run"]["steps"][-1]["kind"] == "stitch"
+    assert body["run"]["steps"][-1]["produced_mp4"] is False
+    assert body["run"]["steps"][-1]["status"] == "awaiting_stitch"
+    blind = client.post(
+        "/api/jobs",
+        headers=auth,
+        json={"episode_id": done["episode_id"], "job_type": "still-sheet", "payload": {"prompt": "blind"}},
+    )
+    assert blind.status_code == 409, blind.text
+    assert blind.json()["detail"]["code"] == "preview_required"
+    get_settings.cache_clear()
+
+
 def test_coverage_persists_on_the_board_without_a_render(client, auth):
     done = _ready_wizard(client, auth)
     episode_id = done["episode_id"]
