@@ -105,6 +105,7 @@ def shot_out(shot: Shot) -> ShotOut:
         readiness=shot.readiness,  # type: ignore[arg-type]
         coverage=shot.coverage if isinstance(shot.coverage, dict) else {},
         continue_from_id=shot.continue_from_id or "",
+        bridge=shot.bridge if isinstance(shot.bridge, dict) else {},
         candidates=[CandidateOut.model_validate(row) for row in shot.candidates],
         hop1_required=is_hop1_required(shot, pack) if shot.episode else False,
         preview=preview,

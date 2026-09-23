@@ -1057,9 +1057,10 @@ function EpisodeView({
       if (previewTypes.has(jobType)) {
         const shot = shots.find((row) => row.id === selectedShotId);
         const continueClip = withShot && shot?.join === "continue";
+        const bridgeShot = shot?.bridge?.dialect === "clip-bridge";
         const preview = await api.previewJob({
           episode_id: episodeId,
-          shot_id: withShot ? selectedShotId || undefined : undefined,
+          shot_id: withShot || bridgeShot ? selectedShotId || undefined : undefined,
           job_type: jobType,
           payload: continueClip
             ? { workflow_id: "h3-extend", continue_from: "previous" }

@@ -132,6 +132,7 @@ class Episode(Base):
     log_line: Mapped[str] = mapped_column(Text, default="")
     map_notes: Mapped[str] = mapped_column(Text, default="")
     dialogue: Mapped[str] = mapped_column(Text, default="")
+    story_lock: Mapped[dict] = mapped_column(JSON, default=dict)
     review_state: Mapped[str] = mapped_column(String(32), default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
@@ -323,6 +324,7 @@ class Shot(Base):
     readiness: Mapped[str] = mapped_column(String(20), default="draft")
     coverage: Mapped[dict] = mapped_column(JSON, default=dict)
     continue_from_id: Mapped[str] = mapped_column(String(36), default="")
+    bridge: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

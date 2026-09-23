@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "./api.ts";
+import type { ClipBridgePreview } from "./clipBridge.ts";
 import type { PromptPreview, WorkflowSummary } from "./types.ts";
 
 type Props = {
@@ -127,6 +128,7 @@ export function PromptPreviewPanel({ preview, busy, onPreview, onGenerate, onClo
           aria-label="Negative prompt"
         />
       </label>
+      {preview.clip_bridge ? <ClipBridgeStrings bridge={preview.clip_bridge} /> : null}
       {preview.refs?.length ? (
         <ul className="preview-refs">
           {preview.refs.map((ref, index) => (
@@ -161,7 +163,7 @@ export function PromptPreviewPanel({ preview, busy, onPreview, onGenerate, onClo
         <button
           type="button"
           className="btn"
-          disabled={busy || preview.prompt_profile !== "h3"}
+          disabled={busy || Boolean(preview.clip_bridge) || preview.prompt_profile !== "h3"}
           onClick={() => void rewrite()}
           data-testid="preview-rewrite"
         >
@@ -181,5 +183,36 @@ export function PromptPreviewPanel({ preview, busy, onPreview, onGenerate, onClo
         </button>
       </div>
     </section>
+  );
+}
+
+function ClipBridgeStrings({ bridge }: { bridge: ClipBridgePreview }) {
+  return (
+    <div data-testid="clip-bridge-preview">
+      <p className="hint">{bridge.honesty}</p>
+      {bridge.issues.length ? (
+        <ul className="hint warn" data-testid="clip-bridge-issues">
+          {bridge.issues.map((issue) => (
+            <li key={`${issue.code}-${issue.clip_id}-${issue.message}`}>
+              {issue.code}: {issue.message}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="hint">Continuity preflight passed. Generate still does not call Comfy until a live lane accepts the prompt.</p>
+      )}
+      <label className="field">
+        <span className="editor-label">H3 FL2VA</span>
+        <textarea readOnly rows={8} value={bridge.h3_prompt} aria-label="H3 prompt" data-testid="clip-bridge-h3" />
+      </label>
+      <label className="field">
+        <span className="editor-label">Qwen start</span>
+        <textarea readOnly rows={6} value={bridge.qwen_start} aria-label="Qwen start prompt" data-testid="clip-bridge-qwen-start" />
+      </label>
+      <label className="field">
+        <span className="editor-label">Qwen end</span>
+        <textarea readOnly rows={6} value={bridge.qwen_end} aria-label="Qwen end prompt" data-testid="clip-bridge-qwen-end" />
+      </label>
+    </div>
   );
 }

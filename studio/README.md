@@ -1,10 +1,16 @@
-# AIGC studio API (Phase 14)
+# AIGC studio API (Phase 15)
 
 FastAPI spine. The front door is the Create wizard (`POST /api/create/wizard`, patch answers, `POST …/finish`). Scope, a prunable task tree, craft-lane labels, and director checkpoints are part of that door. Local recipes are `POST /api/create/recipes` and `recipe_id` on start. **Send to Hermes** (`POST /api/create/wizard/{id}/handoff/hermes`) writes a brief under the handoff root and returns a `hermes://` payload. It does not invoke Hermes or call Comfy. `GET /api/agent-runs/{id}` polls sheets, plates, hop-1 clips, and stitch. Disabled tree branches are skipped. Stitch does not invent an MP4.
 
 `POST /api/studio/start` (blank, template, or brain dump) stays. Edit with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) lists still jobs, then hop-1 clips, then stitch, and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
 
 Native ComfyUI: set `STUDIO_COMFY_STILL_LANES` (Qwen-Image) and `STUDIO_COMFY_CLIP_LANES` (MiniMax H3) to private URLs. Empty lanes stay stub / not live. Example names: `comfy.example.json`. MIT notice: [../NOTICE](../NOTICE).
+
+Phase 15 clip bridge, same desk. `docs/CLIP_BRIDGE.md` is the only H3 continuity dialect.
+
+- **Story lock and clips.** `PUT /api/episodes/{id}/clip-bridge` stores `story_lock` on the episode and one bridge object on each shot. `POST …/clip-bridge/fixture` with `{"name":"forge_dawn"}` loads the 6-clip bladesmith chain. `POST …/copy-handoff` copies `end_state` into the next `start_state` with `strip()` only. `POST …/retry` reassembles one clip's prompts and does not rewrite the lock or earlier states.
+- **Prompt preview.** A bridge shot's Generate preview shows `assemble_h3_prompt` for hop-1 and the Qwen Q2/Q3 strings for stills. The alignment line is the line in `CLIP_BRIDGE.md`. Rewrite stays off so a second H3 profile cannot replace it. Continuity failures return `clip_bridge_rejected` and do not enqueue.
+- **Conform.** `POST …/clip-bridge/conform` returns the ffmpeg extract, trim (`end_frame=239`), and concat commands. `execute: true` runs them only when every clip video exists. Otherwise `produced_mp4` stays false. `studio/scripts/clip_bridge_conform.sh` does the same and exits without writing a stand-in file.
 
 Phase 14 machine shop, still under the director desk:
 

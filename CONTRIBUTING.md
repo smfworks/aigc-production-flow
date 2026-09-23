@@ -1,6 +1,6 @@
 # Contributing
 
-Phase 14 is the Comfy / H3 machine shop under the Phase 13 director desk. Patterns are reimplemented here. Do not paste third-party graphs or agent trees into this repo.
+Phase 15 is the CLIP_BRIDGE continuity bridge on the Phase 14 prompt preview. `docs/CLIP_BRIDGE.md` is the dialect. Fill its slots. Do not paraphrase locked continuity strings, and do not add a second H3 wrapper. Phase 14 is the Comfy / H3 machine shop under the Phase 13 director desk. Patterns are reimplemented here. Do not paste third-party graphs or agent trees into this repo.
 
 ## Role-tagged workflows
 

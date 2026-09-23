@@ -89,3 +89,16 @@ Role-tagged Comfy workflows, prompt preview, shot coverage, and continue-from-pr
 - Clarify-before-run asks for missing brief fields. It does not turn gates green.
 - Brief is that structured pause. Cut is the existing sign-off. Prompt prose is not permission to generate.
 - A stitch file does not mark the episode completed and does not stamp generate-ok. Hermes stays the handoff, not a second runtime.
+
+## Clip bridge (Phase 15)
+
+`docs/CLIP_BRIDGE.md` is the prompt dialect for the long-form H3 continuity bridge. Studio fills slots from the story lock and the clip. It does not paraphrase locked `start_state` / `end_state` strings.
+
+- `clips[n+1].start_state` equals `clips[n].end_state` after `strip()` only. A paraphrase is a reject.
+- Hard joins use the previous `end_extracted` as `start_image` when that extract is present.
+- Identity, wardrobe, and screen direction inherit the lock unless the Director marks a screen-direction reversal.
+- Clip duration is 10.00s. One verb. One camera move. Opposing camera stacks are rejected.
+- Prompt preview shows the assembled H3 and Qwen strings. Preview does not enqueue. `preview_required` still blocks a blind Generate.
+- `called_comfy` stays false until a live lane accepts a prompt. Unset Comfy lanes stay stub.
+- ffmpeg helpers extract a last frame and trim a held tail only when a real local video exists. Otherwise the run stays awaiting conform. No invented MP4.
+- This does not start Hermes, does not ship a second CLIP_BRIDGE app, and does not add CapCut, Skill Square, or a workflow marketplace.
