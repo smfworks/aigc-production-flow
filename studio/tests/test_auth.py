@@ -69,6 +69,6 @@ def test_forward_header_mode(tmp_path, monkeypatch, auth):
         meta = client.get("/api/meta")
         assert meta.status_code == 200
         assert meta.json()["auth_mode"] == "forward-header"
-        assert meta.json()["phase"] == 13
+        assert meta.json()["phase"] == 15
         assert meta.json()["media_backend"] == "local"
     del Path

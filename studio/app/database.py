@@ -59,6 +59,8 @@ _ADDITIVE_COLUMNS = (
     ("shots", "coverage", "TEXT"),
     ("shots", "continue_from_id", "VARCHAR(36) DEFAULT ''"),
     ("media_assets", "ref_role", "VARCHAR(32) DEFAULT ''"),
+    ("episodes", "story_lock", "TEXT"),
+    ("shots", "bridge", "TEXT"),
 )
 
 

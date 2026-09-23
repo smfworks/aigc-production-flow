@@ -40,7 +40,7 @@ class UserOut(BaseModel):
 
 class MetaOut(BaseModel):
     name: str = "AIGC Studio Spine"
-    phase: int = 13
+    phase: int = 15
     auth_mode: Literal["local", "forward-header", "oidc"] = "local"
     sso: str = "local-dev token. OIDC remains opt-in and off by default — see docs/AUTH.md"
     pack_builder_url: str
@@ -448,6 +448,7 @@ class ShotOut(BaseModel):
     readiness: ShotReadiness
     coverage: dict[str, Any] = Field(default_factory=dict)
     continue_from_id: str = ""
+    bridge: dict[str, Any] = Field(default_factory=dict)
     candidates: list[CandidateOut] = []
     hop1_required: bool = False
     preview: ContinuityReceiptOut | None = None

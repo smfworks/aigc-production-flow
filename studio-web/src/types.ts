@@ -1,3 +1,5 @@
+import type { ClipBridgePreview } from "./clipBridge.ts";
+
 export const REVIEW_STATES = [
   "draft",
   "needs-art",
@@ -460,6 +462,14 @@ export type Shot = {
     short?: boolean;
   };
   continue_from_id?: string;
+  bridge?: {
+    dialect?: string;
+    clip_id?: string;
+    start_state?: string;
+    end_state?: string;
+    action?: string;
+    camera_move?: string;
+  };
   candidates: Candidate[];
   hop1_required?: boolean;
   preview?: ContinuityReceipt | null;
@@ -524,6 +534,7 @@ export type PromptPreview = {
   };
   rewrite_source?: string;
   model_ran?: boolean;
+  clip_bridge?: ClipBridgePreview;
 };
 
 export type WorkflowSummary = {

@@ -21,6 +21,7 @@ from .models import Episode, PromptDraft, Shot, utcnow
 from .precheck import hop1_enqueue_blockers
 from .preview import extend_ok, receipt_blockers
 from .mentions import asset_mention_refs, mention_tokens
+from .clipbridge import preview_bundle, recheck_draft
 from .workflows import filled_graph, get_workflow, workflow_has_video_input
 
 GENERATE_TYPES = {"still-sheet", "still-plate", "clip-hop1", "clip-extend"}
@@ -301,6 +302,13 @@ def build_preview(
     if gate:
         generate_enabled = False
         warning = warning or gate
+    bridge = preview_bundle(episode, shot, job_type, body)
+    if bridge:
+        prompt = bridge["prompt"]
+        negative = bridge["negative"] or negative
+        if bridge["issues"]:
+            generate_enabled = False
+            warning = f"{warning} {bridge['warning']}".strip() if warning else bridge["warning"]
     unbound = [str(ref.get("label") or "") for ref in refs if ref.get("source") == "mention" and ref.get("bound") is False]
     if unbound:
         mention_warning = (
@@ -351,6 +359,9 @@ def build_preview(
             "called_comfy stays false until a live lane accepts a prompt."
         ),
     }
+    if bridge:
+        preview["clip_bridge"] = bridge["clip_bridge"]
+        preview["honesty"] = f"{preview['honesty']} {bridge['clip_bridge']['honesty']}"
     draft = PromptDraft(
         episode_id=episode.id,
         shot_id=shot.id if shot else None,
@@ -384,6 +395,7 @@ def update_draft(draft: PromptDraft, *, prompt: str | None, negative: str | None
     if negative is not None:
         body["negative"] = negative.strip()[:4000]
     body["called_comfy"] = False
+    recheck_draft(body)
     draft.body = body
     flag_modified(draft, "body")
     draft.updated_at = utcnow()
@@ -397,6 +409,17 @@ def rewrite_draft(draft: PromptDraft) -> PromptDraft:
             detail=f"Prompt draft is {draft.status}. Rewrite only works on an open draft.",
         )
     body = dict(draft.body) if isinstance(draft.body, dict) else {}
+    if isinstance(body.get("clip_bridge"), dict):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "clip_bridge_dialect",
+                "message": (
+                    "CLIP_BRIDGE H0 is the H3 prompt. "
+                    "Rewrite will not replace it with another profile."
+                ),
+            },
+        )
     if body.get("prompt_profile") != "h3":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -452,6 +475,16 @@ def consume_preview(db: Session, preview_id: str, episode: Episode, job_type: st
             detail={"code": "preview_mismatch", "message": "Preview job type does not match this enqueue."},
         )
     body = dict(draft.body) if isinstance(draft.body, dict) else {}
+    recheck_draft(body)
+    if isinstance(body.get("clip_bridge"), dict) and body["clip_bridge"].get("ok") is False:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "clip_bridge_rejected",
+                "message": body.get("warning") or "CLIP_BRIDGE preflight rejected this clip.",
+                "issues": body["clip_bridge"].get("issues") or [],
+            },
+        )
     decision = body.get("continue") if isinstance(body.get("continue"), dict) else {}
     if decision.get("requested") and not decision.get("allowed"):
         raise HTTPException(

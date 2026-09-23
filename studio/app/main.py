@@ -49,6 +49,7 @@ from .routers import (
     templates,
     wizard,
     workflows,
+    clipbridge,
 )
 from .schemas import MetaOut, UserOut
 from .seed import seed_default_org
@@ -78,8 +79,13 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.14.0",
+        version="0.15.0",
         description=(
+            "Phase 15 studio: CLIP_BRIDGE long-form continuity. "
+            "Prompt preview fills H3 and Qwen slots from docs/CLIP_BRIDGE.md. "
+            "Locked start_state and end_state strings are copied, not paraphrased. "
+            "called_comfy stays false unless a live lane accepts a prompt. "
+            "ffmpeg conform does not invent an MP4. "
             "Phase 14 studio: role-tagged Comfy workflows, prompt preview before enqueue, "
             "scene-to-clip coverage, and continue-from-previous when the workflow has (Input:video). "
             "Stub and dry-run stay labeled. called_comfy stays false unless a live lane accepts a prompt. "
@@ -143,6 +149,7 @@ def create_app() -> FastAPI:
     application.include_router(comments.router)
     application.include_router(media.router)
     application.include_router(shots.router)
+    application.include_router(clipbridge.router)
     application.include_router(jobs.router)
     application.include_router(preview.router)
     application.include_router(adapters.router)
@@ -165,7 +172,7 @@ def create_app() -> FastAPI:
         worker = normalize_worker(cfg.job_worker)
         return {
             "name": "AIGC Studio Spine",
-            "phase": 13,
+            "phase": 15,
             "docs": "/docs",
             "openapi": "/openapi.json",
             "auth": "local Bearer token; optional forward-header identity; optional OIDC JWKS; app-level org roles",
