@@ -187,13 +187,16 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
     try {
       const saved = await save(step, answers);
       if (saved?.director?.task_tree) setTaskTree(asTree(saved.director.task_tree));
-      if (finish) {
+      if (step === "checkpoints") {
         const report = await api.clarifyWizard(wizard.id);
-        if (!report.ready && report.questions.length) {
-          setClarify(report.questions);
+        const questions = !report.ready && report.questions.length ? report.questions : [];
+        setClarify(questions.length ? questions : null);
+        if (finish && questions.length) {
           onNotice("Answer the brief questions before the crew lanes are written. Nothing was generated.");
           return;
         }
+      }
+      if (finish) {
         const done = await api.finishWizard(wizard.id);
         setClarify(null);
         setWizard(done);
