@@ -313,6 +313,38 @@ def start_clip(settings: Settings, ctx: JobContext) -> AdapterResult:
     prompt = _prompt_text(payload)
     if not prompt:
         return _fail("prompt must be a non-empty string")
+    workflow_id = str(payload.get("workflow_id") or "").strip()
+    continue_from = str(payload.get("continue_from") or "").strip()
+    role_graph: dict[str, Any] | None = None
+    if continue_from or workflow_id:
+        from .role_workflow import RoleWorkflowError, parse_workflow
+        from ..workflows import load_graph, filled_graph
+
+        if continue_from and not workflow_id:
+            return _fail(
+                "Continue-from-previous needs a workflow with an (Input:video) role. "
+                "None is selected. ComfyUI was not asked to render."
+            )
+        try:
+            if workflow_id:
+                contract = parse_workflow(load_graph(workflow_id))
+                if continue_from and not contract.get("has_video_input"):
+                    return _fail(
+                        f"Workflow {workflow_id} has no (Input:video) role. "
+                        "Continue-from-previous is disabled. ComfyUI was not asked to render."
+                    )
+                if continue_from and not str(payload.get("video") or "").strip():
+                    return _fail(
+                        "Continue-from-previous has no local video file to send. "
+                        "ComfyUI was not asked to render."
+                    )
+                role_graph = filled_graph(workflow_id, payload)
+        except RoleWorkflowError as exc:
+            return _fail(str(exc))
+        except Exception as exc:  # noqa: BLE001 — HTTPException and IO errors name the cause
+            detail = getattr(exc, "detail", None)
+            message = detail if isinstance(detail, str) else str(exc)
+            return _fail(message or "Role-tagged workflow could not be filled.")
     fps = float(settings.comfy_h3_fps or H3_FPS)
     max_frames = int(settings.comfy_h3_max_frames or 362)
     try:
@@ -362,19 +394,22 @@ def start_clip(settings: Settings, ctx: JobContext) -> AdapterResult:
     width = int(settings.comfy_h3_width or 960)
     height = int(settings.comfy_h3_height or 544)
     seed = secrets.randbits(32)
-    graph = build_h3_graph(
-        prompt=prompt,
-        negative=_NEGATIVE,
-        frames=frames,
-        width=width,
-        height=height,
-        seed=seed,
-        quality=quality,
-        style=style,
-        files=h3_files(settings),
-        fps=fps,
-        first_frame_b64=first_b64,
-    )
+    if role_graph is not None:
+        graph = role_graph
+    else:
+        graph = build_h3_graph(
+            prompt=prompt,
+            negative=_NEGATIVE,
+            frames=frames,
+            width=width,
+            height=height,
+            seed=seed,
+            quality=quality,
+            style=style,
+            files=h3_files(settings),
+            fps=fps,
+            first_frame_b64=first_b64,
+        )
     try:
         prompt_id = client.submit_prompt(lane, graph, VIDEO_CLIENT_ID)
     except ComfyError as exc:

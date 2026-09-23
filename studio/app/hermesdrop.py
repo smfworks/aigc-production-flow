@@ -84,9 +84,12 @@ def write_drop(
             "still_label": engine.get("still_label") or "",
             "clip_label": engine.get("clip_label") or "",
             "produced_mp4": False,
+            "episode_completed": False,
+            "cut_cleared": False,
             "note": (
                 "Studio wrote this brief. Hermes has not been invoked. Comfy has not been called. "
-                "Stitch is a concat plan until real video files exist. No MP4 was invented."
+                "Stitch is a concat plan until real video files exist. No MP4 was invented. "
+                "This drop is not a Cut and does not mark the episode completed."
             ),
         },
         "stitch_contract": HERMES_STITCH_CONTRACT,

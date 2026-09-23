@@ -104,9 +104,14 @@ def run_stitch(job: Job, episode: Episode, set_progress) -> AdapterResult:
                     "produced_mp4": True,
                     "called_comfy": False,
                     "ffmpeg": True,
+                    "episode_completed": False,
+                    "generate_ok": False,
                     "path": str(dest),
                     "concat_plan": plan,
-                    "claim": "Local ffmpeg concat of existing video files. Not a Comfy render. Not CapCut.",
+                    "claim": (
+                        "Local ffmpeg concat of existing video files. Not a Comfy render. Not CapCut. "
+                        "The file does not mark the episode completed and does not stamp generate-ok."
+                    ),
                     "hermes_skill": {"name": "stitch", "contract": HERMES_STITCH_CONTRACT},
                 },
             )
@@ -132,8 +137,10 @@ def run_stitch(job: Job, episode: Episode, set_progress) -> AdapterResult:
         "concat_plan": plan,
         "playlist": {"format": playlist.get("format"), "fps": playlist.get("fps")},
         "hermes_skill": {"name": "stitch", "contract": HERMES_STITCH_CONTRACT},
+        "episode_completed": False,
+        "generate_ok": False,
         "reason": reason,
-        "claim": "Stitch plan only. No MP4 was produced.",
+        "claim": "Stitch plan only. No MP4 was produced. The episode is not completed.",
     }
     return AdapterResult(
         ok=True,

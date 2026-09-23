@@ -13,6 +13,9 @@ import type {
   IdentityStore,
   Job,
   MediaAsset,
+  PromptPreview,
+  WorkflowSummary,
+  ClarifyQuestion,
   Meta,
   NotificationList,
   OrgMember,
@@ -334,6 +337,7 @@ export const api = {
     entityLabel: string,
     notes: string,
     entityType = "",
+    refRole = "",
   ) => {
     const data = new FormData();
     data.append("file", file);
@@ -341,8 +345,14 @@ export const api = {
     data.append("entity_label", entityLabel);
     data.append("entity_type", entityType);
     data.append("notes", notes);
+    data.append("ref_role", refRole);
     return request<MediaAsset>(`/api/episodes/${episodeId}/media`, { method: "POST", body: data });
   },
+  setRefRole: (episodeId: string, assetId: string, refRole: string) =>
+    request<MediaAsset>(`/api/episodes/${episodeId}/media/${assetId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ ref_role: refRole }),
+    }),
   mediaUrl: (assetId: string) => `/api/media/${assetId}`,
   importPack: (episodeId: string, file?: File, handoffId?: string) => {
     const data = new FormData();
@@ -394,6 +404,36 @@ export const api = {
   job: (jobId: string) => request<Job>(`/api/jobs/${jobId}`),
   enqueueJob: (body: { episode_id: string; shot_id?: string; job_type: string; payload?: Record<string, unknown> }) =>
     request<Job>("/api/jobs", { method: "POST", body: JSON.stringify(body) }),
+  previewJob: (body: {
+    episode_id: string;
+    shot_id?: string;
+    job_type: string;
+    payload?: Record<string, unknown>;
+    adapter?: string;
+  }) => request<PromptPreview>("/api/jobs/preview", { method: "POST", body: JSON.stringify(body) }),
+  patchPreview: (draftId: string, body: { prompt?: string; negative?: string }) =>
+    request<PromptPreview>(`/api/jobs/preview/${draftId}`, { method: "PATCH", body: JSON.stringify(body) }),
+  rewritePreview: (draftId: string) =>
+    request<PromptPreview>(`/api/jobs/preview/${draftId}/rewrite`, { method: "POST" }),
+  cancelPreview: (draftId: string) =>
+    request<PromptPreview>(`/api/jobs/preview/${draftId}/cancel`, { method: "POST" }),
+  workflows: () => request<WorkflowSummary[]>("/api/workflows"),
+  breakCoverage: (
+    episodeId: string,
+    body: {
+      action?: string;
+      dialogue?: string;
+      scene_s?: number;
+      target_s?: number;
+      min_s?: number;
+      max_s?: number;
+      continue_chain?: boolean;
+    },
+  ) =>
+    request<{ clip_count: number; rendered: boolean; plan_only: boolean; note: string; shots: Shot[] }>(
+      `/api/episodes/${episodeId}/coverage`,
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   cancelJob: (jobId: string) => request<Job>(`/api/jobs/${jobId}/cancel`, { method: "POST" }),
   retryJob: (jobId: string) => request<Job>(`/api/jobs/${jobId}/retry`, { method: "POST" }),
   previewDesk: (episodeId: string) => request<PreviewDesk>(`/api/episodes/${episodeId}/preview-desk`),
@@ -546,8 +586,15 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(body),
     }),
-  finishWizard: (wizardId: string) =>
-    request<WizardSession>(`/api/create/wizard/${wizardId}/finish`, { method: "POST" }),
+  clarifyWizard: (wizardId: string) =>
+    request<{ questions: ClarifyQuestion[]; ready: boolean; note: string }>(
+      `/api/create/wizard/${wizardId}/clarify`,
+    ),
+  finishWizard: (wizardId: string, acknowledgeGaps = false) =>
+    request<WizardSession>(
+      `/api/create/wizard/${wizardId}/finish${acknowledgeGaps ? "?acknowledge_gaps=true" : ""}`,
+      { method: "POST" },
+    ),
   handoffHermes: (wizardId: string) =>
     request<HermesHandoff>(`/api/create/wizard/${wizardId}/handoff/hermes`, { method: "POST" }),
   agentRun: (runId: string) => request<AgentRun>(`/api/agent-runs/${runId}`),

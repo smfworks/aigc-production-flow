@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, status
 
+from ..coverage import CoverageError, apply_coverage, plan_clips
 from ..deps import DbDep, get_episode, latest_revision
 from ..models import Shot, ShotCandidate, utcnow
 from ..rbac import EditUser, ReadUser
@@ -8,6 +9,7 @@ from ..schemas import (
     CandidateCreate,
     CandidateOut,
     CandidateUpdate,
+    CoverageIn,
     ShotOut,
     ShotReadinessSet,
     ShotUpdate,
@@ -29,6 +31,44 @@ def _get_shot(db, episode_id: str, shot_id: str, user=None) -> Shot:
     if not shot or shot.episode_id != episode.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shot not found.")
     return shot
+
+
+@router.post("/api/episodes/{episode_id}/coverage")
+def break_scene(episode_id: str, body: CoverageIn, user: EditUser, db: DbDep) -> dict:
+    """Split a scene into timed clips on the board. This does not render."""
+    episode = get_episode(db, episode_id, user)
+    action = body.action.strip()
+    dialogue = body.dialogue.strip()
+    if not action:
+        action = " ".join(shot.action for shot in episode.shots if shot.action).strip()
+    if not dialogue:
+        dialogue = (episode.dialogue or "").strip()
+    take = episode.shots[0].take if episode.shots else "A"
+    try:
+        plan = plan_clips(
+            action=action,
+            dialogue=dialogue,
+            scene_s=body.scene_s,
+            target_s=body.target_s,
+            min_s=body.min_s,
+            max_s=body.max_s,
+            continue_chain=body.continue_chain,
+            take=take or "A",
+        )
+    except CoverageError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    shots = apply_coverage(db, episode, plan, replace=body.replace)
+    db.commit()
+    return {
+        "episode_id": episode.id,
+        "plan_only": True,
+        "rendered": False,
+        "scene_s": plan["scene_s"],
+        "clip_count": plan["clip_count"],
+        "clips": plan["clips"],
+        "note": plan["note"],
+        "shots": [_shot_out(row) for row in sorted(shots, key=lambda row: row.sort_index)],
+    }
 
 
 @router.get("/api/episodes/{episode_id}/shots", response_model=list[ShotOut])

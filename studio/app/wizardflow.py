@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from .agentbrief import build_agent_brief
+from .clarify import open_questions
 from .agentrun import build_steps, kickoff, recompute, resume_if_idle
 from .blankpack import pack_zip_bytes
 from .createflow import new_episode
@@ -219,8 +220,15 @@ def patch_session(db: Session, wizard: WizardSession, *, step: str | None, answe
             )
         wizard.step = step
     current = dict(wizard.answers or {})
-    if answers:
-        current.update(answers)
+    incoming = answers or {}
+    prefs_changed = any(
+        key in incoming and str(incoming.get(key) or "") != str(current.get(key) or "")
+        for key in ("still_pref", "clip_pref")
+    )
+    if incoming:
+        current.update(incoming)
+    if prefs_changed and str(incoming.get("engine_mode") or "").strip().lower() != "approve":
+        current["engine_mode"] = "ask"
     wizard.answers = normalize_answers(current)
     wizard.updated_at = utcnow()
     db.flush()
@@ -271,6 +279,7 @@ def finish_session(
     *,
     user_name: str,
     unique_slug,
+    acknowledge_gaps: bool = False,
 ) -> tuple[WizardSession, Project, Episode, PackRevision]:
     if wizard.status in {"ready", "handed_off"} and wizard.episode_id and wizard.project_id:
         project = db.get(Project, wizard.project_id)
@@ -287,6 +296,30 @@ def finish_session(
         )
     if answers["format"] not in FORMATS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pick a format.")
+    questions = open_questions(answers, acknowledge_gaps=acknowledge_gaps)
+    if questions:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "clarify_required",
+                "message": (
+                    "Brief fields are missing. Answer them, or proceed with the gaps named. "
+                    "Lane approval and @mentions stay open. This pause is not a gate checkpoint."
+                ),
+                "questions": questions,
+            },
+        )
+    gap_fields = [
+        field
+        for field in ("audience", "deliverables", "cast_notes", "negative_constraints")
+        if not str(answers.get(field) or "").strip()
+        and not (
+            field == "negative_constraints"
+            and (str(answers.get("must_nots") or "").strip() or str(answers.get("claim_bans") or "").strip())
+        )
+    ]
+    if acknowledge_gaps and gap_fields:
+        answers = {**answers, "clarify_ack": True, "clarify_gaps": gap_fields}
     pack, _honesty, people, answers = pack_from_answers(answers)
     title = str(pack.get("title") or "Untitled")[:200]
     project = Project(
@@ -341,6 +374,20 @@ def handoff_hermes(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Finish the wizard before sending to Hermes.",
+        )
+    answers = wizard.answers if isinstance(wizard.answers, dict) else {}
+    questions = open_questions(answers, acknowledge_gaps=bool(answers.get("clarify_ack")))
+    if questions:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "clarify_required",
+                "message": (
+                    "Brief fields are still missing. Answer them before the handoff writes craft lanes. "
+                    "This pause is not a gate checkpoint."
+                ),
+                "questions": questions,
+            },
         )
     episode = db.get(Episode, wizard.episode_id)
     revision = db.get(PackRevision, wizard.revision_id)

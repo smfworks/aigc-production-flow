@@ -77,3 +77,15 @@ Create can show a prunable task tree (script/beats → identity sheets → plate
 - Checkpoints repeat the real gates (log line through lock-diff, plus draft identities, missing plates, unwatched hop-1, and missing sign-off). They do not turn gates green.
 - Scope is copied into pack notes and `director.scope`.
 - Saved Create recipes are local JSON under `data/recipes/` (`skill_<name>_v0.1.json`, or `STUDIO_RECIPE_ROOT`). They prefill the wizard. There is no plaza.
+
+## Machine shop (Phase 14)
+
+Role-tagged Comfy workflows, prompt preview, shot coverage, and continue-from-previous live under the same desk.
+
+- A workflow file is not a render. `called_comfy` stays false until a live lane accepts a prompt.
+- Prompt preview does not enqueue. Stub and dry-run stay labeled. Do not treat a fixture receipt as an MP4.
+- Coverage clips are a plan on the board (`rendered: false`). They do not invent video.
+- Continue-from-previous requires an `(Input:video)` role. A missing role disables Generate and names why.
+- Clarify-before-run asks for missing brief fields. It does not turn gates green.
+- Brief is that structured pause. Cut is the existing sign-off. Prompt prose is not permission to generate.
+- A stitch file does not mark the episode completed and does not stamp generate-ok. Hermes stays the handoff, not a second runtime.

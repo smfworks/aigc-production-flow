@@ -56,6 +56,9 @@ _ADDITIVE_COLUMNS = (
     ("episodes", "map_notes", "TEXT DEFAULT ''"),
     ("episodes", "dialogue", "TEXT DEFAULT ''"),
     ("projects", "director_state", "TEXT"),
+    ("shots", "coverage", "TEXT"),
+    ("shots", "continue_from_id", "VARCHAR(36) DEFAULT ''"),
+    ("media_assets", "ref_role", "VARCHAR(32) DEFAULT ''"),
 )
 
 

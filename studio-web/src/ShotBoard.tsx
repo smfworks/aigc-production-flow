@@ -17,6 +17,12 @@ type Props = {
     body: { status?: string; linked_asset_id?: string; linked_ref?: string },
   ) => void;
   onAddCandidate: (shotId: string, body: { kind: CandidateKind; label: string }) => void;
+  onBreakScene?: (body: {
+    action: string;
+    dialogue: string;
+    scene_s: number;
+    continue_chain: boolean;
+  }) => void;
   episodeId?: string;
   canComment?: boolean;
   canMutate?: boolean;
@@ -44,6 +50,7 @@ export function ShotBoard({
   onReadiness,
   onCandidate,
   onAddCandidate,
+  onBreakScene,
   episodeId,
   canComment = false,
   canMutate = true,
@@ -53,6 +60,10 @@ export function ShotBoard({
   const [view, setView] = useState<"list" | "canvas">("list");
   const [kind, setKind] = useState<CandidateKind>("character");
   const [label, setLabel] = useState("");
+  const [breakAction, setBreakAction] = useState("");
+  const [breakDialogue, setBreakDialogue] = useState("");
+  const [breakSeconds, setBreakSeconds] = useState("16");
+  const [breakContinue, setBreakContinue] = useState(false);
   const selected =
     shots.find((shot) => shot.id === selectedShotId) ??
     shots.find((shot) => shot.hop1_required) ??
@@ -91,6 +102,69 @@ export function ShotBoard({
           Extract candidates (stub)
         </button>
       </div>
+      {onBreakScene ? (
+        <form
+          className="coverage-form"
+          data-testid="shot-break"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const scene_s = Number(breakSeconds);
+            if (!Number.isFinite(scene_s) || scene_s <= 0) return;
+            onBreakScene({
+              action: breakAction,
+              dialogue: breakDialogue,
+              scene_s,
+              continue_chain: breakContinue,
+            });
+          }}
+        >
+          <p className="editor-label">Break scene into clips</p>
+          <p className="hint">
+            Timed coverage, about 5–10 seconds each. This writes plan rows on the board. It does not render.
+          </p>
+          <label className="field">
+            <span className="editor-label">Action</span>
+            <textarea
+              rows={2}
+              value={breakAction}
+              onChange={(event) => setBreakAction(event.target.value)}
+              aria-label="Coverage action"
+            />
+          </label>
+          <label className="field">
+            <span className="editor-label">Dialogue</span>
+            <textarea
+              rows={2}
+              value={breakDialogue}
+              onChange={(event) => setBreakDialogue(event.target.value)}
+              aria-label="Coverage dialogue"
+              placeholder={"One line per beat"}
+            />
+          </label>
+          <label className="field inline">
+            <span className="editor-label">Scene seconds</span>
+            <input
+              type="number"
+              min={1}
+              step="0.1"
+              value={breakSeconds}
+              onChange={(event) => setBreakSeconds(event.target.value)}
+              aria-label="Scene seconds"
+            />
+          </label>
+          <label className="field inline">
+            <input
+              type="checkbox"
+              checked={breakContinue}
+              onChange={(event) => setBreakContinue(event.target.checked)}
+            />
+            Chain clips with continue
+          </label>
+          <button type="submit" className="btn" disabled={!canMutate}>
+            Break into clips
+          </button>
+        </form>
+      ) : null}
       {shots.length === 0 ? (
         <p className="empty">No edit-list shots yet. Fill the storyboard stage, or import a zip.</p>
       ) : view === "canvas" ? (
@@ -142,6 +216,7 @@ export function ShotBoard({
                   <em className={`chip-status is-${shot.readiness}`}>{shot.readiness}</em>
                   {shot.hop1_required ? " · hop-1" : ""}
                   {shot.preview?.preview_watched ? " · watched" : ""}
+                  {shot.coverage?.plan_only ? ` · plan ${shot.coverage.duration_s ?? "?"}s · not rendered` : ""}
                   {" · "}
                   {shot.action || "no action"}
                 </span>

@@ -34,6 +34,10 @@ export function JobTable({
             <div>
               <strong>
                 {job.job_type} · <em className={`chip-status is-${job.status}`}>{job.status}</em>
+                {job.adapter === "stub" || job.result?.stub === true || job.result?.outcome === "fixture" ? (
+                  <em className="chip-status is-stub">stub fixture</em>
+                ) : null}
+                {job.result?.called_comfy === true ? <em className="chip-status is-running">called Comfy</em> : null}
               </strong>
               <span>
                 adapter={job.adapter}

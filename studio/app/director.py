@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .clarify import clarify_questions
 from .gates import GATE_DEFS, evaluate_gates, is_real_still_file
 
 PLATFORM_FORMATS = ("9:16", "16:9", "1:1", "4:5", "4:3")
@@ -287,6 +288,9 @@ def normalize_platform_formats(value: Any) -> list[str]:
 def normalize_scope(raw: dict[str, Any] | None) -> dict[str, Any]:
     src = raw if isinstance(raw, dict) else {}
     return {
+        "audience": str(src.get("audience") or "").strip()[:500],
+        "deliverables": str(src.get("deliverables") or "").strip()[:2000],
+        "negative_constraints": str(src.get("negative_constraints") or "").strip()[:2000],
         "must_nots": str(src.get("must_nots") or "").strip()[:2000],
         "platform_formats": normalize_platform_formats(src.get("platform_formats")),
         "claim_bans": str(src.get("claim_bans") or "").strip()[:2000],
@@ -295,9 +299,18 @@ def normalize_scope(raw: dict[str, Any] | None) -> dict[str, Any]:
 
 def scope_note(scope: dict[str, Any]) -> str:
     parts: list[str] = []
+    audience = str(scope.get("audience") or "").strip()
+    deliverables = str(scope.get("deliverables") or "").strip()
+    negative = str(scope.get("negative_constraints") or "").strip()
     must = str(scope.get("must_nots") or "").strip()
     bans = str(scope.get("claim_bans") or "").strip()
     formats = scope.get("platform_formats") or []
+    if audience:
+        parts.append(f"Audience: {audience}")
+    if deliverables:
+        parts.append(f"Deliverables: {deliverables}")
+    if negative:
+        parts.append(f"Negative constraints: {negative}")
     if must:
         parts.append(f"Must not: {must}")
     if formats:
@@ -486,9 +499,12 @@ def build_checkpoints(
             "label": "No reviewer/producer sign-off",
             "cleared": bool(signed_off),
             "detail": (
-                "A reviewer or producer has signed off."
+                "Cut is this sign-off. A stitch file does not close it."
                 if signed_off
-                else "generate-ok still needs a reviewer or producer sign-off."
+                else (
+                    "Cut is this sign-off. generate-ok still needs a reviewer or producer. "
+                    "A stitch file does not close Cut and does not mark the episode completed."
+                )
             ),
         },
     ]
@@ -509,7 +525,9 @@ def build_checkpoints(
         "generate_ready": False,
         "note": (
             "These checkpoints use the real gate matrix. "
-            "Create does not clear them and does not lower the bar."
+            "Brief is the structured intake pause. Cut is the existing sign-off. "
+            "Create does not clear them and does not lower the bar. "
+            "Prompt prose is not permission to generate."
         ),
     }
 
@@ -524,9 +542,16 @@ def public_director(
 ) -> dict[str, Any]:
     tree = tree_for(answers)
     scope = normalize_scope(answers)
+    questions = clarify_questions(answers)
+    brief_open = bool(questions) and not answers.get("clarify_ack")
+    note = scope_note(scope)
+    bound_refs = [row for row in (answers.get("subject_refs") or []) if isinstance(row, dict) and row.get("bound")]
+    if bound_refs:
+        listed = ", ".join(f"@{row['token']} (identity draft)" for row in bound_refs)
+        note = f"{note}\nSubject refs: {listed}".strip()
     return {
         "scope": scope,
-        "scope_note": scope_note(scope),
+        "scope_note": note,
         "task_tree": tree,
         "craft_lanes": craft_lanes(answers, tree),
         "checkpoints": build_checkpoints(
@@ -535,7 +560,45 @@ def public_director(
             draft_sheets=draft_sheets,
             signed_off=signed_off,
         ),
+        "clarify": {
+            "questions": questions,
+            "note": (
+                "Clarify-before-run asks for missing brief fields. "
+                "These are not gate checkpoints and they do not turn a gate green."
+            ),
+        },
+        "execution_gates": {
+            "brief": {
+                "id": "brief",
+                "label": "Brief",
+                "cleared": not brief_open,
+                "maps_to": "clarify",
+                "detail": (
+                    "Structured brief fields are filled or the gaps were named. "
+                    "Prompt prose is not permission to generate."
+                    if not brief_open
+                    else (
+                        "Audience, deliverables, cast, or a negative constraint is still empty. "
+                        "This pause is not a pack gate."
+                    )
+                ),
+            },
+            "cut": {
+                "id": "cut",
+                "label": "Cut",
+                "cleared": bool(signed_off),
+                "maps_to": "no-signoff",
+                "detail": (
+                    "Cut is the existing reviewer or producer sign-off. "
+                    "Hermes handoff still writes a brief while Cut is open. "
+                    "A stitch file does not close Cut or mark the episode completed."
+                ),
+            },
+        },
         "agents_ran": False,
+        "subject_refs": [
+            row for row in (answers.get("subject_refs") or []) if isinstance(row, dict)
+        ],
         "called_comfy": False,
         "hermes_ran": False,
         "produced_mp4": False,

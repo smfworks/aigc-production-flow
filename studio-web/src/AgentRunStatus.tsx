@@ -17,7 +17,7 @@ function stepTitle(step: AgentStep): string {
 
 function stepState(step: AgentStep): string {
   if (step.kind === "stitch") {
-    if (step.produced_mp4) return "Concat file";
+    if (step.produced_mp4) return "Concat file · not completed";
     if (step.status === "planned" || step.status === "queued" || step.status === "running") return step.status;
     return "Awaiting stitch";
   }
@@ -71,7 +71,7 @@ export function AgentRunStatus({ runId, onError }: Props) {
         <span data-testid="flag-hermes">{hermes ? "Hermes reported a run" : "Hermes was not invoked"}</span>
         <span data-testid="flag-stitch">
           {run.stitch_state === "stitched"
-            ? "Stitch wrote a file"
+            ? "Stitch wrote a file. Not a completed episode."
             : run.stitch_state === "awaiting_stitch"
               ? "Awaiting stitch"
               : "Stitch pending"}

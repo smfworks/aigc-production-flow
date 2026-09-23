@@ -27,8 +27,26 @@ def _finish_hallway(client, auth) -> dict:
     _answers(client, auth, wizard_id, "format", format="short-drama")
     _answers(client, auth, wizard_id, "length", shot_count=2, target_length_s=20)
     _answers(client, auth, wizard_id, "tone", tone="quiet dusk", look="sodium practicals, no neon")
+    _answers(
+        client,
+        auth,
+        wizard_id,
+        "scope",
+        audience="late-night short drama",
+        deliverables="one 20s pilot, two hop-1 windows",
+        negative_constraints="none",
+    )
     _answers(client, auth, wizard_id, "cast", cast_notes="Mara — lead, tired eyes")
     _answers(client, auth, wizard_id, "audio", audio_notes="room tone, no score")
+    _answers(
+        client,
+        auth,
+        wizard_id,
+        "engines",
+        still_pref="comfy-qwen",
+        clip_pref="comfy-h3",
+        engine_mode="approve",
+    )
     saved = client.get(f"/api/create/wizard/{wizard_id}", headers=auth)
     assert saved.status_code == 200, saved.text
     body = saved.json()
@@ -89,6 +107,8 @@ def test_handoff_writes_stitch_brief_and_status_is_honest(client, auth):
     assert body["payload"]["honesty"]["called_comfy"] is False
     assert body["payload"]["honesty"]["hermes_ran"] is False
     assert body["payload"]["honesty"]["produced_mp4"] is False
+    assert body["payload"]["honesty"]["episode_completed"] is False
+    assert body["payload"]["honesty"]["cut_cleared"] is False
     kinds = [step["kind"] for step in body["run"]["steps"]]
     assert kinds[-1] == "stitch"
     assert "still-sheet" in kinds
@@ -201,6 +221,9 @@ def test_director_scope_lanes_checkpoints_and_tree_persist(client, auth):
         must_nots="no logos",
         platform_formats="9:16 only",
         claim_bans="no medical claims",
+        audience="vertical viewers",
+        deliverables="one 9:16 cut",
+        negative_constraints="no neon",
     )
     assert scoped["answers"]["platform_formats"] == ["9:16"]
     assert scoped["answers"]["must_nots"] == "no logos"
@@ -209,7 +232,15 @@ def test_director_scope_lanes_checkpoints_and_tree_persist(client, auth):
     assert scoped["director"]["executes"] is False
     _answers(client, auth, wizard_id, "cast", cast_notes="Mara — lead, tired eyes")
     _answers(client, auth, wizard_id, "audio", audio_notes="room tone, no score")
-    _answers(client, auth, wizard_id, "engines", still_pref="comfy-qwen", clip_pref="comfy-h3")
+    _answers(
+        client,
+        auth,
+        wizard_id,
+        "engines",
+        still_pref="comfy-qwen",
+        clip_pref="comfy-h3",
+        engine_mode="approve",
+    )
     finished = client.post(f"/api/create/wizard/{wizard_id}/finish", headers=auth)
     assert finished.status_code == 200, finished.text
     done = finished.json()
@@ -224,6 +255,9 @@ def test_director_scope_lanes_checkpoints_and_tree_persist(client, auth):
     assert items["gates-red"]["cleared"] is False
     assert items["hop1-unwatched"]["cleared"] is False
     assert items["no-signoff"]["cleared"] is False
+    assert done["director"]["execution_gates"]["brief"]["cleared"] is True
+    assert done["director"]["execution_gates"]["cut"]["cleared"] is False
+    assert done["director"]["execution_gates"]["cut"]["maps_to"] == "no-signoff"
     gate_ids = {row["id"] for row in done["director"]["checkpoints"]["gates"]}
     assert {
         "log-line",

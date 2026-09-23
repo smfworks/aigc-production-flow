@@ -1094,6 +1094,41 @@ a.btn {
   gap: 8px;
 }
 
+.prompt-preview,
+.coverage-form {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin: 12px 0;
+  display: grid;
+  gap: 8px;
+}
+
+.prompt-preview textarea,
+.coverage-form textarea,
+.prompt-preview select,
+.coverage-form input[type="number"] {
+  width: 100%;
+}
+
+.preview-refs {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.chip-status.is-stub {
+  margin-left: 8px;
+  color: #b45309;
+  border: 1px solid rgba(180, 83, 9, 0.45);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-style: normal;
+}
+
+.hint.warn {
+  color: #b45309;
+}
+
 .wizard-flags {
   display: flex;
   flex-wrap: wrap;

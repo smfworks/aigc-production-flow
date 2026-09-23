@@ -160,7 +160,18 @@ def generate_still(settings: Settings, ctx: JobContext, *, role: str) -> Adapter
         return _fail(str(exc), busy=exc.busy)
 
     seed = secrets.randbits(32)
-    graph = build_qwen_graph(prompt, width, height, seed, graph_files(settings))
+    workflow_id = str((ctx.payload or {}).get("workflow_id") or "").strip() if isinstance(ctx.payload, dict) else ""
+    if workflow_id:
+        from ..workflows import filled_graph
+
+        try:
+            graph = filled_graph(workflow_id, ctx.payload if isinstance(ctx.payload, dict) else {})
+        except Exception as exc:  # noqa: BLE001 — name the cause; do not submit
+            detail = getattr(exc, "detail", None)
+            message = detail if isinstance(detail, str) else str(exc)
+            return _fail(message or f"Role-tagged workflow {workflow_id} could not be filled.")
+    else:
+        graph = build_qwen_graph(prompt, width, height, seed, graph_files(settings))
     ctx.set_progress(15)
     try:
         prompt_id = client.submit_prompt(lane, graph, "smf-aigc-studio")
