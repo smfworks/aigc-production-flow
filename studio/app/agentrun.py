@@ -165,6 +165,17 @@ def _refuse_live(step: dict[str, Any]) -> None:
     )
 
 
+def _refuse_unpreviewed(step: dict[str, Any]) -> None:
+    step["status"] = "refused_live"
+    step["called_comfy"] = False
+    step["produced_mp4"] = False
+    step["job_id"] = ""
+    step["note"] = (
+        "This lane is live. Send to Hermes did not call Comfy. "
+        "Generate on the desk still opens a prompt preview first."
+    )
+
+
 def _enqueue_one(
     session: Session,
     run: AgentRun,
@@ -194,9 +205,11 @@ def _enqueue_one(
         if resolved != "stub":
             if hop1_enqueue_blockers(episode, shot):
                 _refuse_live(step)
-                recompute(run, steps)
-                session.commit()
-                return
+            else:
+                _refuse_unpreviewed(step)
+            recompute(run, steps)
+            session.commit()
+            return
         if shot is None:
             step["status"] = "skipped"
             step["note"] = "No shot row for this hop-1. Stitch still reads the playlist."
@@ -210,7 +223,8 @@ def _enqueue_one(
             job_type="clip-hop1",
             shot_id=shot.id,
             payload=payload,
-            allow_stub_fixture=resolved == "stub",
+            allow_stub_fixture=True,
+            fixture_without_preview=True,
             autocommit=False,
         )
     elif kind == "stitch":
@@ -223,12 +237,19 @@ def _enqueue_one(
             autocommit=False,
         )
     elif kind in {"still-sheet", "still-plate"}:
+        resolved = resolve_adapter_name(kind, get_settings(), project=project)
+        if resolved != "stub":
+            _refuse_unpreviewed(step)
+            recompute(run, steps)
+            session.commit()
+            return
         job = enqueue_job(
             session,
             episode=episode,
             user_name=user_name,
             job_type=kind,
             payload=payload,
+            fixture_without_preview=True,
             autocommit=False,
         )
     else:
