@@ -354,6 +354,7 @@ class MediaAssetOut(BaseModel):
     edit_row_id: str = ""
     lock_keywords: str = ""
     approved: bool = False
+    ref_role: str = ""
 
     model_config = {"from_attributes": True}
 
@@ -445,6 +446,8 @@ class ShotOut(BaseModel):
     action: str
     entities: str
     readiness: ShotReadiness
+    coverage: dict[str, Any] = Field(default_factory=dict)
+    continue_from_id: str = ""
     candidates: list[CandidateOut] = []
     hop1_required: bool = False
     preview: ContinuityReceiptOut | None = None
@@ -479,6 +482,39 @@ class JobEnqueue(BaseModel):
     job_type: JobType
     payload: dict[str, Any] = Field(default_factory=dict)
     adapter: str | None = None
+
+
+class PromptPreviewIn(BaseModel):
+    episode_id: str
+    shot_id: str | None = None
+    job_type: JobType
+    payload: dict[str, Any] = Field(default_factory=dict)
+    adapter: str | None = None
+
+
+class PromptDraftPatch(BaseModel):
+    prompt: str | None = None
+    negative: str | None = None
+
+
+class WorkflowRegisterIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    graph: dict[str, Any]
+
+
+class CoverageIn(BaseModel):
+    action: str = ""
+    dialogue: str = ""
+    scene_s: float | None = None
+    target_s: float = Field(default=8.0, gt=0, le=60)
+    min_s: float = Field(default=5.0, gt=0, le=60)
+    max_s: float = Field(default=10.0, gt=0, le=60)
+    continue_chain: bool = False
+    replace: bool = True
+
+
+class MediaRefRoleIn(BaseModel):
+    ref_role: str = ""
 
 
 class JobOut(BaseModel):

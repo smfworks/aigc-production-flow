@@ -48,6 +48,7 @@ from .routers import (
     shots,
     templates,
     wizard,
+    workflows,
 )
 from .schemas import MetaOut, UserOut
 from .seed import seed_default_org
@@ -77,8 +78,11 @@ def create_app() -> FastAPI:
     settings = get_settings()
     application = FastAPI(
         title="AIGC Studio Spine",
-        version="0.13.0",
+        version="0.14.0",
         description=(
+            "Phase 14 studio: role-tagged Comfy workflows, prompt preview before enqueue, "
+            "scene-to-clip coverage, and continue-from-previous when the workflow has (Input:video). "
+            "Stub and dry-run stay labeled. called_comfy stays false unless a live lane accepts a prompt. "
             "Phase 13 studio: director front door on the Create wizard. "
             "A prunable task tree, Writer/Art/Picture/Sound routing labels, director checkpoints, "
             "deliverable scope, and local Create recipes. The tree does not run Comfy or Hermes. "
@@ -128,6 +132,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(wizard.router)
+    application.include_router(workflows.router)
     application.include_router(create.router)
     application.include_router(projects.router)
     application.include_router(episodes.router)

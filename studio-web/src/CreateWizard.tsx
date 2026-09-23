@@ -86,6 +86,10 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
   const [clipPref, setClipPref] = useState("comfy-h3");
   const [mustNots, setMustNots] = useState("");
   const [claimBans, setClaimBans] = useState("");
+  const [audience, setAudience] = useState("");
+  const [deliverables, setDeliverables] = useState("");
+  const [negativeConstraints, setNegativeConstraints] = useState("");
+  const [clarify, setClarify] = useState<{ field: string; question: string }[] | null>(null);
   const [platformFormats, setPlatformFormats] = useState<string[]>([]);
   const [taskTree, setTaskTree] = useState<TaskNode[]>([]);
   const [recipes, setRecipes] = useState<CreateRecipe[]>([]);
@@ -122,6 +126,9 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
     if (textValue(answers, "clip_pref")) setClipPref(textValue(answers, "clip_pref"));
     setMustNots(textValue(answers, "must_nots"));
     setClaimBans(textValue(answers, "claim_bans"));
+    setAudience(textValue(answers, "audience"));
+    setDeliverables(textValue(answers, "deliverables"));
+    setNegativeConstraints(textValue(answers, "negative_constraints"));
     const formats = answers.platform_formats;
     setPlatformFormats(Array.isArray(formats) ? formats.map(String) : []);
     const tree = asTree(row.director?.task_tree);
@@ -181,7 +188,14 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
       const saved = await save(step, answers);
       if (saved?.director?.task_tree) setTaskTree(asTree(saved.director.task_tree));
       if (finish) {
+        const report = await api.clarifyWizard(wizard.id);
+        if (!report.ready && report.questions.length) {
+          setClarify(report.questions);
+          onNotice("Answer the brief questions before the crew lanes are written. Nothing was generated.");
+          return;
+        }
         const done = await api.finishWizard(wizard.id);
+        setClarify(null);
         setWizard(done);
         if (done.director?.task_tree) setTaskTree(asTree(done.director.task_tree));
         onNotice("Draft pack is in. Gates stay red. Nothing was generated.");
@@ -524,14 +538,52 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
           onSubmit={(event) => {
             event.preventDefault();
             void go("cast", {
+              audience,
+              deliverables,
+              negative_constraints: negativeConstraints,
               must_nots: mustNots,
               claim_bans: claimBans,
               platform_formats: platformFormats,
             });
           }}
         >
-          <p className="editor-label">Deliverables and must-nots</p>
-          <p className="hint">Optional. These notes travel with the pack and the brief. They do not clear a gate.</p>
+          <p className="editor-label">Brief, deliverables, and must-nots</p>
+          <p className="hint">
+            Audience and deliverables are asked again before the pack is created if they are still empty.
+            That pause is not a gate. Notes travel with the pack and the brief. They do not clear a gate.
+          </p>
+          <label className="field">
+            <span className="editor-label">Audience</span>
+            <input
+              value={audience}
+              onChange={(event) => setAudience(event.target.value)}
+              aria-label="Audience"
+              data-testid="wizard-audience"
+              placeholder="Who this is for"
+            />
+          </label>
+          <label className="field">
+            <span className="editor-label">Deliverables</span>
+            <textarea
+              rows={2}
+              value={deliverables}
+              onChange={(event) => setDeliverables(event.target.value)}
+              aria-label="Deliverables"
+              data-testid="wizard-deliverables"
+              placeholder="One 9:16 pilot. Two hop-1 windows."
+            />
+          </label>
+          <label className="field">
+            <span className="editor-label">Negative constraints</span>
+            <textarea
+              rows={2}
+              value={negativeConstraints}
+              onChange={(event) => setNegativeConstraints(event.target.value)}
+              aria-label="Negative constraints"
+              data-testid="wizard-negative"
+              placeholder="No neon. Write none if there are none."
+            />
+          </label>
           <label className="field">
             <span className="editor-label">Must not</span>
             <textarea
@@ -575,6 +627,9 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
               className="btn"
               onClick={() =>
                 void go("tone", {
+                  audience,
+                  deliverables,
+                  negative_constraints: negativeConstraints,
                   must_nots: mustNots,
                   claim_bans: claimBans,
                   platform_formats: platformFormats,
@@ -740,6 +795,86 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
           <p className="hint">{director?.checkpoints.note}</p>
           <CheckpointList director={director} />
           <CrewLanes director={director} />
+          {clarify ? (
+            <div className="prompt-preview" data-testid="wizard-clarify">
+              <p className="editor-label">Clarify before the crew lanes</p>
+              <p className="hint">
+                These questions are missing brief fields. They are not director checkpoints and they do not turn a
+                gate green.
+              </p>
+              <ul>
+                {clarify.map((row) => (
+                  <li key={row.field}>{row.question}</li>
+                ))}
+              </ul>
+              <label className="field">
+                <span className="editor-label">Audience</span>
+                <input value={audience} onChange={(event) => setAudience(event.target.value)} aria-label="Clarify audience" />
+              </label>
+              <label className="field">
+                <span className="editor-label">Deliverables</span>
+                <textarea rows={2} value={deliverables} onChange={(event) => setDeliverables(event.target.value)} aria-label="Clarify deliverables" />
+              </label>
+              <label className="field">
+                <span className="editor-label">Negative constraints</span>
+                <textarea
+                  rows={2}
+                  value={negativeConstraints}
+                  onChange={(event) => setNegativeConstraints(event.target.value)}
+                  aria-label="Clarify negative constraints"
+                />
+              </label>
+              <label className="field">
+                <span className="editor-label">Cast / references</span>
+                <textarea rows={2} value={castNotes} onChange={(event) => setCastNotes(event.target.value)} aria-label="Clarify cast" />
+              </label>
+              <div className="wizard-actions">
+                <button
+                  type="button"
+                  className="btn btn-go"
+                  disabled={busy}
+                  onClick={() =>
+                    void go(
+                      "checkpoints",
+                      {
+                        audience,
+                        deliverables,
+                        negative_constraints: negativeConstraints,
+                        must_nots: mustNots,
+                        claim_bans: claimBans,
+                        cast_notes: castNotes,
+                        task_tree: taskTree,
+                      },
+                      true,
+                    )
+                  }
+                >
+                  Save answers and check again
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  data-testid="wizard-acknowledge-gaps"
+                  onClick={() => {
+                    setBusy(true);
+                    void api
+                      .finishWizard(wizard.id, true)
+                      .then((done) => {
+                        setClarify(null);
+                        setWizard(done);
+                        if (done.director?.task_tree) setTaskTree(asTree(done.director.task_tree));
+                        onNotice("Pack created with the gaps you named. Gates stay red. Nothing was generated.");
+                      })
+                      .catch(onError)
+                      .finally(() => setBusy(false));
+                  }}
+                >
+                  Proceed with these gaps
+                </button>
+              </div>
+            </div>
+          ) : null}
           <div className="wizard-actions">
             <button type="button" className="btn" onClick={() => void go("tree", { task_tree: taskTree })}>
               Back

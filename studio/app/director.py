@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from .clarify import clarify_questions
 from .gates import GATE_DEFS, evaluate_gates, is_real_still_file
 
 PLATFORM_FORMATS = ("9:16", "16:9", "1:1", "4:5", "4:3")
@@ -287,6 +288,9 @@ def normalize_platform_formats(value: Any) -> list[str]:
 def normalize_scope(raw: dict[str, Any] | None) -> dict[str, Any]:
     src = raw if isinstance(raw, dict) else {}
     return {
+        "audience": str(src.get("audience") or "").strip()[:500],
+        "deliverables": str(src.get("deliverables") or "").strip()[:2000],
+        "negative_constraints": str(src.get("negative_constraints") or "").strip()[:2000],
         "must_nots": str(src.get("must_nots") or "").strip()[:2000],
         "platform_formats": normalize_platform_formats(src.get("platform_formats")),
         "claim_bans": str(src.get("claim_bans") or "").strip()[:2000],
@@ -295,9 +299,18 @@ def normalize_scope(raw: dict[str, Any] | None) -> dict[str, Any]:
 
 def scope_note(scope: dict[str, Any]) -> str:
     parts: list[str] = []
+    audience = str(scope.get("audience") or "").strip()
+    deliverables = str(scope.get("deliverables") or "").strip()
+    negative = str(scope.get("negative_constraints") or "").strip()
     must = str(scope.get("must_nots") or "").strip()
     bans = str(scope.get("claim_bans") or "").strip()
     formats = scope.get("platform_formats") or []
+    if audience:
+        parts.append(f"Audience: {audience}")
+    if deliverables:
+        parts.append(f"Deliverables: {deliverables}")
+    if negative:
+        parts.append(f"Negative constraints: {negative}")
     if must:
         parts.append(f"Must not: {must}")
     if formats:
@@ -535,6 +548,13 @@ def public_director(
             draft_sheets=draft_sheets,
             signed_off=signed_off,
         ),
+        "clarify": {
+            "questions": clarify_questions(answers),
+            "note": (
+                "Clarify-before-run asks for missing brief fields. "
+                "These are not gate checkpoints and they do not turn a gate green."
+            ),
+        },
         "agents_ran": False,
         "called_comfy": False,
         "hermes_ran": False,

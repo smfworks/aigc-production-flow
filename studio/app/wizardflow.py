@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from .agentbrief import build_agent_brief
+from .clarify import clarify_questions
 from .agentrun import build_steps, kickoff, recompute, resume_if_idle
 from .blankpack import pack_zip_bytes
 from .createflow import new_episode
@@ -271,6 +272,7 @@ def finish_session(
     *,
     user_name: str,
     unique_slug,
+    acknowledge_gaps: bool = False,
 ) -> tuple[WizardSession, Project, Episode, PackRevision]:
     if wizard.status in {"ready", "handed_off"} and wizard.episode_id and wizard.project_id:
         project = db.get(Project, wizard.project_id)
@@ -287,6 +289,21 @@ def finish_session(
         )
     if answers["format"] not in FORMATS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pick a format.")
+    questions = clarify_questions(answers)
+    if questions and not acknowledge_gaps and not answers.get("clarify_ack"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "clarify_required",
+                "message": (
+                    "Brief fields are missing. Answer them, or proceed with the gaps named. "
+                    "This pause is not a gate checkpoint."
+                ),
+                "questions": questions,
+            },
+        )
+    if acknowledge_gaps and questions:
+        answers = {**answers, "clarify_ack": True, "clarify_gaps": [row["field"] for row in questions]}
     pack, _honesty, people, answers = pack_from_answers(answers)
     title = str(pack.get("title") or "Untitled")[:200]
     project = Project(
@@ -341,6 +358,20 @@ def handoff_hermes(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Finish the wizard before sending to Hermes.",
+        )
+    answers = wizard.answers if isinstance(wizard.answers, dict) else {}
+    questions = clarify_questions(answers)
+    if questions and not answers.get("clarify_ack"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "clarify_required",
+                "message": (
+                    "Brief fields are still missing. Answer them before the handoff writes craft lanes. "
+                    "This pause is not a gate checkpoint."
+                ),
+                "questions": questions,
+            },
         )
     episode = db.get(Episode, wizard.episode_id)
     revision = db.get(PackRevision, wizard.revision_id)

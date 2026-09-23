@@ -1,8 +1,10 @@
-# Studio spine (Phase 13)
+# Studio spine (Phase 14)
 
 **Start here:** open Studio. The home screen asks what you want to make. Finish the wizard. **Send to Hermes** writes a brief. Download agent zip is the fallback.
 
 The wizard fills a draft pack: format, length, tone, deliverable scope, cast, audio, engines, a prunable task tree, then director checkpoints. Cast notes become identity **drafts**, not approvals. Gates stay red. No model is claimed. Unset Comfy lanes stay stub, and the handoff says so.
+
+Phase 14 sits under that door. Generate for a still or clip opens a prompt preview (edit, save draft, H3 rewrite when the workflow asks, or cancel) before anything is queued. Comfy workflows are imported by `(Input:role)` / `(Output:role)` titles, not hardcoded node ids. Break a scene into timed coverage clips on the board — a plan, not a render. Continue-from-previous stays off unless the workflow has `(Input:video)`. Audience, deliverables, and negative constraints are brief fields; missing ones pause Create before the crew lanes are written. That pause is not a gate. Reference roles on an upload are identity lock, motion, environment, or audio. Stub and dry-run stay labeled. Details: [CONTRIBUTING.md](../CONTRIBUTING.md) and [studio/README.md](../studio/README.md).
 
 The task tree follows script/beats → identity sheets → plates → hop-1 → stitch → review gates. Disable or delete a branch you will not use. That skip is written into the brief. The tree does not call Comfy or start Hermes. Writer, Art, Picture, and Sound are routing labels on the crew brief, not four agents that ran. Checkpoints list the real gates (log line through lock-diff) plus draft identities, missing plates, unwatched hop-1, and missing sign-off. Must-nots, platform formats, and claim bans are optional and land in pack notes and `agent-brief.json`. **Save recipe** writes local JSON (`skill_<name>_v0.1.json` under `data/recipes/` or `STUDIO_RECIPE_ROOT`). Load recipe prefills Create. There is no plaza.
 

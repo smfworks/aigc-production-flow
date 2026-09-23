@@ -200,6 +200,7 @@ export type MediaAsset = {
   edit_row_id?: string;
   lock_keywords?: string;
   approved?: boolean;
+  ref_role?: string;
 };
 
 export type EngineHonesty = {
@@ -445,6 +446,16 @@ export type Shot = {
   action: string;
   entities: string;
   readiness: ShotReadiness;
+  coverage?: {
+    plan_only?: boolean;
+    rendered?: boolean;
+    duration_s?: number;
+    dialogue?: string[];
+    dialogue_indexes?: number[];
+    action_indexes?: number[];
+    short?: boolean;
+  };
+  continue_from_id?: string;
   candidates: Candidate[];
   hop1_required?: boolean;
   preview?: ContinuityReceipt | null;
@@ -470,6 +481,57 @@ export type JobType = (typeof JOB_TYPES)[number];
 
 export const JOB_STATUSES = ["queued", "running", "succeeded", "failed", "cancelled"] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
+
+export type PromptRef = {
+  role: string;
+  label?: string;
+  value?: string;
+  ref_role?: string;
+  source?: string;
+  media_id?: string;
+};
+
+export type PromptPreview = {
+  id: string;
+  episode_id: string;
+  shot_id: string | null;
+  job_type: string;
+  adapter: string;
+  status: string;
+  prompt: string;
+  negative: string;
+  refs: PromptRef[];
+  live: boolean;
+  called_comfy: boolean;
+  stub: boolean;
+  cause: string;
+  workflow_id: string;
+  prompt_profile: string;
+  generate_enabled: boolean;
+  warning: string;
+  honesty: string;
+  continue: {
+    requested: boolean;
+    allowed: boolean;
+    warning: string;
+    has_video_input: boolean;
+    previous_shot_id: string;
+    video_resolved: boolean;
+  };
+  rewrite_source?: string;
+  model_ran?: boolean;
+};
+
+export type WorkflowSummary = {
+  id: string;
+  source: string;
+  prompt_profile: string;
+  has_video_input: boolean;
+  asks_h3: boolean;
+  note: string;
+};
+
+export type ClarifyQuestion = { field: string; question: string };
 
 export type Job = {
   id: string;

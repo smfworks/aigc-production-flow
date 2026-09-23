@@ -16,6 +16,9 @@ test("create wizard prunes a task tree, shows lanes and checkpoints, and reloads
   await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(page.getByTestId("wizard-scope")).toBeVisible();
+  await page.getByTestId("wizard-audience").fill("late-night viewers");
+  await page.getByTestId("wizard-deliverables").fill("one 9:16 cut");
+  await page.getByTestId("wizard-negative").fill("no neon");
   await page.getByTestId("wizard-must-nots").fill("no logos");
   await page.getByTestId("platform-9-16").check();
   await page.getByTestId("wizard-claim-bans").fill("no medical claims");

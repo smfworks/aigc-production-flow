@@ -297,6 +297,7 @@ class MediaAsset(Base):
     shot_id: Mapped[str] = mapped_column(String(36), default="")
     edit_row_id: Mapped[str] = mapped_column(String(80), default="")
     lock_keywords: Mapped[str] = mapped_column(Text, default="")
+    ref_role: Mapped[str] = mapped_column(String(32), default="")
 
     episode: Mapped[Episode] = relationship(back_populates="media")
 
@@ -320,6 +321,8 @@ class Shot(Base):
     action: Mapped[str] = mapped_column(Text, default="")
     entities: Mapped[str] = mapped_column(String(400), default="")
     readiness: Mapped[str] = mapped_column(String(20), default="draft")
+    coverage: Mapped[dict] = mapped_column(JSON, default=dict)
+    continue_from_id: Mapped[str] = mapped_column(String(36), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -399,6 +402,25 @@ class Job(Base):
     episode: Mapped[Episode] = relationship(back_populates="jobs", foreign_keys=[episode_id])
     shot: Mapped[Shot | None] = relationship(back_populates="jobs", foreign_keys=[shot_id])
     media: Mapped[MediaAsset | None] = relationship(foreign_keys=[media_id])
+
+
+class PromptDraft(Base):
+    """Prompt text shown before enqueue. A draft is not a job and not a render."""
+
+    __tablename__ = "prompt_drafts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    episode_id: Mapped[str] = mapped_column(ForeignKey("episodes.id"), nullable=False)
+    shot_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    job_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    adapter: Mapped[str] = mapped_column(String(80), default="stub")
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    body: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(120), default="local-dev")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
 
 
 class ContinuityReceipt(Base):

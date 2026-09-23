@@ -27,6 +27,15 @@ def _finish_hallway(client, auth) -> dict:
     _answers(client, auth, wizard_id, "format", format="short-drama")
     _answers(client, auth, wizard_id, "length", shot_count=2, target_length_s=20)
     _answers(client, auth, wizard_id, "tone", tone="quiet dusk", look="sodium practicals, no neon")
+    _answers(
+        client,
+        auth,
+        wizard_id,
+        "scope",
+        audience="late-night short drama",
+        deliverables="one 20s pilot, two hop-1 windows",
+        negative_constraints="none",
+    )
     _answers(client, auth, wizard_id, "cast", cast_notes="Mara — lead, tired eyes")
     _answers(client, auth, wizard_id, "audio", audio_notes="room tone, no score")
     saved = client.get(f"/api/create/wizard/{wizard_id}", headers=auth)
@@ -201,6 +210,9 @@ def test_director_scope_lanes_checkpoints_and_tree_persist(client, auth):
         must_nots="no logos",
         platform_formats="9:16 only",
         claim_bans="no medical claims",
+        audience="vertical viewers",
+        deliverables="one 9:16 cut",
+        negative_constraints="no neon",
     )
     assert scoped["answers"]["platform_formats"] == ["9:16"]
     assert scoped["answers"]["must_nots"] == "no logos"

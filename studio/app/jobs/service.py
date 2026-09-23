@@ -146,6 +146,23 @@ def enqueue_job(
         )
     shot = _require_shot(db, episode, shot_id, job_type)
     body = dict(payload) if isinstance(payload, dict) else {}
+    from ..promptpreview import consume_preview, mark_preview_enqueued, require_preview_or_raise
+
+    preview_id = str(body.get("preview_id") or "").strip()
+    if preview_id:
+        consumed = consume_preview(db, preview_id, episode, job_type)
+        body["prompt"] = consumed["prompt"]
+        body["negative"] = consumed["negative"]
+        body["refs"] = consumed["refs"]
+        body["workflow_id"] = consumed["workflow_id"]
+        body["preview_id"] = consumed["preview_id"]
+        body["called_comfy"] = False
+        if consumed["continue_requested"]:
+            body["continue_from"] = consumed["continue_from"] or "previous"
+        if not adapter:
+            adapter = consumed["adapter"] or None
+    else:
+        require_preview_or_raise(body, job_type)
     requested = adapter or (str(body.get("adapter") or "").strip() or None)
     from ..config import get_settings
 
@@ -156,6 +173,18 @@ def enqueue_job(
         resolved = "stub"
     else:
         resolved = resolve_adapter_name(job_type, cfg, requested=requested, project=episode.project)
+    from ..promptpreview import continue_decision
+
+    if str(body.get("continue_from") or "").strip() or body.get("continue"):
+        decision = continue_decision(episode, shot, body, live=resolved not in {"stub", "stitch"})
+        if decision["requested"] and not decision["allowed"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "continue_blocked",
+                    "message": decision["warning"] or "Continue-from-previous is disabled.",
+                },
+            )
     if job_type == "clip-hop1":
         stub_fixture = allow_stub_fixture and resolved == "stub"
         if stub_fixture:
@@ -210,6 +239,7 @@ def enqueue_job(
     )
     db.add(job)
     db.flush()
+    mark_preview_enqueued(db, str(body.get("preview_id") or ""))
     if not autocommit:
         return job
     db.commit()

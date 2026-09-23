@@ -1,10 +1,21 @@
-# AIGC studio API (Phase 13)
+# AIGC studio API (Phase 14)
 
 FastAPI spine. The front door is the Create wizard (`POST /api/create/wizard`, patch answers, `POST …/finish`). Scope, a prunable task tree, craft-lane labels, and director checkpoints are part of that door. Local recipes are `POST /api/create/recipes` and `recipe_id` on start. **Send to Hermes** (`POST /api/create/wizard/{id}/handoff/hermes`) writes a brief under the handoff root and returns a `hermes://` payload. It does not invoke Hermes or call Comfy. `GET /api/agent-runs/{id}` polls sheets, plates, hop-1 clips, and stitch. Disabled tree branches are skipped. Stitch does not invent an MP4.
 
 `POST /api/studio/start` (blank, template, or brain dump) stays. Edit with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) lists still jobs, then hop-1 clips, then stitch, and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
 
 Native ComfyUI: set `STUDIO_COMFY_STILL_LANES` (Qwen-Image) and `STUDIO_COMFY_CLIP_LANES` (MiniMax H3) to private URLs. Empty lanes stay stub / not live. Example names: `comfy.example.json`. MIT notice: [../NOTICE](../NOTICE).
+
+Phase 14 machine shop, still under the director desk:
+
+- **Role-tagged workflows.** `GET/POST /api/workflows` registers Comfy API-format JSON. Editable nodes are discovered from titles such as `Prompt (Input:prompt)` and `Clip (Output:video)`. Canonical roles: prompt, negative, width, height, character, location, image, video, audio, seed, duration (aliases such as `identity` → character). Node ids are not the contract. Builtins: `studio/fixtures/workflows/character-sheet.json` (H3 6-section profile) and `h3-extend.json` (video input). `STUDIO_WORKFLOW_ROOT` overrides the import directory. Import does not call Comfy.
+- **Prompt preview.** `POST /api/jobs/preview` shows the exact prompt, negative, and reference roles before a still or clip job. Patch, `…/rewrite` (only when the workflow title includes `(Profile:h3)`), or `…/cancel`. `POST /api/jobs` with `payload.preview_id` queues that draft. With `STUDIO_REQUIRE_PROMPT_PREVIEW` left on (the default), a still or clip enqueue without a preview returns 409 `preview_required`. Tests set the flag false so older callers keep working. A stub result is `outcome: fixture` and `called_comfy: false`.
+- **Shot coverage.** `POST /api/episodes/{id}/coverage` breaks a scene into clips of about 5–10 seconds and stores them on the edit list / board. `coverage.rendered` stays false. No MP4 is written.
+- **Continue-from-previous.** Set `continue_from` to `previous` or a shot id. Generate stays off, with a named warning, unless the selected workflow has `(Input:video)`. A fixture JSON receipt is not a video file. A live lane is not sent one.
+- **Clarify-before-run.** `GET /api/create/wizard/{id}/clarify`. Finish returns 409 `clarify_required` when audience, deliverables, cast refs, or negative constraints are missing. `?acknowledge_gaps=true` records the gaps and continues. This is not a gate checkpoint.
+- **Reference roles** on media: `identity-lock`, `motion`, `environment`, `audio`. They show up on the prompt preview. They are instructions, not receipts.
+
+Dry-run (`POST /api/adapters/{id}/dry-run`) says it did not enqueue. An unreachable live adapter names the cause and does not look like success.
 
 Also: ordered episodes, pack revision diff, review sign-off, identity store, media, shots, jobs, adapters, hop-1 preview desk, playlist scrubber, budget, audit, retention, EDL, vertical templates, org members, presence, multi-org lite, notifications, continuity, demo seed, backup, and optional builder handoff. Optional Celery. Optional OIDC.
 

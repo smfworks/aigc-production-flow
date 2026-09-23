@@ -55,4 +55,9 @@ def adapter_dry_run(adapter_id: str, _user: ReadUser) -> AdapterHealthOut:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown adapter {adapter_id}.",
         )
-    return AdapterHealthOut.model_validate(health_for(key))
+    report = health_for(key)
+    report["detail"] = (
+        "Dry-run only. This did not enqueue a generate and did not call Comfy. "
+        + str(report.get("detail") or "")
+    )
+    return AdapterHealthOut.model_validate(report)

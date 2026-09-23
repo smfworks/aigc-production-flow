@@ -32,6 +32,7 @@ def media_out(asset: MediaAsset) -> MediaAssetOut:
         edit_row_id=asset.edit_row_id or "",
         lock_keywords=asset.lock_keywords or "",
         approved=status == "approved",
+        ref_role=asset.ref_role or "",
     )
 
 
@@ -102,6 +103,8 @@ def shot_out(shot: Shot) -> ShotOut:
         action=shot.action or "",
         entities=shot.entities or "",
         readiness=shot.readiness,  # type: ignore[arg-type]
+        coverage=shot.coverage if isinstance(shot.coverage, dict) else {},
+        continue_from_id=shot.continue_from_id or "",
         candidates=[CandidateOut.model_validate(row) for row in shot.candidates],
         hop1_required=is_hop1_required(shot, pack) if shot.episode else False,
         preview=preview,

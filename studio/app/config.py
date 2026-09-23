@@ -89,6 +89,10 @@ class Settings(BaseSettings):
     hermes_drop: str = ""
     # Local Create recipes. Empty uses <media parent>/recipes (./data/recipes next to ./data/media).
     recipe_root: str = ""
+    # Role-tagged Comfy workflows. Empty uses <media parent>/workflows. Builtins still load from the repo.
+    workflow_root: str = ""
+    # Still and clip enqueue requires a prompt preview unless this is turned off.
+    require_prompt_preview: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

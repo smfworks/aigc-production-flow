@@ -186,8 +186,28 @@ def update_wizard(wizard_id: str, body: WizardPatchIn, user: MutateUser, db: DbD
     return _wizard_out(db, wizard)
 
 
+@router.get("/api/create/wizard/{wizard_id}/clarify")
+def clarify_wizard(wizard_id: str, user: ReadUser, db: DbDep) -> dict:
+    org = get_active_org(db, user)
+    wizard = get_session(db, wizard_id, org.id)
+    from ..clarify import clarify_questions
+
+    answers = wizard.answers if isinstance(wizard.answers, dict) else {}
+    questions = clarify_questions(answers)
+    return {
+        "questions": questions,
+        "ready": not questions or bool(answers.get("clarify_ack")),
+        "note": "Missing brief fields. Not a gate checkpoint. Answering does not generate.",
+    }
+
+
 @router.post("/api/create/wizard/{wizard_id}/finish", response_model=WizardOut)
-def finish_wizard(wizard_id: str, user: MutateUser, db: DbDep) -> WizardOut:
+def finish_wizard(
+    wizard_id: str,
+    user: MutateUser,
+    db: DbDep,
+    acknowledge_gaps: bool = False,
+) -> WizardOut:
     org = get_active_org(db, user)
     wizard = get_session(db, wizard_id, org.id)
     from .projects import _unique_slug
@@ -198,6 +218,7 @@ def finish_wizard(wizard_id: str, user: MutateUser, db: DbDep) -> WizardOut:
         wizard,
         user_name=user.name,
         unique_slug=_unique_slug,
+        acknowledge_gaps=acknowledge_gaps,
     )
     if not already:
         record(

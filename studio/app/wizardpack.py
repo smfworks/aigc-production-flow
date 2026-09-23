@@ -266,6 +266,9 @@ def normalize_answers(raw: dict[str, Any] | None) -> dict[str, Any]:
     }
     body.update(normalize_scope(src))
     body["task_tree"] = normalize_stored_tree(src.get("task_tree"), body)
+    body["clarify_ack"] = bool(src.get("clarify_ack"))
+    gaps = src.get("clarify_gaps")
+    body["clarify_gaps"] = [str(item) for item in gaps][:8] if isinstance(gaps, list) else []
     return body
 
 
@@ -357,11 +360,7 @@ def pack_from_answers(
         "still_pref": answers["still_pref"],
         "clip_pref": answers["clip_pref"],
     }
-    scope = {
-        "must_nots": answers["must_nots"],
-        "platform_formats": answers["platform_formats"],
-        "claim_bans": answers["claim_bans"],
-    }
+    scope = normalize_scope(answers)
     meta["notes"] = scope_note(scope)
     pack["studioMeta"] = meta
     director = public_director(

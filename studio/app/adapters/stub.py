@@ -49,6 +49,10 @@ def _receipt(kind: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
         "job": kind,
         "claim": STUB_CLAIM,
         "live_hook": "unset — stub only",
+        "stub": True,
+        "live": False,
+        "called_comfy": False,
+        "outcome": "fixture",
     }
     if extra:
         body.update(extra)

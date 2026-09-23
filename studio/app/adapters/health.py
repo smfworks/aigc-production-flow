@@ -247,9 +247,10 @@ def refuse_if_unhealthy(adapter_id: str, settings: Settings | None = None) -> di
         detail={
             "code": "adapter_unhealthy",
             "message": (
-                f"Live adapter {report['id']} is unhealthy. "
+                f"Live adapter {report['id']} is unreachable or invalid. "
+                f"Cause: {report.get('detail') or 'no cause reported'}. "
                 "Fix the hook or enqueue with adapter=stub. "
-                "Unset live hooks stay stub — this is a configured-but-down box."
+                "Unset live hooks stay stub. This is a configured-but-down box, not a silent success."
             ),
             "health": report,
         },

@@ -1,0 +1,37 @@
+{
+  "p20": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {"text": ""},
+    "_meta": {"title": "Prompt (Input:prompt)"}
+  },
+  "n21": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {"text": ""},
+    "_meta": {"title": "Negative (Input:negative)"}
+  },
+  "v30": {
+    "class_type": "LoadVideo",
+    "inputs": {"video": ""},
+    "_meta": {"title": "Previous clip (Input:video)"}
+  },
+  "a31": {
+    "class_type": "LoadAudio",
+    "inputs": {"audio": ""},
+    "_meta": {"title": "Bed (Input:audio)"}
+  },
+  "d32": {
+    "class_type": "PrimitiveFloat",
+    "inputs": {"value": 8},
+    "_meta": {"title": "Seconds (Input:duration)"}
+  },
+  "s33": {
+    "class_type": "KSampler",
+    "inputs": {"seed": 0},
+    "_meta": {"title": "Seed (Input:seed)"}
+  },
+  "o40": {
+    "class_type": "SaveVideo",
+    "inputs": {"filename_prefix": "extend"},
+    "_meta": {"title": "Clip (Output:video)"}
+  }
+}

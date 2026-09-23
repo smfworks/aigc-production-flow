@@ -8,7 +8,8 @@ from ..deps import DbDep, get_episode, touch
 from ..models import ContinuityReceipt, ENTITY_TYPES, Job, MEDIA_KINDS, MediaAsset, utcnow
 from ..packzip import safe_filename, slugify
 from ..rbac import PERM_IDENTITY, PERM_MEDIA, MediaOrIdentityUser, ReadUser, refuse_unless
-from ..schemas import MediaAssetOut
+from ..promptpreview import REF_ROLES
+from ..schemas import MediaAssetOut, MediaRefRoleIn
 from ..serializers import media_out
 from ..store import get_store
 
@@ -38,6 +39,7 @@ async def upload_media(
     entity_label: str = Form(""),
     entity_type: str = Form(""),
     notes: str = Form(""),
+    ref_role: str = Form(""),
 ) -> MediaAssetOut:
     episode = get_episode(db, episode_id, user)
     if kind not in MEDIA_KINDS:
@@ -52,6 +54,12 @@ async def upload_media(
     entity_kind = entity_type.strip()
     if kind == "costume" and not entity_kind:
         entity_kind = "costume"
+    role = ref_role.strip()
+    if role and role not in REF_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ref_role must be identity-lock, motion, environment, audio, or empty.",
+        )
     if entity_kind and entity_kind not in ENTITY_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -88,6 +96,7 @@ async def upload_media(
         entity_label=entity_label.strip(),
         entity_type=entity_kind,
         notes=notes.strip(),
+        ref_role=role,
         created_by=user.name,
     )
     db.add(asset)
@@ -110,6 +119,31 @@ async def upload_media(
         entity_id=asset.id,
         detail={"kind": kind, "original_name": original},
     )
+    db.commit()
+    db.refresh(asset)
+    return media_out(asset)
+
+
+@router.patch("/api/episodes/{episode_id}/media/{asset_id}", response_model=MediaAssetOut)
+def set_ref_role(
+    episode_id: str,
+    asset_id: str,
+    body: MediaRefRoleIn,
+    user: MediaOrIdentityUser,
+    db: DbDep,
+) -> MediaAssetOut:
+    episode = get_episode(db, episode_id, user)
+    asset = db.get(MediaAsset, asset_id)
+    if asset is None or asset.episode_id != episode.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found.")
+    role = body.ref_role.strip()
+    if role and role not in REF_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ref_role must be identity-lock, motion, environment, audio, or empty.",
+        )
+    asset.ref_role = role
+    episode.updated_at = utcnow()
     db.commit()
     db.refresh(asset)
     return media_out(asset)

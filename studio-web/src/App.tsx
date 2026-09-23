@@ -24,6 +24,7 @@ import type {
   IdentityStore as IdentityStoreData,
   Job,
   MediaAsset,
+  PromptPreview,
   Meta,
   PackDiff,
   PreviewDesk,
@@ -37,6 +38,7 @@ import type {
   VerticalTemplate,
 } from "./types.ts";
 import { REVIEW_COPY, REVIEW_STATES } from "./types.ts";
+import { PromptPreviewPanel } from "./PromptPreviewPanel.tsx";
 import { ShotBoard } from "./ShotBoard.tsx";
 import { TaskCenter } from "./TaskCenter.tsx";
 import { PreviewDesk as PreviewDeskPanel } from "./PreviewDesk.tsx";
@@ -980,6 +982,9 @@ function EpisodeView({
   const [entityType, setEntityType] = useState("");
   const [entity, setEntity] = useState("");
   const [mediaNotes, setMediaNotes] = useState("");
+  const [refRole, setRefRole] = useState("");
+  const [promptPreview, setPromptPreview] = useState<PromptPreview | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   const [identity, setIdentity] = useState<IdentityStoreData | null>(null);
   const [packDiff, setPackDiff] = useState<PackDiff | null>(null);
@@ -1047,7 +1052,23 @@ function EpisodeView({
   }
 
   async function enqueue(jobType: string, withShot = false) {
+    const previewTypes = new Set(["still-sheet", "still-plate", "clip-hop1", "clip-extend"]);
     try {
+      if (previewTypes.has(jobType)) {
+        const shot = shots.find((row) => row.id === selectedShotId);
+        const continueClip = withShot && shot?.join === "continue";
+        const preview = await api.previewJob({
+          episode_id: episodeId,
+          shot_id: withShot ? selectedShotId || undefined : undefined,
+          job_type: jobType,
+          payload: continueClip
+            ? { workflow_id: "h3-extend", continue_from: "previous" }
+            : {},
+        });
+        setPromptPreview(preview);
+        onNotice("Prompt preview is open. Nothing was queued.");
+        return;
+      }
       const job = await api.enqueueJob({
         episode_id: episodeId,
         shot_id: withShot ? selectedShotId || undefined : undefined,
@@ -1057,6 +1078,33 @@ function EpisodeView({
       await load();
     } catch (err) {
       onError(err);
+    }
+  }
+
+  async function confirmPreview(preview: PromptPreview) {
+    setPreviewBusy(true);
+    try {
+      if (preview.prompt !== promptPreview?.prompt || preview.negative !== promptPreview?.negative) {
+        await api.patchPreview(preview.id, { prompt: preview.prompt, negative: preview.negative });
+      }
+      const job = await api.enqueueJob({
+        episode_id: episodeId,
+        shot_id: preview.shot_id || undefined,
+        job_type: preview.job_type,
+        payload: { preview_id: preview.id },
+      });
+      setPromptPreview(null);
+      const stub = job.adapter === "stub" || job.result?.stub === true;
+      onNotice(
+        stub
+          ? `${job.job_type} queued as stub. Fixture receipt only. Comfy was not called.`
+          : `${job.job_type} → ${job.status} (adapter=${job.adapter})`,
+      );
+      await load();
+    } catch (err) {
+      onError(err);
+    } finally {
+      setPreviewBusy(false);
     }
   }
 
@@ -1155,7 +1203,7 @@ function EpisodeView({
 
   async function uploadMedia(file: File) {
     try {
-      await api.uploadMedia(episodeId, file, kind, entity.trim(), mediaNotes.trim(), entityType);
+      await api.uploadMedia(episodeId, file, kind, entity.trim(), mediaNotes.trim(), entityType, refRole);
       setEntity("");
       setMediaNotes("");
       onNotice(`Uploaded ${file.name} (${kind})`);
@@ -1487,6 +1535,15 @@ function EpisodeView({
             })
             .catch(onError);
         }}
+        onBreakScene={(body) => {
+          void api
+            .breakCoverage(episodeId, body)
+            .then((result) => {
+              setShots(result.shots);
+              onNotice(`${result.note} ${result.clip_count} clips.`);
+            })
+            .catch(onError);
+        }}
         onAddCandidate={(shotId, body) => {
           void api
             .addCandidate(episodeId, shotId, body)
@@ -1514,8 +1571,9 @@ function EpisodeView({
       <section className="panel">
         <h3>Jobs</h3>
         <p className="hint">
-          Path: green pack → batch-precheck → stub hop-1 → attach preview+receipt → preview-watched.
-          Adapter label is honest. Default worker is thread. Celery is opt-in.
+          Path: green pack → batch-precheck → prompt preview → stub or live hop-1 → attach preview+receipt → preview-watched.
+          Generate opens the exact prompt first. A stub result is a fixture, not a Comfy render.
+          Default worker is thread. Celery is opt-in.
           {adapterHealth.some((row) => row.live && !row.ok)
             ? " Live adapters in the strip that are down will 409 on enqueue — use stub or fix the hook."
             : ""}
@@ -1526,21 +1584,31 @@ function EpisodeView({
             Enqueue batch-precheck
           </button>
           <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("still-sheet")}>
-            Stub still-sheet
+            Generate still-sheet
           </button>
           <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("still-plate")}>
-            Stub still-plate
+            Generate still-plate
           </button>
           <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("clip-hop1", true)}>
-            Stub hop-1
+            Generate hop-1
           </button>
           <button type="button" className="btn" disabled={!can(me, "jobs")} onClick={() => void enqueue("clip-extend", true)}>
-            Stub clip-extend
+            Generate extend
           </button>
           <button type="button" className="btn" onClick={() => navigate({ page: "tasks" })}>
             Open Task Center
           </button>
         </div>
+        {promptPreview ? (
+          <PromptPreviewPanel
+            preview={promptPreview}
+            busy={previewBusy}
+            onPreview={setPromptPreview}
+            onGenerate={(preview) => void confirmPreview(preview)}
+            onClose={() => setPromptPreview(null)}
+            onError={onError}
+          />
+        ) : null}
         <JobTable
           jobs={jobs}
           onCancel={(job) => {
@@ -1692,6 +1760,13 @@ function EpisodeView({
               <option value="scene">scene</option>
               <option value="costume">costume</option>
             </select>
+            <select value={refRole} onChange={(event) => setRefRole(event.target.value)} aria-label="Reference role">
+              <option value="">reference role</option>
+              <option value="identity-lock">identity lock</option>
+              <option value="motion">motion</option>
+              <option value="environment">environment</option>
+              <option value="audio">audio</option>
+            </select>
             <input
               placeholder="Entity / take label"
               value={entity}
@@ -1744,7 +1819,27 @@ function EpisodeView({
                     {asset.kind === "sheet" || asset.kind === "plate"
                       ? ` · ${asset.approval_status || "draft"}`
                       : ""}
+                    {asset.ref_role ? ` · ${asset.ref_role}` : ""}
                   </span>
+                  <select
+                    aria-label={`Reference role for ${asset.original_name}`}
+                    value={asset.ref_role || ""}
+                    onChange={(event) => {
+                      const next = event.target.value;
+                      void api
+                        .setRefRole(episodeId, asset.id, next)
+                        .then((row) => {
+                          setMedia((current) => current.map((item) => (item.id === row.id ? row : item)));
+                        })
+                        .catch(onError);
+                    }}
+                  >
+                    <option value="">no role</option>
+                    <option value="identity-lock">identity lock</option>
+                    <option value="motion">motion</option>
+                    <option value="environment">environment</option>
+                    <option value="audio">audio</option>
+                  </select>
                 </li>
               ))}
             </ul>

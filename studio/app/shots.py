@@ -70,17 +70,27 @@ def refresh_readiness(shot: Shot) -> None:
 
 def _row_fields(raw: Any, index: int) -> dict[str, Any]:
     row = as_record(raw)
+    coverage = row.get("coverage") if isinstance(row.get("coverage"), dict) else {}
     return {
         "edit_row_id": str(row.get("id") or f"row-{index + 1}"),
         "sort_index": index,
-        "song_t": str(row.get("songT") or ""),
+        "song_t": str(row.get("songT") or "")[:40],
         "join": str(row.get("join") or ""),
         "take": str(row.get("take") or ""),
         "location_grade": str(row.get("locationGrade") or ""),
         "camera_verb": str(row.get("cameraVerb") or ""),
         "action": str(row.get("action") or ""),
         "entities": str(row.get("entities") or ""),
+        "coverage": coverage,
     }
+
+
+def _link_continue(shots: list[Shot]) -> None:
+    by_row = {shot.edit_row_id: shot for shot in shots}
+    for shot in shots:
+        coverage = shot.coverage if isinstance(shot.coverage, dict) else {}
+        prior = str(coverage.get("continue_from_edit_row") or "")
+        shot.continue_from_id = by_row[prior].id if prior and prior in by_row else ""
 
 
 def sync_shots_from_pack(db: Session, episode: Episode, revision: PackRevision) -> list[Shot]:
@@ -103,7 +113,14 @@ def sync_shots_from_pack(db: Session, episode: Episode, revision: PackRevision) 
         if shot.edit_row_id not in keep_ids:
             db.delete(shot)
     db.flush()
-    return list(episode.shots)
+    kept = (
+        db.query(Shot)
+        .filter(Shot.episode_id == episode.id, Shot.edit_row_id.in_(keep_ids))
+        .order_by(Shot.sort_index.asc())
+        .all()
+    )
+    _link_continue(kept)
+    return kept
 
 
 def known_entities(pack: dict[str, Any], media: list[MediaAsset]) -> list[tuple[str, str]]:

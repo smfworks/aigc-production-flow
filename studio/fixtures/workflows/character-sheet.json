@@ -1,0 +1,47 @@
+{
+  "c7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {"text": "", "clip": ["c1", 0]},
+    "_meta": {"title": "Positive (Input:prompt) (Profile:h3)"}
+  },
+  "c8": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {"text": ""},
+    "_meta": {"title": "Negative (Input:negative)"}
+  },
+  "w4": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {"width": 1344, "height": 768, "batch_size": 1},
+    "_meta": {"title": "Canvas width (Input:width)"}
+  },
+  "h4": {
+    "class_type": "EmptyLatentImage",
+    "inputs": {"width": 1344, "height": 768, "batch_size": 1},
+    "_meta": {"title": "Canvas height (Input:height)"}
+  },
+  "id9": {
+    "class_type": "LoadImage",
+    "inputs": {"image": ""},
+    "_meta": {"title": "Char Ref (Input:character)"}
+  },
+  "env2": {
+    "class_type": "LoadImage",
+    "inputs": {"image": ""},
+    "_meta": {"title": "Env Ref (Input:location)"}
+  },
+  "still3": {
+    "class_type": "LoadImage",
+    "inputs": {"image": ""},
+    "_meta": {"title": "Plate (Input:image)"}
+  },
+  "seed6": {
+    "class_type": "KSampler",
+    "inputs": {"seed": 0, "steps": 8},
+    "_meta": {"title": "Seed (Input:seed)"}
+  },
+  "out1": {
+    "class_type": "SaveImage",
+    "inputs": {"filename_prefix": "sheet"},
+    "_meta": {"title": "Sheet (Output:image)"}
+  }
+}
