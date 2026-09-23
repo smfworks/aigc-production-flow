@@ -29,7 +29,8 @@ test("create wizard prunes a task tree, shows lanes and checkpoints, and reloads
   await page.getByLabel("Audio and SFX notes").fill("room tone, no score");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByTestId("engine-honesty")).toContainText(/Comfy has not been called|stub/i);
-  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("This does not call Comfy.")).toBeVisible();
+  await page.getByTestId("wizard-approve-engines").click();
 
   await expect(page.getByTestId("task-tree")).toBeVisible();
   const plates = page.getByTestId("task-node-plates");
@@ -70,8 +71,12 @@ test("create wizard prunes a task tree, shows lanes and checkpoints, and reloads
     agent_run_id: string;
     gates_green: boolean;
     generate_ready: boolean;
+    answers: { engine_mode: string; still_pref: string; clip_pref: string };
     director: { agents_ran: boolean; called_comfy: boolean };
   };
+  expect(wizard.answers.engine_mode).toBe("approve");
+  expect(wizard.answers.still_pref).toBe("comfy-qwen");
+  expect(wizard.answers.clip_pref).toBe("comfy-h3");
   expect(wizard.gates_green).toBe(false);
   expect(wizard.generate_ready).toBe(false);
   expect(wizard.director.agents_ran).toBe(false);
