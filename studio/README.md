@@ -1,10 +1,12 @@
-# AIGC studio API (Phase 15)
+# AIGC studio API (Phase 16)
 
 FastAPI spine. The front door is the Create wizard (`POST /api/create/wizard`, patch answers, `POST …/finish`). Scope, a prunable task tree, craft-lane labels, and director checkpoints are part of that door. Local recipes are `POST /api/create/recipes` and `recipe_id` on start. **Send to Hermes** (`POST /api/create/wizard/{id}/handoff/hermes`) writes a brief under the handoff root and returns a `hermes://` payload. It does not invoke Hermes or call Comfy. `GET /api/agent-runs/{id}` polls sheets, plates, hop-1 clips, and stitch. Disabled tree branches are skipped. Stitch does not invent an MP4.
 
 `POST /api/studio/start` (blank, template, or brain dump) stays. Edit with `POST /api/episodes/{id}/pack/json`. Export an agent zip (`GET /api/episodes/{id}/export/agent`) lists still jobs, then hop-1 clips, then stitch, and does not call Comfy. Brain dump uses a deterministic template unless `STUDIO_LLM_BASE_URL` is set.
 
 Native ComfyUI: set `STUDIO_COMFY_STILL_LANES` (Qwen-Image) and `STUDIO_COMFY_CLIP_LANES` (MiniMax H3) to private URLs. Empty lanes stay stub / not live. Example names: `comfy.example.json`. MIT notice: [../NOTICE](../NOTICE).
+
+Phase 16 Comfy stubs, same desk. `docs/CLIP_BRIDGE_COMFY.md` is the widget guide. The API graphs are `studio/fixtures/clip_bridge/workflows/` (`resize_lock`, `qwen_t2i_sheet`, `qwen_edit_start`, `qwen_edit_end`, `h3_fl2va_api`, `h3_fl2va_native`). `GET /api/clip-bridge/workflows` lists inject paths and locked widgets. `POST …/inject` fills `_clip_bridge.inject` on a copy and does not queue. Prefer `h3_fl2va_api` for 2K / 10s. Qwen stays steps 25, cfg 1, euler, simple. Edit slots are `images.image_1` in the API JSON and `<image1>` in the prompt. Extract and stitch stay on ffmpeg. A stub file is not an MP4.
 
 Phase 15 clip bridge, same desk. `docs/CLIP_BRIDGE.md` is the only H3 continuity dialect.
 

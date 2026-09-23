@@ -1,6 +1,29 @@
 # Contributing
 
-Phase 15 is the CLIP_BRIDGE continuity bridge on the Phase 14 prompt preview. `docs/CLIP_BRIDGE.md` is the dialect. Fill its slots. Do not paraphrase locked continuity strings, and do not add a second H3 wrapper. Phase 14 is the Comfy / H3 machine shop under the Phase 13 director desk. Patterns are reimplemented here. Do not paste third-party graphs or agent trees into this repo.
+Phase 16 checks in the CLIP_BRIDGE Comfy API stubs. `docs/CLIP_BRIDGE_COMFY.md` is the widget guide. `docs/CLIP_BRIDGE.md` is still the prompt dialect, including §20. Fill its slots. Do not paraphrase locked continuity strings, and do not add a second H3 wrapper.
+
+Phase 15 is the continuity bridge on the Phase 14 prompt preview. Phase 14 is the Comfy / H3 machine shop under the Phase 13 director desk. Patterns are reimplemented here. Do not paste third-party graphs or agent trees into this repo.
+
+## CLIP_BRIDGE Comfy stubs
+
+Official API-format graphs live in `studio/fixtures/clip_bridge/workflows/`. `_clip_bridge` metadata stays on the file. Studio does not retitle those nodes with `(Input:role)`, because that would rewrite the pack. The Phase 14 registry still lists only role-tagged graphs. A stub id on `GET /api/workflows/{id}` is refused and points at `GET /api/clip-bridge/workflows/{id}`.
+
+`POST /api/clip-bridge/workflows/{id}/inject` copies the graph and writes `_clip_bridge.inject`. It does not POST `/prompt`. `called_comfy` stays false.
+
+Locked widgets, from `docs/CLIP_BRIDGE_COMFY.md`:
+
+- Qwen T2I and both edit graphs: steps 25, cfg 1, sampler euler, scheduler simple, denoise 1. Checked-in canvas 2560×1440.
+- Edit graphs: `TextEncodeQwenImage21.resolution` stays 0. API slots are `images.image_1`, `images.image_2`, `images.image_3`. Prompt text keeps `<image1>`.
+- `h3_fl2va_api` (preferred): `MinimaxHailuo03FirstLastFrameNode`, model MiniMax H3, duration 10, resolution 2K, watermark false, prompt expansion balanced.
+- `h3_fl2va_native`: `MiniMaxH3ImageToVideo`, checked-in 1344×768, length 243. 2560×1440 is the other pair the guide allows. first_frame and last_frame stay connected.
+
+The edit graphs' `_clip_bridge.inject` canvas paths are `14.inputs.width` and `14.inputs.height` (ImageScale). The prose map's `12.inputs.width` line does not match these files. Studio writes the paths on the file.
+
+If a stub fails to queue on ComfyUI, import the official template and patch widgets only (Qwen T2I, Qwen Edit, H3 FLF2V). Do not rebuild the graph.
+
+Extract and stitch stay on ffmpeg: `studio/scripts/clip_bridge_conform.sh` and CLIP_BRIDGE §12. Do not add those nodes to a Comfy stub.
+
+Live queue of this pack against a production Comfy machine is not this slice. The measured Qwen and H3 lane builders are unchanged. A job that names one of these stub ids is refused before submit.
 
 ## Role-tagged workflows
 

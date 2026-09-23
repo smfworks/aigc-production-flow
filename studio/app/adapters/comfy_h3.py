@@ -314,6 +314,12 @@ def start_clip(settings: Settings, ctx: JobContext) -> AdapterResult:
     if not prompt:
         return _fail("prompt must be a non-empty string")
     workflow_id = str(payload.get("workflow_id") or "").strip()
+    if workflow_id:
+        from ..clipbridge_workflows import role_registry_refusal
+
+        refusal = role_registry_refusal(workflow_id)
+        if refusal:
+            return _fail(refusal)
     continue_from = str(payload.get("continue_from") or "").strip()
     role_graph: dict[str, Any] | None = None
     if continue_from or workflow_id:

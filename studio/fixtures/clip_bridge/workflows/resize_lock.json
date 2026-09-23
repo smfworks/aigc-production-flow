@@ -1,0 +1,36 @@
+{
+  "_clip_bridge": {
+    "id": "resize_lock",
+    "step": "pixel_lock",
+    "purpose": "Force any still to story_lock width x height before it enters H3. Run on start.png and end_designed.png.",
+    "inject": [
+      "1.inputs.image",
+      "2.inputs.width",
+      "2.inputs.height",
+      "3.inputs.filename_prefix"
+    ]
+  },
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "start.png"
+    }
+  },
+  "2": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["1", 0],
+      "upscale_method": "lanczos",
+      "width": 2560,
+      "height": 1440,
+      "crop": "center"
+    }
+  },
+  "3": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": ["2", 0],
+      "filename_prefix": "clipbridge/01/start_locked"
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "_clip_bridge": {
+    "id": "h3_fl2va_api",
+    "step": "animate",
+    "purpose": "Hosted MiniMax H3 first+last frame, 10s, 2K. Preferred production graph.",
+    "official_template": "api_minimax_h3_flf2v.json",
+    "inject": [
+      "1.inputs.image",
+      "2.inputs.image",
+      "10.inputs.prompt",
+      "10.inputs.seed",
+      "20.inputs.filename_prefix"
+    ]
+  },
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "start.png"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "end_designed.png"
+    }
+  },
+  "3": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["1", 0],
+      "upscale_method": "lanczos",
+      "width": 2560,
+      "height": 1440,
+      "crop": "center"
+    }
+  },
+  "4": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": ["2", 0],
+      "upscale_method": "lanczos",
+      "width": 2560,
+      "height": 1440,
+      "crop": "center"
+    }
+  },
+  "10": {
+    "class_type": "MinimaxHailuo03FirstLastFrameNode",
+    "inputs": {
+      "first_frame": ["3", 0],
+      "last_frame": ["4", 0],
+      "model": "MiniMax H3",
+      "prompt": "How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot 1) aligns with the 10.00-second mark of the target video.\n\nintegrated_multimodal_description: [Shot 1] photoreal cinematic, live-action. Begin exactly from Picture 1. Hold the first second. One continuous uncut shot. Toward the end the differences narrow until Picture 2 at the 10.00-second mark.\n\noverall_soundscape: room tone and action foley only\nnon_diegetic_music: N/A",
+      "resolution": "2K",
+      "duration": 10,
+      "prompt_expansion_mode": "balanced",
+      "seed": 42,
+      "watermark": false
+    }
+  },
+  "20": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": ["10", 0],
+      "filename_prefix": "video/clipbridge/01/clip",
+      "format": "auto",
+      "codec": "auto"
+    }
+  }
+}

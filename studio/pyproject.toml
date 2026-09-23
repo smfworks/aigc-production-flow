@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aigc-studio"
-version = "0.15.0"
-description = "Phase 15 studio: CLIP_BRIDGE continuity on the prompt preview. Comfy lanes stay opt-in."
+version = "0.16.0"
+description = "Phase 16 studio: CLIP_BRIDGE Comfy stubs with locked widgets. Extract and stitch stay on ffmpeg."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"

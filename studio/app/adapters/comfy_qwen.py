@@ -141,13 +141,21 @@ def _fail(message: str, *, busy: bool = False) -> AdapterResult:
 def generate_still(settings: Settings, ctx: JobContext, *, role: str) -> AdapterResult:
     if ctx.cancel_requested():
         return AdapterResult(ok=False, adapter="comfy-qwen", error="cancelled")
-    prompt = _prompt_text(ctx.payload if isinstance(ctx.payload, dict) else {})
+    payload = ctx.payload if isinstance(ctx.payload, dict) else {}
+    prompt = _prompt_text(payload)
     if not prompt:
         return _fail("prompt must be a non-empty string")
     if len(prompt) > 100_000:
         return _fail("prompt is too long")
+    workflow_id = str(payload.get("workflow_id") or "").strip()
+    if workflow_id:
+        from ..clipbridge_workflows import role_registry_refusal
+
+        refusal = role_registry_refusal(workflow_id)
+        if refusal:
+            return _fail(refusal)
     try:
-        size_name, width, height = resolve_size(ctx.payload if isinstance(ctx.payload, dict) else {})
+        size_name, width, height = resolve_size(payload)
     except ComfyError as exc:
         return _fail(str(exc))
 
@@ -160,7 +168,6 @@ def generate_still(settings: Settings, ctx: JobContext, *, role: str) -> Adapter
         return _fail(str(exc), busy=exc.busy)
 
     seed = secrets.randbits(32)
-    workflow_id = str((ctx.payload or {}).get("workflow_id") or "").strip() if isinstance(ctx.payload, dict) else ""
     if workflow_id:
         from ..workflows import filled_graph
 
