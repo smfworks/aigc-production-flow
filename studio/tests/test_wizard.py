@@ -98,6 +98,8 @@ def test_handoff_writes_stitch_brief_and_status_is_honest(client, auth):
     assert body["payload"]["honesty"]["called_comfy"] is False
     assert body["payload"]["honesty"]["hermes_ran"] is False
     assert body["payload"]["honesty"]["produced_mp4"] is False
+    assert body["payload"]["honesty"]["episode_completed"] is False
+    assert body["payload"]["honesty"]["cut_cleared"] is False
     kinds = [step["kind"] for step in body["run"]["steps"]]
     assert kinds[-1] == "stitch"
     assert "still-sheet" in kinds
@@ -236,6 +238,9 @@ def test_director_scope_lanes_checkpoints_and_tree_persist(client, auth):
     assert items["gates-red"]["cleared"] is False
     assert items["hop1-unwatched"]["cleared"] is False
     assert items["no-signoff"]["cleared"] is False
+    assert done["director"]["execution_gates"]["brief"]["cleared"] is True
+    assert done["director"]["execution_gates"]["cut"]["cleared"] is False
+    assert done["director"]["execution_gates"]["cut"]["maps_to"] == "no-signoff"
     gate_ids = {row["id"] for row in done["director"]["checkpoints"]["gates"]}
     assert {
         "log-line",

@@ -259,6 +259,10 @@ export type DirectorView = {
     generate_ready: boolean;
     note: string;
   };
+  execution_gates?: {
+    brief: DirectorCheckpoint & { maps_to?: string };
+    cut: DirectorCheckpoint & { maps_to?: string };
+  };
   agents_ran: boolean;
   called_comfy: boolean;
   hermes_ran: boolean;

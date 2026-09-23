@@ -135,7 +135,8 @@ def recompute(run: AgentRun, steps: list[dict[str, Any]]) -> None:
     elif any(status in {"refused_live", "awaiting_gates"} for status in statuses) and run.stitch_state != "stitched":
         run.status = "awaiting_stitch" if run.stitch_state == "awaiting_stitch" else "blocked"
     elif statuses and all(status in _TERMINAL_OK for status in statuses):
-        run.status = "succeeded" if run.stitch_state == "stitched" else "awaiting_stitch"
+        # A concat file is a stitch result. It is not an episode Completed stamp.
+        run.status = "stitched" if run.stitch_state == "stitched" else "awaiting_stitch"
     else:
         run.status = run.status or "queued"
     run.plan = {"steps": copy.deepcopy(steps)}
@@ -308,7 +309,10 @@ def honesty_note(run: AgentRun) -> str:
     else:
         called = " Comfy was not called."
     if run.stitch_state == "stitched":
-        stitch = " Stitch wrote a local concat file."
+        stitch = (
+            " Stitch wrote a local concat file. That file does not mark the episode completed "
+            "and does not stamp generate-ok."
+        )
     elif run.stitch_state == "awaiting_stitch":
         stitch = " Stitch is awaiting a real concat. No MP4 was produced."
     else:

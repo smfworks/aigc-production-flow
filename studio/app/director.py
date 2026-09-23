@@ -499,9 +499,12 @@ def build_checkpoints(
             "label": "No reviewer/producer sign-off",
             "cleared": bool(signed_off),
             "detail": (
-                "A reviewer or producer has signed off."
+                "Cut is this sign-off. A stitch file does not close it."
                 if signed_off
-                else "generate-ok still needs a reviewer or producer sign-off."
+                else (
+                    "Cut is this sign-off. generate-ok still needs a reviewer or producer. "
+                    "A stitch file does not close Cut and does not mark the episode completed."
+                )
             ),
         },
     ]
@@ -522,7 +525,9 @@ def build_checkpoints(
         "generate_ready": False,
         "note": (
             "These checkpoints use the real gate matrix. "
-            "Create does not clear them and does not lower the bar."
+            "Brief is the structured intake pause. Cut is the existing sign-off. "
+            "Create does not clear them and does not lower the bar. "
+            "Prompt prose is not permission to generate."
         ),
     }
 
@@ -537,6 +542,8 @@ def public_director(
 ) -> dict[str, Any]:
     tree = tree_for(answers)
     scope = normalize_scope(answers)
+    questions = clarify_questions(answers)
+    brief_open = bool(questions) and not answers.get("clarify_ack")
     return {
         "scope": scope,
         "scope_note": scope_note(scope),
@@ -549,11 +556,39 @@ def public_director(
             signed_off=signed_off,
         ),
         "clarify": {
-            "questions": clarify_questions(answers),
+            "questions": questions,
             "note": (
                 "Clarify-before-run asks for missing brief fields. "
                 "These are not gate checkpoints and they do not turn a gate green."
             ),
+        },
+        "execution_gates": {
+            "brief": {
+                "id": "brief",
+                "label": "Brief",
+                "cleared": not brief_open,
+                "maps_to": "clarify",
+                "detail": (
+                    "Structured brief fields are filled or the gaps were named. "
+                    "Prompt prose is not permission to generate."
+                    if not brief_open
+                    else (
+                        "Audience, deliverables, cast, or a negative constraint is still empty. "
+                        "This pause is not a pack gate."
+                    )
+                ),
+            },
+            "cut": {
+                "id": "cut",
+                "label": "Cut",
+                "cleared": bool(signed_off),
+                "maps_to": "no-signoff",
+                "detail": (
+                    "Cut is the existing reviewer or producer sign-off. "
+                    "Hermes handoff still writes a brief while Cut is open. "
+                    "A stitch file does not close Cut or mark the episode completed."
+                ),
+            },
         },
         "agents_ran": False,
         "called_comfy": False,

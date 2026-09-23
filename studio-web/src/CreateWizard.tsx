@@ -796,6 +796,7 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
         <div className="wizard-card" data-testid="wizard-checkpoints">
           <p className="editor-label">Director checkpoints</p>
           <p className="hint">{director?.checkpoints.note}</p>
+          <ExecutionGates director={director} />
           <CheckpointList director={director} />
           <CrewLanes director={director} />
           {clarify ? (
@@ -903,6 +904,7 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
             been called. Hermes has not been started. {wizard.engines.note}
           </p>
           <CrewLanes director={director} />
+          <ExecutionGates director={director} />
           <CheckpointList director={director} />
           {locked ? (
             <TaskTree nodes={visibleTree} byId={byId} busy onToggle={() => undefined} onDelete={() => undefined} />
@@ -1031,6 +1033,26 @@ function CrewLanes({ director }: { director: DirectorView | undefined }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function ExecutionGates({ director }: { director: DirectorView | undefined }) {
+  const gates = director?.execution_gates;
+  if (!gates) return null;
+  return (
+    <ul className="checkpoint-list" data-testid="execution-gates">
+      {(["brief", "cut"] as const).map((key) => {
+        const row = gates[key];
+        return (
+          <li key={key} data-cleared={row.cleared ? "true" : "false"} data-testid={`execution-${key}`}>
+            <strong>
+              {row.cleared ? "Clear" : "Open"} · {row.label}
+            </strong>
+            <span>{row.detail}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

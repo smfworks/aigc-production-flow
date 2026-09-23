@@ -1,6 +1,11 @@
 """Phase 14: role tags, prompt preview, shot coverage, continue-from-previous."""
 
 import copy
+import shutil
+import subprocess
+from types import SimpleNamespace
+
+import pytest
 
 from app.adapters.role_workflow import fill_workflow, h3_profile_text, h3_sections, parse_workflow
 from app.config import get_settings
@@ -377,3 +382,96 @@ def test_ref_role_round_trip(client, auth):
     )
     roles = {ref["ref_role"] for ref in preview.json()["refs"] if ref.get("source") == "asset"}
     assert "environment" in roles
+
+
+def test_stitched_run_does_not_complete_the_episode(monkeypatch):
+    monkeypatch.setattr("app.agentrun.flag_modified", lambda *_args, **_kwargs: None)
+    from app.agentrun import honesty_note, recompute
+
+    run = SimpleNamespace(
+        status="queued",
+        called_comfy=False,
+        hermes_ran=False,
+        stitch_state="",
+        plan={},
+        updated_at=None,
+    )
+    recompute(
+        run,
+        [
+            {"kind": "clip-hop1", "status": "succeeded", "called_comfy": False},
+            {
+                "kind": "stitch",
+                "status": "succeeded",
+                "stitch_state": "stitched",
+                "produced_mp4": True,
+                "called_comfy": False,
+            },
+        ],
+    )
+    assert run.status == "stitched"
+    assert run.hermes_ran is False
+    note = honesty_note(run)
+    assert "does not mark the episode completed" in note
+    assert "generate-ok" in note
+
+
+def test_ffmpeg_concat_does_not_stamp_generate_ok(tmp_path, monkeypatch):
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        pytest.skip("ffmpeg is not on PATH")
+    clips = []
+    for name in ("a", "b"):
+        dest = tmp_path / f"{name}.mp4"
+        proc = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "color=c=black:s=64x64:d=0.2",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                str(dest),
+            ],
+            capture_output=True,
+            check=False,
+        )
+        if proc.returncode != 0 or not dest.is_file():
+            pytest.skip("ffmpeg could not write a tiny clip")
+        clips.append(dest)
+    monkeypatch.setattr(
+        "app.stitch.render_playlist",
+        lambda _episode: {
+            "format": "mp4",
+            "fps": 24,
+            "shots": [
+                {
+                    "sort_index": index,
+                    "edit_row_id": f"row-{index}",
+                    "take": "A",
+                    "join": "cut",
+                    "duration_s": 0.2,
+                    "frames": 5,
+                    "rec_in_tc": "00:00:00:00",
+                    "rec_out_tc": "00:00:00:05",
+                    "media_path": str(path),
+                }
+                for index, path in enumerate(clips)
+            ],
+        },
+    )
+    monkeypatch.setattr("app.stitch.get_settings", lambda: SimpleNamespace(media_path=tmp_path))
+    episode = SimpleNamespace(id="ep-stitch", review_state="draft")
+    from app.stitch import run_stitch
+
+    result = run_stitch(SimpleNamespace(id="job-stitch"), episode, lambda _progress: None)
+    assert result.ok is True
+    assert result.receipt["produced_mp4"] is True
+    assert result.receipt["episode_completed"] is False
+    assert result.receipt["generate_ok"] is False
+    assert result.receipt["called_comfy"] is False
+    assert episode.review_state == "draft"

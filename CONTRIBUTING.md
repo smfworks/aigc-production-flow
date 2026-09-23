@@ -71,7 +71,9 @@ Reference roles on an upload are `identity-lock`, `motion`, `environment`, or `a
 
 ## Honesty
 
-Stub receipts say `stub: true`, `live: false`, `called_comfy: false`, `outcome: fixture`. Dry-run text says it did not enqueue. An unreachable live adapter names the cause. Hermes handoff still writes `called_comfy`, `hermes_ran`, and `produced_mp4` as false. Stitch concats only local video files that exist.
+Stub receipts say `stub: true`, `live: false`, `called_comfy: false`, `outcome: fixture`. Dry-run text says it did not enqueue. An unreachable live adapter names the cause. Hermes handoff still writes `called_comfy`, `hermes_ran`, and `produced_mp4` as false. Stitch concats only local video files that exist. A concat file sets `episode_completed` and `generate_ok` to false. The agent run status is `stitched`, not a completed episode. Hermes keeps the handoff. Studio does not replace it with another agent runtime.
+
+Brief and Cut are labels on gates that already exist. Brief is the structured intake pause (audience, deliverables, cast, negative constraints). Cut is reviewer or producer sign-off. Prompt prose does not clear either one. Handoff still writes a brief while Cut is open, and that drop says `cut_cleared: false`.
 
 ## Deferred
 

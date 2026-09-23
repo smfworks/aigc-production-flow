@@ -87,3 +87,5 @@ Role-tagged Comfy workflows, prompt preview, shot coverage, and continue-from-pr
 - Coverage clips are a plan on the board (`rendered: false`). They do not invent video.
 - Continue-from-previous requires an `(Input:video)` role. A missing role disables Generate and names why.
 - Clarify-before-run asks for missing brief fields. It does not turn gates green.
+- Brief is that structured pause. Cut is the existing sign-off. Prompt prose is not permission to generate.
+- A stitch file does not mark the episode completed and does not stamp generate-ok. Hermes stays the handoff, not a second runtime.
