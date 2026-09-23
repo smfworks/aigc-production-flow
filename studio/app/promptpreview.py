@@ -20,6 +20,7 @@ from .config import get_settings
 from .models import Episode, PromptDraft, Shot, utcnow
 from .precheck import hop1_enqueue_blockers
 from .preview import extend_ok, receipt_blockers
+from .mentions import asset_mention_refs, mention_tokens
 from .workflows import filled_graph, get_workflow, workflow_has_video_input
 
 GENERATE_TYPES = {"still-sheet", "still-plate", "clip-hop1", "clip-extend"}
@@ -103,6 +104,22 @@ def _refs(episode: Episode, shot: Shot | None, payload: dict[str, Any]) -> list[
                 "value": asset.original_name,
                 "media_id": asset.id,
                 "source": "asset",
+            }
+        )
+    mentioned, unresolved = asset_mention_refs(_text(payload.get("prompt") or payload.get("text")), list(episode.media))
+    seen = {str(row.get("media_id") or "") for row in rows}
+    for ref in mentioned:
+        if ref.get("media_id") and str(ref["media_id"]) in seen:
+            continue
+        rows.append(ref)
+    if unresolved and mention_tokens(_text(payload.get("prompt") or payload.get("text"))):
+        rows.append(
+            {
+                "role": "",
+                "label": ", ".join(f"@{token}" for token in unresolved),
+                "value": "",
+                "source": "mention",
+                "bound": False,
             }
         )
     return rows
@@ -245,7 +262,7 @@ def build_preview(
     pack = _pack(episode)
     prompt = _base_prompt(body, episode, shot)
     negative = _negative(body, pack)
-    refs = _refs(episode, shot, body)
+    refs = _refs(episode, shot, {**body, "prompt": prompt})
     workflow_id = _text(body.get("workflow_id"))
     contract: dict[str, Any] = {}
     if workflow_id:
@@ -284,6 +301,12 @@ def build_preview(
     if gate:
         generate_enabled = False
         warning = warning or gate
+    unbound = [str(ref.get("label") or "") for ref in refs if ref.get("source") == "mention" and ref.get("bound") is False]
+    if unbound:
+        mention_warning = (
+            f"{unbound[0]} has no sheet or plate slot. The mention was not bound. Nothing was created."
+        )
+        warning = f"{warning} {mention_warning}".strip() if warning else mention_warning
     profile = contract.get("prompt_profile") or ""
     sections = None
     if profile == "h3":

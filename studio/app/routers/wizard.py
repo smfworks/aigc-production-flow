@@ -190,13 +190,13 @@ def update_wizard(wizard_id: str, body: WizardPatchIn, user: MutateUser, db: DbD
 def clarify_wizard(wizard_id: str, user: ReadUser, db: DbDep) -> dict:
     org = get_active_org(db, user)
     wizard = get_session(db, wizard_id, org.id)
-    from ..clarify import clarify_questions
+    from ..clarify import open_questions
 
     answers = wizard.answers if isinstance(wizard.answers, dict) else {}
-    questions = clarify_questions(answers)
+    questions = open_questions(answers, acknowledge_gaps=bool(answers.get("clarify_ack")))
     return {
         "questions": questions,
-        "ready": not questions or bool(answers.get("clarify_ack")),
+        "ready": not questions,
         "note": "Missing brief fields. Not a gate checkpoint. Answering does not generate.",
     }
 

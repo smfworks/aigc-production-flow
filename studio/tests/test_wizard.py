@@ -38,6 +38,15 @@ def _finish_hallway(client, auth) -> dict:
     )
     _answers(client, auth, wizard_id, "cast", cast_notes="Mara — lead, tired eyes")
     _answers(client, auth, wizard_id, "audio", audio_notes="room tone, no score")
+    _answers(
+        client,
+        auth,
+        wizard_id,
+        "engines",
+        still_pref="comfy-qwen",
+        clip_pref="comfy-h3",
+        engine_mode="approve",
+    )
     saved = client.get(f"/api/create/wizard/{wizard_id}", headers=auth)
     assert saved.status_code == 200, saved.text
     body = saved.json()
@@ -223,7 +232,15 @@ def test_director_scope_lanes_checkpoints_and_tree_persist(client, auth):
     assert scoped["director"]["executes"] is False
     _answers(client, auth, wizard_id, "cast", cast_notes="Mara — lead, tired eyes")
     _answers(client, auth, wizard_id, "audio", audio_notes="room tone, no score")
-    _answers(client, auth, wizard_id, "engines", still_pref="comfy-qwen", clip_pref="comfy-h3")
+    _answers(
+        client,
+        auth,
+        wizard_id,
+        "engines",
+        still_pref="comfy-qwen",
+        clip_pref="comfy-h3",
+        engine_mode="approve",
+    )
     finished = client.post(f"/api/create/wizard/{wizard_id}/finish", headers=auth)
     assert finished.status_code == 200, finished.text
     done = finished.json()

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from .mentions import unresolved_mentions
+
+_ACK_FIELDS = {"audience", "deliverables", "cast_notes", "negative_constraints"}
+
 
 def clarify_questions(answers: dict[str, Any] | None) -> list[dict[str, str]]:
     """Pause before craft lanes when the brief is missing required intake.
@@ -44,4 +48,36 @@ def clarify_questions(answers: dict[str, Any] | None) -> list[dict[str, str]]:
                 "question": "Any negative constraints or must-nots? Write them, or write none.",
             }
         )
+    missing = unresolved_mentions(src)
+    if missing:
+        listed = ", ".join(f"@{token}" for token in missing)
+        questions.append(
+            {
+                "field": "mentions",
+                "question": (
+                    f"{listed} has no identity or plate slot. "
+                    "Add that name to the cast, or remove the mention. "
+                    "A mention does not create an asset."
+                ),
+            }
+        )
+    if str(src.get("engine_mode") or "ask").strip().lower() != "approve":
+        questions.append(
+            {
+                "field": "engines",
+                "question": (
+                    "Approve the still and clip lanes before the crew brief is written. "
+                    "Ask stays open until you do. Approving does not call Comfy, and unset lanes stay stub."
+                ),
+            }
+        )
+    return questions
+
+
+def open_questions(answers: dict[str, Any] | None, *, acknowledge_gaps: bool = False) -> list[dict[str, str]]:
+    """Content gaps can be acknowledged. Mentions and lane approval cannot."""
+    questions = clarify_questions(answers)
+    src = answers if isinstance(answers, dict) else {}
+    if acknowledge_gaps or src.get("clarify_ack"):
+        return [row for row in questions if row["field"] not in _ACK_FIELDS]
     return questions

@@ -122,6 +122,10 @@ def _ready_wizard(client, auth) -> dict:
         ),
         ("cast", {"cast_notes": "Mara — lead"}),
         ("audio", {"audio_notes": "room tone"}),
+        (
+            "engines",
+            {"still_pref": "stub", "clip_pref": "stub", "engine_mode": "approve"},
+        ),
     ):
         patched = client.patch(
             f"/api/create/wizard/{wizard_id}",
@@ -154,9 +158,21 @@ def test_clarify_blocks_finish_until_the_brief_is_answered(client, auth):
     fields = {row["field"] for row in detail["questions"]}
     assert "audience" in fields
     assert "deliverables" in fields
+    assert "engines" in fields
     paused = client.get(f"/api/create/wizard/{wizard_id}/clarify", headers=auth)
     assert paused.status_code == 200
     assert paused.json()["ready"] is False
+    still_asking = client.post(
+        f"/api/create/wizard/{wizard_id}/finish?acknowledge_gaps=true",
+        headers=auth,
+    )
+    assert still_asking.status_code == 409, still_asking.text
+    assert {row["field"] for row in still_asking.json()["detail"]["questions"]} == {"engines"}
+    client.patch(
+        f"/api/create/wizard/{wizard_id}",
+        headers=auth,
+        json={"step": "engines", "answers": {"engine_mode": "approve"}},
+    )
     acknowledged = client.post(
         f"/api/create/wizard/{wizard_id}/finish?acknowledge_gaps=true",
         headers=auth,
@@ -382,6 +398,81 @@ def test_ref_role_round_trip(client, auth):
     )
     roles = {ref["ref_role"] for ref in preview.json()["refs"] if ref.get("source") == "asset"}
     assert "environment" in roles
+
+
+def test_at_mention_binds_only_an_existing_cast_slot(client, auth):
+    started = client.post(
+        "/api/create/wizard",
+        headers=auth,
+        json={"prompt": "@Mara waits. @Kite does not."},
+    )
+    wizard_id = started.json()["id"]
+    for step, answers in (
+        ("format", {"format": "custom"}),
+        ("length", {"shot_count": 1, "target_length_s": 8}),
+        ("tone", {"tone": "quiet"}),
+        (
+            "scope",
+            {
+                "audience": "editors",
+                "deliverables": "one still",
+                "negative_constraints": "none",
+            },
+        ),
+        ("cast", {"cast_notes": "Mara — lead"}),
+        ("engines", {"engine_mode": "approve"}),
+    ):
+        patched = client.patch(
+            f"/api/create/wizard/{wizard_id}",
+            headers=auth,
+            json={"step": step, "answers": answers},
+        )
+        assert patched.status_code == 200, patched.text
+    refs = {row["token"]: row for row in patched.json()["answers"]["subject_refs"]}
+    assert refs["Mara"]["bound"] is True
+    assert refs["Mara"]["role"] == "identity"
+    assert refs["Kite"]["bound"] is False
+    blocked = client.post(f"/api/create/wizard/{wizard_id}/finish", headers=auth)
+    assert blocked.status_code == 409
+    assert any(row["field"] == "mentions" for row in blocked.json()["detail"]["questions"])
+    fixed = client.patch(
+        f"/api/create/wizard/{wizard_id}",
+        headers=auth,
+        json={"step": "prompt", "answers": {"prompt": "@Mara waits in the hall."}},
+    )
+    assert fixed.status_code == 200, fixed.text
+    done = client.post(f"/api/create/wizard/{wizard_id}/finish", headers=auth)
+    assert done.status_code == 200, done.text
+    assert "@Mara (identity draft)" in done.json()["director"]["scope_note"]
+    assert done.json()["director"]["called_comfy"] is False
+
+
+def test_prompt_preview_binds_at_mention_to_a_sheet(client, auth):
+    done = _ready_wizard(client, auth)
+    episode_id = done["episode_id"]
+    uploaded = client.post(
+        f"/api/episodes/{episode_id}/media",
+        headers=auth,
+        data={"kind": "sheet", "entity_label": "Mara"},
+        files={"file": ("mara.txt", b"sheet notes", "text/plain")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    preview = client.post(
+        "/api/jobs/preview",
+        headers=auth,
+        json={
+            "episode_id": episode_id,
+            "job_type": "still-sheet",
+            "payload": {"prompt": "@Mara in the hall. @Nope stays unbound."},
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    bound = [ref for ref in body["refs"] if ref.get("source") == "mention" and ref.get("bound")]
+    assert bound and bound[0]["label"] == "Mara"
+    assert bound[0]["slot"] == "sheet"
+    assert "@Nope" in body["warning"]
+    assert body["called_comfy"] is False
 
 
 def test_stitched_run_does_not_complete_the_episode(monkeypatch):

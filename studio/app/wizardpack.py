@@ -263,7 +263,11 @@ def normalize_answers(raw: dict[str, Any] | None) -> dict[str, Any]:
         "audio_notes": str(src.get("audio_notes") or "").strip()[:2000],
         "still_pref": still_pref,
         "clip_pref": clip_pref,
+        "engine_mode": "approve" if str(src.get("engine_mode") or "").strip().lower() == "approve" else "ask",
     }
+    from .mentions import bind_subject_mentions
+
+    body["subject_refs"] = bind_subject_mentions(body["prompt"], body["cast_notes"])
     body.update(normalize_scope(src))
     body["task_tree"] = normalize_stored_tree(src.get("task_tree"), body)
     body["clarify_ack"] = bool(src.get("clarify_ack"))
@@ -361,7 +365,13 @@ def pack_from_answers(
         "clip_pref": answers["clip_pref"],
     }
     scope = normalize_scope(answers)
-    meta["notes"] = scope_note(scope)
+    note = scope_note(scope)
+    bound = [row for row in answers.get("subject_refs") or [] if isinstance(row, dict) and row.get("bound")]
+    if bound:
+        listed = ", ".join(f"@{row['token']} (identity draft)" for row in bound)
+        note = f"{note}\nSubject refs: {listed}".strip()
+    meta["notes"] = note
+    meta["wizard"]["engine_mode"] = answers["engine_mode"]
     pack["studioMeta"] = meta
     director = public_director(
         answers,

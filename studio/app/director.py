@@ -544,9 +544,14 @@ def public_director(
     scope = normalize_scope(answers)
     questions = clarify_questions(answers)
     brief_open = bool(questions) and not answers.get("clarify_ack")
+    note = scope_note(scope)
+    bound_refs = [row for row in (answers.get("subject_refs") or []) if isinstance(row, dict) and row.get("bound")]
+    if bound_refs:
+        listed = ", ".join(f"@{row['token']} (identity draft)" for row in bound_refs)
+        note = f"{note}\nSubject refs: {listed}".strip()
     return {
         "scope": scope,
-        "scope_note": scope_note(scope),
+        "scope_note": note,
         "task_tree": tree,
         "craft_lanes": craft_lanes(answers, tree),
         "checkpoints": build_checkpoints(
@@ -591,6 +596,9 @@ def public_director(
             },
         },
         "agents_ran": False,
+        "subject_refs": [
+            row for row in (answers.get("subject_refs") or []) if isinstance(row, dict)
+        ],
         "called_comfy": False,
         "hermes_ran": False,
         "produced_mp4": False,

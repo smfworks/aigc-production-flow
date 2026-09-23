@@ -385,6 +385,9 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
               data-testid="wizard-prompt"
             />
           </label>
+          <p className="hint">
+            @Name binds to a cast identity when that name is already a slot. It does not create a plate.
+          </p>
           <button type="submit" className="btn btn-go" disabled={busy || !can(me, "mutate")} data-testid="wizard-continue">
             Continue
           </button>
@@ -717,7 +720,7 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
           className="wizard-card"
           onSubmit={(event) => {
             event.preventDefault();
-            void go("tree", { still_pref: stillPref, clip_pref: clipPref });
+            void go("tree", { still_pref: stillPref, clip_pref: clipPref, engine_mode: "approve" });
           }}
         >
           <p className="editor-label">Engines</p>
@@ -755,9 +758,10 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
             <button type="button" className="btn" onClick={() => void go("audio", { still_pref: stillPref, clip_pref: clipPref })}>
               Back
             </button>
-            <button type="submit" className="btn btn-go" disabled={busy || !can(me, "mutate")}>
+            <button type="submit" className="btn btn-go" disabled={busy || !can(me, "mutate")} data-testid="wizard-approve-engines">
               Continue
             </button>
+            <p className="hint">Continuing approves these lanes. Ask stays open until you do. This does not call Comfy.</p>
           </div>
         </form>
       ) : null}
@@ -796,6 +800,7 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
         <div className="wizard-card" data-testid="wizard-checkpoints">
           <p className="editor-label">Director checkpoints</p>
           <p className="hint">{director?.checkpoints.note}</p>
+          <SubjectRefs answers={wizard.answers} />
           <ExecutionGates director={director} />
           <CheckpointList director={director} />
           <CrewLanes director={director} />
@@ -855,6 +860,34 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
                 >
                   Save answers and check again
                 </button>
+                {clarify.some((row) => row.field === "engines") ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busy}
+                    data-testid="wizard-approve-engines"
+                    onClick={() =>
+                      void go(
+                        "checkpoints",
+                        {
+                          audience,
+                          deliverables,
+                          negative_constraints: negativeConstraints,
+                          must_nots: mustNots,
+                          claim_bans: claimBans,
+                          cast_notes: castNotes,
+                          task_tree: taskTree,
+                          still_pref: stillPref,
+                          clip_pref: clipPref,
+                          engine_mode: "approve",
+                        },
+                        true,
+                      )
+                    }
+                  >
+                    Approve these lanes
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="btn"
@@ -904,6 +937,7 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
             been called. Hermes has not been started. {wizard.engines.note}
           </p>
           <CrewLanes director={director} />
+          <SubjectRefs answers={wizard.answers} />
           <ExecutionGates director={director} />
           <CheckpointList director={director} />
           {locked ? (
@@ -1033,6 +1067,22 @@ function CrewLanes({ director }: { director: DirectorView | undefined }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function SubjectRefs({ answers }: { answers: Record<string, unknown> | undefined }) {
+  const refs = Array.isArray(answers?.subject_refs) ? answers.subject_refs : [];
+  const rows = refs.filter((row): row is { token?: string; bound?: boolean; role?: string } => !!row && typeof row === "object");
+  if (!rows.length) return null;
+  return (
+    <ul className="checkpoint-list" data-testid="subject-refs">
+      {rows.map((row) => (
+        <li key={String(row.token)} data-bound={row.bound ? "true" : "false"}>
+          <strong>@{row.token}</strong>
+          <span>{row.bound ? "identity draft" : "no slot"}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

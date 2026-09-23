@@ -63,7 +63,11 @@ The plan is written onto the edit list and the board. `coverage.rendered` stays 
 
 ## Clarify before the crew lanes
 
-Create asks for audience, deliverables, cast notes, and a negative constraint (must-nots, claim bans, or the negative field). Finish returns 409 `clarify_required` while any of those are empty. `?acknowledge_gaps=true` records the gaps and continues. The same check blocks Hermes handoff until the gaps are answered or acknowledged.
+Create asks for audience, deliverables, cast notes, and a negative constraint (must-nots, claim bans, or the negative field). Finish returns 409 `clarify_required` while any of those are empty. `?acknowledge_gaps=true` records those content gaps and continues. `@Name` in the prompt binds to a cast identity only when that name is already a slot, and to a sheet or plate on a job preview only when that asset exists. An unmatched mention stays a question. Acknowledging content gaps does not bind it and does not create an asset.
+
+Still and clip lanes stay in ask mode until `engine_mode` is `approve`. The engines step records that approval. Approving does not call Comfy, and unset lanes stay stub. Lane approval is not skipped by acknowledging content gaps.
+
+The same check blocks Hermes handoff until the gaps are answered or acknowledged and the lanes are approved.
 
 This pause is not a gate. It does not turn checkpoints green.
 
