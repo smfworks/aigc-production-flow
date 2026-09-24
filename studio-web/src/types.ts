@@ -383,6 +383,56 @@ export type Meta = {
   llm_configured?: boolean;
   llm_note?: string;
   primary_create?: string;
+  imagine_configured?: boolean;
+};
+
+export type ImagineShot = {
+  id: string;
+  prompt_still: string;
+  prompt_motion: string;
+  duration_sec?: number;
+  beat?: string;
+  start_state?: string;
+  end_state?: string;
+  camera?: { scale?: string; angle?: string; move?: string; exit_frame?: string };
+};
+
+export type ImaginePlan = {
+  title?: string;
+  logline?: string;
+  aspect_ratio?: string;
+  resolution?: string;
+  look_bible?: Record<string, string>;
+  beat_map?: { role: string; summary: string }[];
+  shots: ImagineShot[];
+};
+
+export type QuickPlanResponse = {
+  plan: ImaginePlan;
+  called_comfy: boolean;
+  called_imagine: boolean;
+  produced_mp4: boolean;
+  estimated_cost_units: number;
+};
+
+export type QuickStatus = {
+  run_id: string;
+  status: string;
+  progress: number;
+  message: string;
+  error: string;
+  project_id: string;
+  episode_id: string;
+  imagine_pack_id: string;
+  imagine_job_id: string;
+  called_imagine: boolean;
+  called_comfy: boolean;
+  produced_mp4: boolean;
+  stitched_episode: boolean;
+  media_id: string | null;
+  estimated_cost_units: number;
+  poll_seconds: number;
+  review_state?: string;
 };
 
 export const REVIEW_COPY: Record<ReviewStateName, string> = {

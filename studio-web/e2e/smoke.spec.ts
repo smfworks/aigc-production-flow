@@ -66,6 +66,14 @@ test("demo seed shows continuity and identity signals, then stub precheck", asyn
   await expect(page.getByText("batch-precheck · failed")).toBeVisible();
 });
 
+test("quick create degrades when Imagine is unconfigured", async ({ page }) => {
+  await page.goto("/#/create");
+  await expect(page.getByTestId("quick-create-unconfigured")).toBeVisible();
+  await expect(page.getByTestId("quick-create-unconfigured")).toContainText("STUDIO_IMAGINE_URL");
+  await expect(page.getByTestId("quick-create")).toHaveCount(0);
+  await expect(page.getByTestId("create-wizard")).toBeVisible();
+});
+
 test("new project opens pack stages without a zip", async ({ page }) => {
   await page.goto("/#/projects");
   const start = page.getByTestId("start-here");

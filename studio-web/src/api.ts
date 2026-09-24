@@ -26,6 +26,8 @@ import type {
   PresenceUser,
   PreviewDesk,
   Project,
+  QuickPlanResponse,
+  QuickStatus,
   RetentionPreview,
   Review,
   ReviewSignoff,
@@ -569,6 +571,17 @@ export const api = {
   },
   retentionApply: (body: { project_id?: string; episode_id?: string; dry_run?: boolean; confirm?: string }) =>
     request<RetentionPreview>("/api/retention", { method: "POST", body: JSON.stringify(body) }),
+  quickPlan: (body: { prompt: string; target_duration_sec: number; aspect_ratio: string }) =>
+    request<QuickPlanResponse>("/api/quick/plan", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  quickRun: (plan: QuickPlanResponse["plan"]) =>
+    request<QuickStatus>("/api/quick/run", {
+      method: "POST",
+      body: JSON.stringify({ plan, confirm: true }),
+    }),
+  quickStatus: (runId: string) => request<QuickStatus>(`/api/quick/${runId}`),
   startWizard: (prompt: string, recipeId = "") =>
     request<WizardSession>("/api/create/wizard", {
       method: "POST",

@@ -145,6 +145,17 @@ def enqueue_job(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"job_type must be one of: {', '.join(JOB_TYPES)}",
         )
+    if job_type == "imagine-episode":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "imagine_confirm_required",
+                "message": (
+                    "imagine-episode starts at POST /api/quick/run with confirm true. "
+                    "The desk enqueue does not call Imagine and does not call Comfy."
+                ),
+            },
+        )
     shot = _require_shot(db, episode, shot_id, job_type)
     body = dict(payload) if isinstance(payload, dict) else {}
     from ..promptpreview import consume_preview, mark_preview_enqueued, require_preview_or_raise

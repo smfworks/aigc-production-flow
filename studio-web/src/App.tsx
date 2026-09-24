@@ -57,6 +57,7 @@ import { PackDiffPanel } from "./PackDiffPanel.tsx";
 import { PackStage } from "./PackStage.tsx";
 import { StartHere } from "./StartHere.tsx";
 import { CreateWizard } from "./CreateWizard.tsx";
+import { QuickCreate } from "./QuickCreate.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
 import {
@@ -345,15 +346,39 @@ export default function App() {
         </p>
       ) : null}
 
-      {view.page === "create" ? (
-        <CreateWizard
-          wizardId={view.wizardId}
+      {view.page === "create" && meta?.imagine_configured && !view.fullWizard ? (
+        <QuickCreate
           me={me}
-          onWizard={(id) => navigate(id ? { page: "create", wizardId: id } : { page: "create" })}
+          onFullWizard={() => navigate({ page: "create", fullWizard: true })}
           onOpenEpisode={(projectId, episodeId) => navigate({ page: "episode", projectId, episodeId })}
           onError={showError}
           onNotice={setNotice}
         />
+      ) : null}
+      {view.page === "create" && !(meta?.imagine_configured && !view.fullWizard) ? (
+        <>
+          {meta && !meta.imagine_configured ? (
+            <p className="banner" data-testid="quick-create-unconfigured">
+              Fast path needs the Imagine app (set STUDIO_IMAGINE_URL)
+            </p>
+          ) : null}
+          <CreateWizard
+            wizardId={view.wizardId}
+            me={me}
+            onWizard={(id) =>
+              navigate(
+                view.fullWizard
+                  ? { page: "create", fullWizard: true, wizardId: id }
+                  : id
+                    ? { page: "create", wizardId: id }
+                    : { page: "create" },
+              )
+            }
+            onOpenEpisode={(projectId, episodeId) => navigate({ page: "episode", projectId, episodeId })}
+            onError={showError}
+            onNotice={setNotice}
+          />
+        </>
       ) : null}
       {view.page === "projects" ? (
         <ProjectList
