@@ -35,10 +35,18 @@ SHOT_READINESS = ("draft", "candidates", "linked", "ready")
 CANDIDATE_KINDS = ("character", "prop", "scene", "costume")
 CANDIDATE_STATUSES = ("pending", "accepted", "ignored", "linked")
 CANDIDATE_SOURCES = ("stub", "manual")
-JOB_TYPES = ("still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck", "stitch")
+JOB_TYPES = (
+    "still-sheet",
+    "still-plate",
+    "clip-hop1",
+    "clip-extend",
+    "batch-precheck",
+    "stitch",
+    "imagine-episode",
+)
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
 RECEIPT_SOURCES = ("manual", "parsed")
-ADAPTER_IDS = ("stub", "comfy-h3", "comfy-qwen", "webhook", "cli")
+ADAPTER_IDS = ("stub", "comfy-h3", "comfy-qwen", "webhook", "cli", "grok-imagine")
 
 
 def utcnow() -> datetime:

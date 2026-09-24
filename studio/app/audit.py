@@ -38,6 +38,8 @@ AGENT_EXPORT = "agent.export"
 WIZARD_START = "wizard.start"
 WIZARD_FINISH = "wizard.finish"
 HERMES_HANDOFF = "hermes.handoff"
+QUICK_PLAN = "quick.plan"
+QUICK_RUN = "quick.run"
 
 ACTIONS = (
     REVIEW_SET,
@@ -70,6 +72,8 @@ ACTIONS = (
     WIZARD_START,
     WIZARD_FINISH,
     HERMES_HANDOFF,
+    QUICK_PLAN,
+    QUICK_RUN,
 )
 
 

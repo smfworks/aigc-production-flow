@@ -67,6 +67,8 @@ export function AuditLog({
           <option value="pack.export">pack.export</option>
           <option value="media.upload">media.upload</option>
           <option value="project.create">project.create</option>
+          <option value="quick.plan">quick.plan</option>
+          <option value="quick.run">quick.run</option>
           <option value="retention.apply">retention.apply</option>
         </select>
         <button type="button" className="btn" onClick={() => void load()}>

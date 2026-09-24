@@ -1,5 +1,5 @@
 export type View =
-  | { page: "create"; wizardId?: string }
+  | { page: "create"; wizardId?: string; fullWizard?: boolean }
   | { page: "projects" }
   | { page: "project"; projectId: string }
   | { page: "episode"; projectId: string; episodeId: string; shotId?: string; identityId?: string }
@@ -11,6 +11,9 @@ export function parseHash(hash = window.location.hash): View {
   const raw = hash.replace(/^#/, "");
   const parts = raw.split("/").filter(Boolean);
   if (parts[0] === "create") {
+    if (parts[1] === "full") {
+      return { page: "create", fullWizard: true, wizardId: parts[2] };
+    }
     return { page: "create", wizardId: parts[1] };
   }
   if (parts[0] === "tasks") {
@@ -39,6 +42,9 @@ export function parseHash(hash = window.location.hash): View {
 
 export function viewToHash(view: View): string {
   if (view.page === "create") {
+    if (view.fullWizard) {
+      return view.wizardId ? `#/create/full/${view.wizardId}` : "#/create/full";
+    }
     return view.wizardId ? `#/create/${view.wizardId}` : "#/create";
   }
   if (view.page === "tasks") {

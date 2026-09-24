@@ -15,7 +15,15 @@ ReviewStateName = Literal[
 
 MediaKind = Literal["sheet", "plate", "costume", "preview", "other"]
 ApprovalStatus = Literal["draft", "approved"]
-JobType = Literal["still-sheet", "still-plate", "clip-hop1", "clip-extend", "batch-precheck", "stitch"]
+JobType = Literal[
+    "still-sheet",
+    "still-plate",
+    "clip-hop1",
+    "clip-extend",
+    "batch-precheck",
+    "stitch",
+    "imagine-episode",
+]
 JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 ReceiptSource = Literal["manual", "parsed"]
 EntityType = Literal["character", "prop", "scene", "costume", ""]
@@ -74,6 +82,7 @@ class MetaOut(BaseModel):
         "Set STUDIO_LLM_BASE_URL for an optional local/OpenAI-compatible endpoint."
     )
     primary_create: str = "wizard"
+    imagine_configured: bool = False
 
 
 class RoleMatrixRow(BaseModel):

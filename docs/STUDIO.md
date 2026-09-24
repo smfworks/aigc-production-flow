@@ -1,6 +1,6 @@
 # Studio spine (Phase 14)
 
-**Start here:** open Studio. The home screen asks what you want to make. Finish the wizard. **Send to Hermes** writes a brief. Download agent zip is the fallback.
+**Start here:** open Studio. When `STUDIO_IMAGINE_URL` points at a local Imagine app whose `/api/health` reports `imagine_configured`, Create opens on **Quick create**: one story, a length, an aspect, a plan, then a confirmed run. That run is a paid xAI render. It stores `episode.mp4` in the Studio media store when Imagine has stitched it. Gates, sign-off, and generate-ok are unchanged. `called_comfy` stays false. `produced_mp4` is true only after that file is on disk. Otherwise Create stays the wizard, with one line: set `STUDIO_IMAGINE_URL`. **Full wizard** is still there. **Send to Hermes** writes a brief. Download agent zip is the fallback.
 
 The wizard fills a draft pack: format, length, tone, deliverable scope, cast, audio, engines, a prunable task tree, then director checkpoints. Cast notes become identity **drafts**, not approvals. Gates stay red. No model is claimed. Unset Comfy lanes stay stub, and the handoff says so.
 
@@ -30,6 +30,9 @@ Brain dump is stub/local only. `STUDIO_LLM_BASE_URL` may point at a local or Ope
 | `STUDIO_LLM_BASE_URL` | empty | Optional `…/v1` or full `…/chat/completions` URL. Unset → deterministic brain dump |
 | `STUDIO_LLM_MODEL` | `local` when a URL is set | Model name sent to that endpoint |
 | `STUDIO_LLM_API_KEY` | empty | Optional bearer for that endpoint. Stays in the process environment, not git |
+| `STUDIO_IMAGINE_URL` | empty | Local Omarchy Grok Imagine app, for example `http://127.0.0.1:8010`. Empty means the fast path is not live. Studio does not start that app |
+| `STUDIO_IMAGINE_TOKEN` | `local-dev-token` | Bearer token for Imagine. Sent as `Authorization: Bearer` |
+| `STUDIO_IMAGINE_POLL_SECONDS` | `5` | How often Quick create polls a running Imagine job |
 
 It is not Jellyfish, not CapCut, and not a generate API. Pack zip remains the collaboration contract. The default factory is `adapter=stub` (fixture receipts). It never claims H3 or Qwen ran. Budget units are an **operator rate table** — not a cloud invoice. Media defaults to **local disk**. S3/MinIO is opt-in and never claimed live when unset. **OIDC is opt-in and off by default.** Celery is opt-in and off by default (`STUDIO_JOB_WORKER=thread`). **Multi-org lite is membership isolation, not SaaS billing, and not SSO org mapping.**
 
@@ -262,7 +265,7 @@ Comments: episode thread plus `shot_id` / `board_node_id`. `POST /api/comments/{
 
 ## Budget
 
-Job rows store `estimated_cost_units` at enqueue and `actual_cost_units` on success (0 on fail/cancel). Units come from `STUDIO_COST_RATES` (default `stub:0.1,webhook:1,cli:1,comfy-h3:2,comfy-qwen:0.5`). `STUDIO_COST_CURRENCY` defaults to `credits`. Optional `STUDIO_COST_USD_PER_UNIT` is an estimate only.
+Job rows store `estimated_cost_units` at enqueue and `actual_cost_units` on success (0 on fail/cancel). Units come from `STUDIO_COST_RATES` (default `stub:0.1,webhook:1,cli:1,comfy-h3:2,comfy-qwen:0.5,grok-imagine:4`). `STUDIO_COST_CURRENCY` defaults to `credits`. Optional `STUDIO_COST_USD_PER_UNIT` is an estimate only. The `grok-imagine` rate is the operator estimate for one Quick create run. It is not an xAI invoice.
 
 `STUDIO_BUDGET_CAP_UNITS` + `STUDIO_BUDGET_HARD_STOP` are env defaults; each project can override (**producer** only). Hard stop returns **409** `budget_cap` when spent + pending + new estimate would exceed the cap.
 
@@ -270,7 +273,7 @@ This never claims a cloud bill was paid.
 
 ## Audit + retention
 
-Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `pack.diff`, `pack.save`, `brain.dump`, `agent.export`, `media.upload`, `identity.approve`, `identity.unapprove`, `identity.keywords`, `identity.link`, `episode.reorder`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
+Audit table: `review.set`, `review.signoff`, `review.override`, `job.enqueue`, `job.cancel`, `pack.import`, `pack.export`, `pack.diff`, `pack.save`, `brain.dump`, `agent.export`, `media.upload`, `identity.approve`, `identity.unapprove`, `identity.keywords`, `identity.link`, `episode.reorder`, `project.create`, `retention.apply`, `comment.create`, `comment.resolve`, `member.add`, `member.role`, `org.create`, `backup.export`, `backup.restore`, `demo.seed`, `quick.plan`, `quick.run`. `GET /api/audit?project_id=&episode_id=&action=`. Scoped to the active org.
 
 Retention: `STUDIO_RETENTION_DAYS` (default 30; `0` disables). Project override allowed (producer). `GET /api/retention` (dry-run) and `POST /api/retention` with `{ "dry_run": false, "confirm": "expire" }` deletes **ephemeral** stub job outputs / temp media older than N days. **Pack revisions are not deleted.** Episode **season/sequence order is preserved**; retention does not reorder or delete episodes. Backup manifests store that order and restore it with the episode.
 

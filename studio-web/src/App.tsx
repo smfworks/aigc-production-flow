@@ -57,6 +57,7 @@ import { PackDiffPanel } from "./PackDiffPanel.tsx";
 import { PackStage } from "./PackStage.tsx";
 import { StartHere } from "./StartHere.tsx";
 import { CreateWizard } from "./CreateWizard.tsx";
+import { QuickCreate } from "./QuickCreate.tsx";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { navigate, parseHash, shareUrl, importHint, clearImportHint, type View } from "./nav.ts";
 import {
@@ -84,6 +85,63 @@ function formatWhen(iso: string): string {
   return date.toLocaleString();
 }
 
+type CreateMode = "pending" | "quick" | "wizard";
+
+function CreateRoute({
+  mode,
+  meta,
+  fullWizard,
+  wizardId,
+  me,
+  onWizard,
+  onOpenEpisode,
+  onError,
+  onNotice,
+}: {
+  mode: Exclude<CreateMode, "pending">;
+  meta: Meta | null;
+  fullWizard: boolean;
+  wizardId?: string;
+  me: StudioUser | null;
+  onWizard: (id: string) => void;
+  onOpenEpisode: (projectId: string, episodeId: string) => void;
+  onError: (err: unknown) => void;
+  onNotice: (msg: string) => void;
+}) {
+  if (mode === "quick" && !fullWizard) {
+    return (
+      <QuickCreate
+        me={me}
+        onFullWizard={() => navigate({ page: "create", fullWizard: true })}
+        onOpenEpisode={onOpenEpisode}
+        onError={onError}
+        onNotice={onNotice}
+      />
+    );
+  }
+  // The banner slot is always the first child. Toggling the message inside it
+  // must not take CreateWizard's fiber, or recipe state resets.
+  return (
+    <>
+      <div className="create-banner-slot">
+        {meta && !meta.imagine_configured ? (
+          <p className="banner" data-testid="quick-create-unconfigured">
+            Fast path needs the Imagine app (set STUDIO_IMAGINE_URL)
+          </p>
+        ) : null}
+      </div>
+      <CreateWizard
+        wizardId={wizardId}
+        me={me}
+        onWizard={onWizard}
+        onOpenEpisode={onOpenEpisode}
+        onError={onError}
+        onNotice={onNotice}
+      />
+    </>
+  );
+}
+
 export default function App() {
   const [view, setView] = useState<View>(() => {
     if (!window.location.hash) {
@@ -97,6 +155,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
+  const [createMode, setCreateMode] = useState<CreateMode>("pending");
   const [me, setMe] = useState<StudioUser | null>(null);
   const [orgs, setOrgs] = useState<StudioOrg[]>([]);
   const [adapterHealth, setAdapterHealth] = useState<AdapterHealth[]>([]);
@@ -115,6 +174,20 @@ export default function App() {
     setError(err instanceof Error ? err.message : String(err));
   }, []);
 
+  const createFullWizard = view.page === "create" && Boolean(view.fullWizard);
+  const openWizard = useCallback(
+    (id: string) => {
+      navigate(
+        createFullWizard
+          ? { page: "create", fullWizard: true, wizardId: id || undefined }
+          : id
+            ? { page: "create", wizardId: id }
+            : { page: "create" },
+      );
+    },
+    [createFullWizard],
+  );
+
   useEffect(() => {
     return onStaleOrgCleared(() => {
       setNotice(STALE_ORG_NOTICE);
@@ -123,13 +196,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    api.meta().then(setMeta).catch(() => setMeta(null));
+    let live = true;
+    api
+      .meta()
+      .then((row) => {
+        if (!live) return;
+        setMeta(row);
+        setCreateMode((current) =>
+          current === "pending" ? (row.imagine_configured ? "quick" : "wizard") : current,
+        );
+      })
+      .catch(() => {
+        if (!live) return;
+        setMeta(null);
+        setCreateMode((current) => (current === "pending" ? "wizard" : current));
+      });
     api.me().then((user) => {
       setMe(user);
       if (user.org_id && !getOrgId()) setOrgId(user.org_id);
     }).catch(() => setMe(null));
     api.orgs().then(setOrgs).catch(() => setOrgs([]));
     api.adapterHealth().then(setAdapterHealth).catch(() => setAdapterHealth([]));
+    return () => {
+      live = false;
+    };
   }, [token, userName, view.page]);
 
   useEffect(() => {
@@ -345,11 +435,14 @@ export default function App() {
         </p>
       ) : null}
 
-      {view.page === "create" ? (
-        <CreateWizard
+      {view.page === "create" && createMode !== "pending" ? (
+        <CreateRoute
+          mode={createMode}
+          meta={meta}
+          fullWizard={createFullWizard}
           wizardId={view.wizardId}
           me={me}
-          onWizard={(id) => navigate(id ? { page: "create", wizardId: id } : { page: "create" })}
+          onWizard={openWizard}
           onOpenEpisode={(projectId, episodeId) => navigate({ page: "episode", projectId, episodeId })}
           onError={showError}
           onNotice={setNotice}

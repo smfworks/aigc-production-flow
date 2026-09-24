@@ -17,6 +17,7 @@ from .deps import DbDep, ScopedUserDep
 from .jobs.modes import WORKER_CELERY, normalize_worker
 from .jobs.worker import start_worker, stop_worker
 from .models import Job
+from .imagine_bridge import imagine_configured
 from .notify import webhook_configured
 from .observability import StructuredLogMiddleware, prometheus_text
 from .oidc import oidc_configured
@@ -50,6 +51,7 @@ from .routers import (
     wizard,
     workflows,
     clipbridge,
+    quick,
 )
 from .schemas import MetaOut, UserOut
 from .seed import seed_default_org
@@ -141,6 +143,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(wizard.router)
+    application.include_router(quick.router)
     application.include_router(workflows.router)
     application.include_router(create.router)
     application.include_router(projects.router)
@@ -276,6 +279,7 @@ def create_app() -> FastAPI:
                 )
             ),
             primary_create="wizard",
+            imagine_configured=imagine_configured(cfg),
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])

@@ -110,7 +110,7 @@ def test_configured_webhook_unreachable_blocks_enqueue(client, auth, monkeypatch
 def test_catalog_health_helper_matches_slots():
     rows = catalog_health()
     ids = {row["id"] for row in rows}
-    assert ids == {"stub", "comfy-h3", "comfy-qwen", "webhook", "cli"}
+    assert ids == {"stub", "comfy-h3", "comfy-qwen", "webhook", "cli", "grok-imagine"}
 
 
 def test_live_comfy_does_not_skip_hop1_watch(client, auth, monkeypatch):
