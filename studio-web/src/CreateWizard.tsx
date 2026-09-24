@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, downloadAgentExport } from "./api.ts";
 import type { CreateRecipe, DirectorView, HermesHandoff, StudioUser, TaskNode, WizardSession } from "./types.ts";
 import { AgentRunStatus } from "./AgentRunStatus.tsx";
@@ -97,12 +97,15 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
   const [recipeName, setRecipeName] = useState("");
   const [busy, setBusy] = useState(false);
   const [handoff, setHandoff] = useState<HermesHandoff | null>(null);
+  const onWizardRef = useRef(onWizard);
+  onWizardRef.current = onWizard;
+  const wizardEpoch = useRef(0);
 
   useEffect(() => {
     if (wizardId) return;
     const stored = localStorage.getItem(WIZARD_KEY);
-    if (stored) onWizard(stored);
-  }, [onWizard, wizardId]);
+    if (stored) onWizardRef.current(stored);
+  }, [wizardId]);
 
   useEffect(() => {
     api
@@ -141,15 +144,17 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
       setHandoff(null);
       return;
     }
+    const ticket = wizardEpoch.current;
     let stop = false;
     api
       .wizard(wizardId)
       .then((row) => {
-        if (stop) return;
+        if (stop || ticket !== wizardEpoch.current) return;
         localStorage.setItem(WIZARD_KEY, row.id);
         applyWizard(row);
       })
       .catch((err) => {
+        if (stop || ticket !== wizardEpoch.current) return;
         localStorage.removeItem(WIZARD_KEY);
         onError(err);
       });
@@ -350,6 +355,7 @@ export function CreateWizard({ wizardId, me, onWizard, onOpenEpisode, onError, o
           type="button"
           className="text-btn"
           onClick={() => {
+            wizardEpoch.current += 1;
             localStorage.removeItem(WIZARD_KEY);
             setWizard(null);
             setHandoff(null);
