@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 Kind = Literal["still", "clip"]
-Transport = Literal["none", "webhook", "cli", "webhook-or-cli", "imagine-http"]
+Transport = Literal["none", "webhook", "cli", "webhook-or-cli"]
 
 STUB_NAME = "stub"
 
@@ -215,20 +215,6 @@ CATALOG: tuple[AdapterSlot, ...] = (
         hop1_watch_required=True,
         config_schema=CLI_ENV_SCHEMA,
         honesty="Generic CLI transport. Unset is not live. Hop-1 watch still required.",
-    ),
-    AdapterSlot(
-        id="grok-imagine",
-        label="Grok Imagine (local app)",
-        kinds=("still", "clip"),
-        live=False,
-        transport="imagine-http",
-        note=(
-            "Informational slot for the local Omarchy Grok Imagine app "
-            "(STUDIO_IMAGINE_URL). The quick path talks to that HTTP API. "
-            "This slot is not a Comfy lane and does not enqueue stills or clips."
-        ),
-        hop1_watch_required=True,
-        honesty="xAI Grok Imagine via the local Imagine app. Not H3/Qwen.",
     ),
 )
 

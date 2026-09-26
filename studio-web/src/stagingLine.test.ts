@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { whoIsWhere } from "./stagingLine.ts";
-import type { ImagineShot, ImagineStaging } from "./types.ts";
+import type { QuickShot, QuickStaging } from "./types.ts";
 
-const staging: ImagineStaging = {
+const staging: QuickStaging = {
   scenes: [
     {
       id: "sc1",
@@ -25,7 +25,7 @@ const cast = [
 
 describe("whoIsWhere", () => {
   it("reads start blocking and scene relations", () => {
-    const shot: ImagineShot = {
+    const shot: QuickShot = {
       id: "s01",
       prompt_still: "wide",
       prompt_motion: "gallop",
@@ -45,7 +45,7 @@ describe("whoIsWhere", () => {
   });
 
   it("shows a look that differs from facing", () => {
-    const shot: ImagineShot = {
+    const shot: QuickShot = {
       id: "s03",
       prompt_still: "close",
       prompt_motion: "twists",
@@ -68,8 +68,8 @@ describe("whoIsWhere", () => {
     assert.equal(whoIsWhere(shot, staging, cast), "Jack: right third, foreground, looking screen-left");
   });
 
-  it("is empty when Imagine returned no stage", () => {
-    const shot: ImagineShot = { id: "s01", prompt_still: "wide", prompt_motion: "gallop" };
+  it("is empty when the shot has no stage", () => {
+    const shot: QuickShot = { id: "s01", prompt_still: "wide", prompt_motion: "gallop" };
     assert.equal(whoIsWhere(shot, null, cast), "");
     assert.equal(whoIsWhere(shot, staging, cast), "");
   });

@@ -20,6 +20,7 @@ from urllib.parse import urlencode, urlparse
 import httpx
 
 from ..config import Settings
+from ..local_only import is_cloud_generation_host
 
 IMAGE_CLIENT_ID = "smf-aigc-studio"
 VIDEO_CLIENT_ID = "smf-aigc-studio"
@@ -81,6 +82,11 @@ def validate_lane(url: str, settings: Settings) -> tuple[bool, str]:
     host = (parsed.hostname or "").lower()
     if parsed.scheme not in {"http", "https"} or not host:
         return False, f"ComfyUI lane must be http(s) with a host: {raw}"
+    if is_cloud_generation_host(host):
+        return False, (
+            f"ComfyUI lane host {host} is a cloud generation API. "
+            "Studio stays on local inference."
+        )
     if host in allow_hosts(settings):
         return True, ""
     try:

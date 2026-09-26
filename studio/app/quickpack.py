@@ -1,13 +1,15 @@
-"""HTTP client for the local Omarchy Grok Imagine app, plus a pure pack mirror.
+"""Local quick-create plans and the pack mirror.
 
-Imagine listens on its own port (default :8010) with a bearer token. Studio does
-not start that process. An empty ``STUDIO_IMAGINE_URL`` means the fast path is
-not live. This module never calls Comfy and never invents an MP4.
+Studio plans shots on this machine. Cast notes become cast rows. When a plan
+carries staging, the mirror keeps that map on ``studioMeta.staging``, copies
+each shot's blocking onto the edit row and ``studioMeta.shot_stages``, and
+fills ``entities`` from the visible blocks. ``who_is_where`` is the read-only
+line for one shot. This module does not call a network and does not invent an MP4.
 
-Camera cards on an Imagine shot become Studio edit-list camera fields with this
-table. Unlisted moves stay blank so the edit-list gate can fail honestly.
+Camera cards on a shot become Studio edit-list camera fields with this table.
+Unlisted moves stay blank so the edit-list gate can fail honestly.
 
-| Imagine ``camera.move`` | Studio ``cameraVerb`` |
+| Plan ``camera.move`` | Studio ``cameraVerb`` |
 |---|---|
 | ``dolly_in`` | ``push`` |
 | ``dolly_out`` | ``pull`` |
@@ -18,18 +20,18 @@ table. Unlisted moves stay blank so the edit-list gate can fail honestly.
 | ``handheld`` | ``shake`` |
 | ``static`` | ``static`` |
 
-| Imagine ``camera.scale`` | Studio ``cameraAmplitude`` |
+| Plan ``camera.scale`` | Studio ``cameraAmplitude`` |
 |---|---|
 | ``wide`` | ``wide`` |
 | ``medium`` | ``medium`` |
 | ``close`` | ``close`` |
 | ``extreme_close`` | ``tight`` |
 
-Imagine has no speed token. ``cameraSpeed`` stays empty. Studio does not invent one.
+There is no speed token. ``cameraSpeed`` stays empty.
 
 Beat roles become map energy (the pack gate's verse/chorus/bridge set):
 
-| Imagine beat role | Studio ``energy`` |
+| Beat role | Studio ``energy`` |
 |---|---|
 | ``setup`` | ``verse`` |
 | ``turn`` | ``bridge`` |
@@ -37,30 +39,17 @@ Beat roles become map energy (the pack gate's verse/chorus/bridge set):
 | ``button`` | ``outro`` |
 
 Map clocks are cumulative shot durations (``m:ss``) at the first shot of that beat.
-
-Staging is optional. When Imagine returns ``staging`` and per-shot ``stage``,
-the mirror keeps that map on ``studioMeta.staging``, copies each shot's blocking
-onto the edit row, and fills ``entities`` from the visible blocks (cast names
-when a block is linked). A plan with no staging leaves ``entities`` blank.
+A plan with no staging leaves ``studioMeta.staging`` unset. Cast names still fill
+``entities`` when the plan names a cast.
 """
 
 from __future__ import annotations
 
 import copy
 import re
-import time
 from typing import Any
 
-import httpx
-
 from .blankpack import empty_pack, studio_meta
-from .config import Settings, get_settings
-
-IMAGINE_ADAPTER = "grok-imagine"
-HEALTH_TIMEOUT_SECONDS = 2.0
-HEALTH_CACHE_SECONDS = 10.0
-PLAN_TIMEOUT_SECONDS = 120.0
-DEFAULT_TIMEOUT_SECONDS = 60.0
 
 CAMERA_MOVE_TO_VERB: dict[str, str] = {
     "dolly_in": "push",
@@ -87,190 +76,20 @@ BEAT_ROLE_TO_ENERGY: dict[str, str] = {
     "button": "outro",
 }
 
-_health_cache: dict[str, tuple[float, bool]] = {}
-_transport_override: httpx.BaseTransport | None = None
 
-
-class ImagineError(Exception):
-    """Imagine returned an error, or the call could not be completed."""
-
-    def __init__(self, message: str, status_code: int = 502):
-        self.status_code = status_code
-        super().__init__(message)
-
-
-class ImagineNotConfigured(ImagineError):
-    def __init__(self, message: str = "Imagine is not configured. Set STUDIO_IMAGINE_URL."):
-        super().__init__(message, status_code=409)
-
-
-def set_transport_for_tests(transport: httpx.BaseTransport | None) -> None:
-    """Install an httpx transport. Tests use MockTransport so nothing leaves the process."""
-    global _transport_override
-    _transport_override = transport
-    clear_health_cache()
-
-
-def clear_health_cache() -> None:
-    _health_cache.clear()
-
-
-def imagine_url(settings: Settings | None = None) -> str:
-    cfg = settings or get_settings()
-    return (cfg.imagine_url or "").strip().rstrip("/")
-
-
-def get_imagine_client(settings: Settings | None = None, *, timeout: float | None = None) -> ImagineClient:
-    cfg = settings or get_settings()
-    url = imagine_url(cfg)
-    if not url:
-        raise ImagineNotConfigured()
-    return ImagineClient(
-        url,
-        (cfg.imagine_token or "local-dev-token").strip() or "local-dev-token",
-        transport=_transport_override,
-        timeout=timeout if timeout is not None else DEFAULT_TIMEOUT_SECONDS,
-    )
-
-
-def imagine_configured(settings: Settings | None = None) -> bool:
-    """True only when GET {url}/api/health returns imagine_configured true.
-
-    An empty URL is false and does not open a socket. Failures are false.
-    A successful answer is cached briefly.
-    """
-    url = imagine_url(settings)
-    if not url:
-        return False
-    now = time.monotonic()
-    cached = _health_cache.get(url)
-    if cached is not None and now - cached[0] < HEALTH_CACHE_SECONDS:
-        return cached[1]
-    ok = False
-    try:
-        body = get_imagine_client(settings, timeout=HEALTH_TIMEOUT_SECONDS).health()
-        ok = bool(body.get("imagine_configured"))
-    except Exception:
-        ok = False
-    _health_cache[url] = (now, ok)
-    return ok
-
-
-class ImagineClient:
-    """Bearer-auth client for the Imagine pack API."""
-
-    def __init__(
-        self,
-        base_url: str,
-        token: str,
-        *,
-        transport: httpx.BaseTransport | None = None,
-        timeout: float = DEFAULT_TIMEOUT_SECONDS,
-    ):
-        self.base_url = base_url.rstrip("/")
-        self.token = token
-        self._transport = transport
-        self._timeout = timeout
-
-    def _request(
-        self,
-        method: str,
-        path: str,
-        *,
-        json_body: dict[str, Any] | None = None,
-        timeout: float | None = None,
-    ) -> httpx.Response:
-        headers = {"Authorization": f"Bearer {self.token}"}
-        try:
-            with httpx.Client(
-                base_url=self.base_url,
-                headers=headers,
-                transport=self._transport,
-                timeout=timeout if timeout is not None else self._timeout,
-            ) as client:
-                response = client.request(method, path, json=json_body)
-        except httpx.HTTPError as exc:
-            raise ImagineError(f"Imagine request failed: {exc.__class__.__name__}") from exc
-        if response.status_code >= 400:
-            raise ImagineError(
-                _error_text(response),
-                status_code=response.status_code if response.status_code < 500 else 502,
-            )
-        return response
-
-    def health(self) -> dict[str, Any]:
-        response = self._request("GET", "/api/health", timeout=HEALTH_TIMEOUT_SECONDS)
-        body = _json_object(response)
-        return body
-
-    def plan(self, body: dict[str, Any]) -> dict[str, Any]:
-        response = self._request(
-            "POST",
-            "/api/packs/plan",
-            json_body=body,
-            timeout=PLAN_TIMEOUT_SECONDS,
-        )
-        return _json_object(response)
-
-    def create_pack(self, body: dict[str, Any]) -> dict[str, Any]:
-        response = self._request("POST", "/api/packs", json_body=body)
-        return _json_object(response)
-
-    def run(self, pack_id: str) -> dict[str, Any]:
-        response = self._request("POST", f"/api/packs/{pack_id}/run")
-        return _json_object(response)
-
-    def jobs(self, pack_id: str) -> dict[str, Any]:
-        response = self._request("GET", f"/api/packs/{pack_id}/jobs")
-        return _json_object(response)
-
-    def download_episode(self, pack_id: str) -> bytes:
-        response = self._request("GET", f"/api/packs/{pack_id}/episode")
-        data = response.content or b""
-        if not data:
-            raise ImagineError("Imagine episode download was empty.", status_code=404)
-        return data
-
-
-def pack_body_for_create(plan: dict[str, Any]) -> dict[str, Any]:
-    """Drop cast and music paths Imagine would reject.
-
-    A plan may name cast before a file exists. Saving a pack requires those
-    files under ``references/`` and ``music/``. This is not an upload.
-
-    ``staging``, ``lock_staging``, and each shot's ``stage`` are copied through
-    unchanged. An older plan that omits them stays omitted.
-    """
-    body = dict(plan)
-    cast = body.get("cast")
-    if isinstance(cast, list):
-        kept = []
-        for item in cast:
-            if not isinstance(item, dict):
-                continue
-            path = str(item.get("image_path") or "").strip()
-            if path.startswith("references/"):
-                kept.append(item)
-        body["cast"] = kept
-    music = str(body.get("music_path") or "").strip()
-    if music and not music.startswith("music/"):
-        body["music_path"] = ""
-    return body
-
-
-def studio_pack_from_imagine(plan: dict[str, Any]) -> dict[str, Any]:
-    """Mirror an Imagine PackIn into a Studio pack.json. Does not call Imagine.
+def studio_pack_from_plan(plan: dict[str, Any]) -> dict[str, Any]:
+    """Mirror a quick-create plan into a Studio pack.json. Does not call a renderer.
 
     Gates are whatever ``evaluate_gates`` says about this dict. Nothing here
     sets ``all_gates_green`` or stamps generate-ok.
     """
-    title = _text(plan.get("title")) or "Imagine episode"
+    title = _text(plan.get("title")) or "Quick episode"
     pack = empty_pack(
         title,
-        source="imagine-plan",
+        source="quick-plan",
         note=(
-            "Pack mirrored from an Imagine plan. Gates are evaluated as written. "
-            "This mirror does not render, does not call Comfy, and does not invent an MP4."
+            "Pack mirrored from a local quick-create plan. Gates are evaluated as written. "
+            "This mirror does not render and does not invent an MP4."
         ),
     )
     pack["logLine"] = _text(plan.get("logline"))
@@ -284,16 +103,15 @@ def studio_pack_from_imagine(plan: dict[str, Any]) -> dict[str, Any]:
     if characters:
         pack["characters"] = characters
     pack["studioMeta"] = studio_meta(
-        source="imagine-plan",
-        model="grok-imagine",
+        source="quick-plan",
+        model="none",
         model_ran=False,
         note=(
-            "Mirrored from an Imagine plan. model_ran is false because this JSON is not a render. "
+            "Mirrored from a local quick-create plan. model_ran is false because this JSON is not a render. "
             "Gates stay whatever the pack actually satisfies. called_comfy is false."
         ),
     )
     pack["studioMeta"]["called_comfy"] = False
-    pack["studioMeta"]["called_imagine"] = False
     pack["studioMeta"]["produced_mp4"] = False
     pack["studioMeta"]["generate_ready"] = False
     staging = plan.get("staging") if isinstance(plan.get("staging"), dict) else None
@@ -301,6 +119,9 @@ def studio_pack_from_imagine(plan: dict[str, Any]) -> dict[str, Any]:
         pack["studioMeta"]["staging"] = copy.deepcopy(staging)
     if "lock_staging" in plan:
         pack["studioMeta"]["lock_staging"] = bool(plan.get("lock_staging"))
+    aspect = _text(plan.get("aspect_ratio"))
+    if aspect:
+        pack["studioMeta"]["aspect_ratio"] = aspect
     shot_stages = _shot_stages(shots)
     if shot_stages:
         pack["studioMeta"]["shot_stages"] = shot_stages
@@ -515,7 +336,7 @@ def cast_payload_for_plan(
     cast_notes: str = "",
     prompt: str = "",
 ) -> list[dict[str, str]]:
-    """Imagine ``cast`` rows from a structured list, cast notes, or a Cast: block.
+    """Cast rows from a structured list, cast notes, or a Cast: block.
 
     Empty input returns an empty list. Nothing here invents a lead.
     """
@@ -896,25 +717,165 @@ def _list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
 
 
-def _json_object(response: httpx.Response) -> dict[str, Any]:
-    try:
-        body = response.json()
-    except ValueError as exc:
-        raise ImagineError("Imagine response was not JSON.") from exc
-    if not isinstance(body, dict):
-        raise ImagineError("Imagine response was not a JSON object.")
-    return body
+
+_SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+_CAST_LINE = re.compile(r"^cast\s*:\s*", re.IGNORECASE)
+_CAST_ONLY = re.compile(r"^cast\s*$", re.IGNORECASE)
+_PLACES = ("left_third", "center", "right_third")
+_MAX_SHOTS = 8
 
 
-def _error_text(response: httpx.Response) -> str:
-    try:
-        payload = response.json()
-    except ValueError:
-        return (response.text or f"Imagine HTTP {response.status_code}")[:500]
-    if isinstance(payload, dict):
-        detail = payload.get("detail")
-        if isinstance(detail, str) and detail.strip():
-            return detail.strip()[:500]
-        if isinstance(detail, dict) and detail.get("message"):
-            return str(detail["message"])[:500]
-    return f"Imagine HTTP {response.status_code}"
+def local_plan(
+    *,
+    prompt: str,
+    target_duration_sec: int,
+    aspect_ratio: str | None = None,
+    resolution: str | None = None,
+    title: str | None = None,
+    style_preset: str | None = None,
+    cast: Any = None,
+    cast_notes: str | None = None,
+) -> dict[str, Any]:
+    """Deterministic shot list. No model call. Staging is filled only from named cast."""
+    raw = (prompt or "").strip()
+    story = _story_without_cast(raw) or raw
+    sentences = _sentences(story) or [story]
+    duration = max(1, int(target_duration_sec))
+    count = min(len(sentences), duration, _MAX_SHOTS)
+    sentences = sentences[:count]
+    durations = _split_duration(duration, count)
+    named = cast_payload_for_plan(cast=cast, cast_notes=cast_notes or "", prompt=raw)
+    shots: list[dict[str, Any]] = []
+    for index, (sentence, seconds) in enumerate(zip(sentences, durations, strict=False)):
+        if index == 0:
+            beat = "setup"
+        elif index == count - 1:
+            beat = "button"
+        else:
+            beat = "turn"
+        shots.append(
+            {
+                "id": f"s{index + 1}",
+                "prompt_still": sentence,
+                "prompt_motion": sentence,
+                "duration_sec": seconds,
+                "start_state": "",
+                "end_state": "",
+                "beat": beat,
+            }
+        )
+    heading = _text(title) or _clip(sentences[0], 80)
+    plan: dict[str, Any] = {
+        "title": heading or "Quick episode",
+        "logline": _clip(sentences[0], 400),
+        "aspect_ratio": _text(aspect_ratio),
+        "resolution": _text(resolution),
+        "look_bible": {},
+        "beat_map": _beat_map(shots),
+        "cast": named,
+        "shots": shots,
+        "lock_staging": True,
+    }
+    preset = _text(style_preset)
+    if preset:
+        plan["style_preset"] = preset
+    if named:
+        _attach_local_staging(plan)
+    return plan
+
+
+def _sentences(text: str) -> list[str]:
+    parts = [part.strip(" \t-•*") for part in _SENTENCE.split(text or "")]
+    return [part for part in parts if part]
+
+
+def _clip(value: str, limit: int) -> str:
+    text = " ".join((value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _story_without_cast(prompt: str) -> str:
+    kept: list[str] = []
+    skipping = False
+    for line in (prompt or "").splitlines():
+        stripped = line.strip()
+        if not skipping and (_CAST_ONLY.match(stripped) or _CAST_LINE.match(stripped)):
+            skipping = True
+            continue
+        if skipping:
+            if not stripped:
+                skipping = False
+            continue
+        kept.append(line)
+    return "\n".join(kept).strip()
+
+
+def _split_duration(total: int, count: int) -> list[int]:
+    count = max(1, count)
+    base = total // count
+    extra = total % count
+    return [base + (1 if index < extra else 0) for index in range(count)]
+
+
+def _beat_map(shots: list[dict[str, Any]]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for shot in shots:
+        role = _text(shot.get("beat")).lower()
+        if not role or role in seen:
+            continue
+        seen.add(role)
+        rows.append({"role": role, "summary": role})
+    return rows
+
+
+def _attach_local_staging(plan: dict[str, Any]) -> None:
+    """Place named cast on one scene so who-is-where has a line. No invented relations."""
+    cast = [row for row in _list(plan.get("cast")) if isinstance(row, dict) and _text(row.get("name"))]
+    if not cast:
+        return
+    shots = [row for row in _list(plan.get("shots")) if isinstance(row, dict)]
+    entities = []
+    blocks = []
+    for index, item in enumerate(cast):
+        cid = _text(item.get("id")) or _text(item.get("name"))
+        role = _text(item.get("role")).lower() or "character"
+        entities.append(
+            {
+                "id": cid,
+                "label": _text(item.get("name")),
+                "kind": role,
+                "cast_id": cid,
+                "count": 1,
+            }
+        )
+        if role == "location":
+            continue
+        blocks.append(
+            {
+                "id": cid,
+                "x": _PLACES[index % len(_PLACES)],
+                "depth": "mid",
+                "facing": "screen_right",
+                "visible": True,
+            }
+        )
+    scene = {
+        "id": "sc1",
+        "shot_ids": [_text(shot.get("id")) for shot in shots if _text(shot.get("id"))],
+        "entities": entities,
+        "relations": [],
+    }
+    plan["staging"] = {"scenes": [scene]}
+    if not blocks:
+        return
+    for shot in shots:
+        shot["stage"] = {
+            "scene_id": "sc1",
+            "camera_side": "same",
+            "start": copy.deepcopy(blocks),
+        }
+
+

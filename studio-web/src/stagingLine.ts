@@ -1,4 +1,4 @@
-import type { ImagineCast, ImagineRelation, ImagineShot, ImagineShotStage, ImagineStaging } from "./types.ts";
+import type { QuickCast, QuickRelation, QuickShot, QuickShotStage, QuickStaging } from "./types.ts";
 
 const WORD_ALIASES: Record<string, string> = {
   screen_left: "screen-left",
@@ -21,7 +21,7 @@ function words(value: unknown): string {
   return WORD_ALIASES[key] ?? key.replaceAll("_", " ");
 }
 
-function nameIndex(staging: ImagineStaging | null | undefined, cast: ImagineCast[] | null | undefined): Record<string, string> {
+function nameIndex(staging: QuickStaging | null | undefined, cast: QuickCast[] | null | undefined): Record<string, string> {
   const castById: Record<string, string> = {};
   for (const item of cast ?? []) {
     const id = text(item.id);
@@ -46,7 +46,7 @@ function nameIndex(staging: ImagineStaging | null | undefined, cast: ImagineCast
   return names;
 }
 
-function sceneFor(shot: ImagineShot, staging: ImagineStaging | null | undefined) {
+function sceneFor(shot: QuickShot, staging: QuickStaging | null | undefined) {
   const scenes = staging?.scenes ?? [];
   const sceneId = text(shot.stage?.scene_id);
   const shotId = text(shot.id);
@@ -57,13 +57,13 @@ function sceneFor(shot: ImagineShot, staging: ImagineStaging | null | undefined)
   return scenes.length === 1 ? scenes[0] : undefined;
 }
 
-function relationsFor(shot: ImagineShot, staging: ImagineStaging | null | undefined): ImagineRelation[] {
+function relationsFor(shot: QuickShot, staging: QuickStaging | null | undefined): QuickRelation[] {
   const own = shot.stage?.relations ?? [];
   if (own.length) return own;
   return sceneFor(shot, staging)?.relations ?? [];
 }
 
-function blocksOf(stage: ImagineShotStage | null | undefined) {
+function blocksOf(stage: QuickShotStage | null | undefined) {
   if (!stage) return [];
   if (stage.start?.length) return stage.start;
   if (stage.end?.length) return stage.end;
@@ -80,7 +80,7 @@ function placeWords(block: { x?: string; depth?: string; facing?: string; look?:
 
 function relationPhrase(
   entityId: string,
-  relations: ImagineRelation[],
+  relations: QuickRelation[],
   names: Record<string, string>,
   depth: string,
 ): string {
@@ -99,9 +99,9 @@ function relationPhrase(
 
 /** Compact read-only "who is where" line. Empty when the shot has no blocking. */
 export function whoIsWhere(
-  shot: ImagineShot,
-  staging?: ImagineStaging | null,
-  cast?: ImagineCast[] | null,
+  shot: QuickShot,
+  staging?: QuickStaging | null,
+  cast?: QuickCast[] | null,
 ): string {
   const blocks = blocksOf(shot.stage);
   if (!blocks.length) return "";

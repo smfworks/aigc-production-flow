@@ -22,7 +22,6 @@ DEFAULT_RATES = {
     "cli": 1.0,
     "comfy-h3": 2.0,
     "comfy-qwen": 0.5,
-    "grok-imagine": 4.0,
 }
 
 JOB_MULTIPLIERS = {
@@ -32,7 +31,6 @@ JOB_MULTIPLIERS = {
     "clip-hop1": 1.0,
     "clip-extend": 0.75,
     "stitch": 0.25,
-    "imagine-episode": 1.0,
 }
 
 COST_NOTE = "operator rate table — not a cloud bill"

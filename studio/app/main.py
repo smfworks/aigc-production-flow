@@ -17,7 +17,6 @@ from .deps import DbDep, ScopedUserDep
 from .jobs.modes import WORKER_CELERY, normalize_worker
 from .jobs.worker import start_worker, stop_worker
 from .models import Job
-from .imagine_bridge import imagine_configured
 from .notify import webhook_configured
 from .observability import StructuredLogMiddleware, prometheus_text
 from .oidc import oidc_configured
@@ -279,7 +278,6 @@ def create_app() -> FastAPI:
                 )
             ),
             primary_create="wizard",
-            imagine_configured=imagine_configured(cfg),
         )
 
     @application.get("/api/me", response_model=UserOut, tags=["meta"])

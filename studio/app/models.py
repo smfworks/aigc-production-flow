@@ -42,11 +42,10 @@ JOB_TYPES = (
     "clip-extend",
     "batch-precheck",
     "stitch",
-    "imagine-episode",
 )
 JOB_STATUSES = ("queued", "running", "succeeded", "failed", "cancelled")
 RECEIPT_SOURCES = ("manual", "parsed")
-ADAPTER_IDS = ("stub", "comfy-h3", "comfy-qwen", "webhook", "cli", "grok-imagine")
+ADAPTER_IDS = ("stub", "comfy-h3", "comfy-qwen", "webhook", "cli")
 
 
 def utcnow() -> datetime:

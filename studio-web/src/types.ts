@@ -383,10 +383,9 @@ export type Meta = {
   llm_configured?: boolean;
   llm_note?: string;
   primary_create?: string;
-  imagine_configured?: boolean;
 };
 
-export type ImagineCast = {
+export type QuickCast = {
   id?: string;
   name: string;
   role?: string;
@@ -394,7 +393,7 @@ export type ImagineCast = {
   image_path?: string;
 };
 
-export type ImagineStageBlock = {
+export type QuickStageBlock = {
   id: string;
   x?: string;
   depth?: string;
@@ -404,24 +403,24 @@ export type ImagineStageBlock = {
   visible?: boolean;
 };
 
-export type ImagineRelation = {
+export type QuickRelation = {
   a?: string;
   rel?: string;
   b?: string;
   gap?: string;
 };
 
-export type ImagineShotStage = {
+export type QuickShotStage = {
   scene_id?: string;
   camera_side?: string;
   cross_reason?: string;
   cross_motivation?: string;
-  start?: ImagineStageBlock[];
-  end?: ImagineStageBlock[];
-  relations?: ImagineRelation[];
+  start?: QuickStageBlock[];
+  end?: QuickStageBlock[];
+  relations?: QuickRelation[];
 };
 
-export type ImagineStageEntity = {
+export type QuickStageEntity = {
   id: string;
   label?: string;
   kind?: string;
@@ -429,20 +428,20 @@ export type ImagineStageEntity = {
   count?: number;
 };
 
-export type ImagineStagingScene = {
+export type QuickStagingScene = {
   id?: string;
   shot_ids?: string[];
   axis?: string;
   travel?: string;
-  entities?: ImagineStageEntity[];
-  relations?: ImagineRelation[];
+  entities?: QuickStageEntity[];
+  relations?: QuickRelation[];
 };
 
-export type ImagineStaging = {
-  scenes?: ImagineStagingScene[];
+export type QuickStaging = {
+  scenes?: QuickStagingScene[];
 };
 
-export type ImagineShot = {
+export type QuickShot = {
   id: string;
   prompt_still: string;
   prompt_motion: string;
@@ -451,26 +450,25 @@ export type ImagineShot = {
   start_state?: string;
   end_state?: string;
   camera?: { scale?: string; angle?: string; move?: string; exit_frame?: string };
-  stage?: ImagineShotStage | null;
+  stage?: QuickShotStage | null;
 };
 
-export type ImaginePlan = {
+export type QuickPlan = {
   title?: string;
   logline?: string;
   aspect_ratio?: string;
   resolution?: string;
   look_bible?: Record<string, string>;
   beat_map?: { role: string; summary: string }[];
-  cast?: ImagineCast[];
-  staging?: ImagineStaging | null;
+  cast?: QuickCast[];
+  staging?: QuickStaging | null;
   lock_staging?: boolean;
-  shots: ImagineShot[];
+  shots: QuickShot[];
 };
 
 export type QuickPlanResponse = {
-  plan: ImaginePlan;
+  plan: QuickPlan;
   called_comfy: boolean;
-  called_imagine: boolean;
   produced_mp4: boolean;
   estimated_cost_units: number;
 };
@@ -483,9 +481,8 @@ export type QuickStatus = {
   error: string;
   project_id: string;
   episode_id: string;
-  imagine_pack_id: string;
-  imagine_job_id: string;
-  called_imagine: boolean;
+  still_adapter?: string;
+  clip_adapter?: string;
   called_comfy: boolean;
   produced_mp4: boolean;
   stitched_episode: boolean;

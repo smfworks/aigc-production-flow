@@ -5,7 +5,7 @@ def test_adapter_catalog_lists_documented_slots(client, auth):
     response = client.get("/api/adapters", headers=auth)
     assert response.status_code == 200
     ids = {row["id"] for row in response.json()["adapters"]}
-    assert ids == {"stub", "comfy-h3", "comfy-qwen", "webhook", "cli", "grok-imagine"}
+    assert ids == {"stub", "comfy-h3", "comfy-qwen", "webhook", "cli"}
     live = {row["id"]: row["live"] for row in response.json()["adapters"]}
     assert live["stub"] is False
     assert live["comfy-h3"] is True
