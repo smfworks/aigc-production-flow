@@ -571,7 +571,13 @@ export const api = {
   },
   retentionApply: (body: { project_id?: string; episode_id?: string; dry_run?: boolean; confirm?: string }) =>
     request<RetentionPreview>("/api/retention", { method: "POST", body: JSON.stringify(body) }),
-  quickPlan: (body: { prompt: string; target_duration_sec: number; aspect_ratio: string }) =>
+  quickPlan: (body: {
+    prompt: string;
+    target_duration_sec: number;
+    aspect_ratio: string;
+    cast_notes?: string;
+    cast?: { id?: string; name: string; role?: string; markers?: string; image_path?: string }[];
+  }) =>
     request<QuickPlanResponse>("/api/quick/plan", {
       method: "POST",
       body: JSON.stringify(body),

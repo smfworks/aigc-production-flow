@@ -386,6 +386,62 @@ export type Meta = {
   imagine_configured?: boolean;
 };
 
+export type ImagineCast = {
+  id?: string;
+  name: string;
+  role?: string;
+  markers?: string;
+  image_path?: string;
+};
+
+export type ImagineStageBlock = {
+  id: string;
+  x?: string;
+  depth?: string;
+  facing?: string;
+  look?: string;
+  travel?: string;
+  visible?: boolean;
+};
+
+export type ImagineRelation = {
+  a?: string;
+  rel?: string;
+  b?: string;
+  gap?: string;
+};
+
+export type ImagineShotStage = {
+  scene_id?: string;
+  camera_side?: string;
+  cross_reason?: string;
+  cross_motivation?: string;
+  start?: ImagineStageBlock[];
+  end?: ImagineStageBlock[];
+  relations?: ImagineRelation[];
+};
+
+export type ImagineStageEntity = {
+  id: string;
+  label?: string;
+  kind?: string;
+  cast_id?: string;
+  count?: number;
+};
+
+export type ImagineStagingScene = {
+  id?: string;
+  shot_ids?: string[];
+  axis?: string;
+  travel?: string;
+  entities?: ImagineStageEntity[];
+  relations?: ImagineRelation[];
+};
+
+export type ImagineStaging = {
+  scenes?: ImagineStagingScene[];
+};
+
 export type ImagineShot = {
   id: string;
   prompt_still: string;
@@ -395,6 +451,7 @@ export type ImagineShot = {
   start_state?: string;
   end_state?: string;
   camera?: { scale?: string; angle?: string; move?: string; exit_frame?: string };
+  stage?: ImagineShotStage | null;
 };
 
 export type ImaginePlan = {
@@ -404,6 +461,9 @@ export type ImaginePlan = {
   resolution?: string;
   look_bible?: Record<string, string>;
   beat_map?: { role: string; summary: string }[];
+  cast?: ImagineCast[];
+  staging?: ImagineStaging | null;
+  lock_staging?: boolean;
   shots: ImagineShot[];
 };
 

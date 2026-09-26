@@ -9,7 +9,12 @@ import pytest
 
 from app.config import get_settings
 from app.gates import GATE_DEFS, evaluate_gates
-from app.imagine_bridge import set_transport_for_tests, studio_pack_from_imagine
+from app.imagine_bridge import (
+    cast_payload_for_plan,
+    set_transport_for_tests,
+    studio_pack_from_imagine,
+    who_is_where,
+)
 from tests.helpers import add_member, as_user
 
 MP4 = b"\x00\x00\x00\x18ftypmp42imagine-episode"
@@ -106,8 +111,16 @@ def test_pack_mirror_maps_camera_and_does_not_force_gates():
     assert pack["map"][1]["clock"] == "0:08"
     assert pack["map"][1]["energy"] == "outro"
     assert "Cast: Mara, tired eyes" in pack["look"]["styleLine"]
+    assert pack["editList"][0]["entities"] == ""
+    assert pack["editList"][1]["entities"] == ""
+    assert "stage" not in pack["editList"][0]
+    assert "staging:" not in pack["editList"][0]["notes"]
+    assert "staging" not in pack["studioMeta"]
+    assert "lock_staging" not in pack["studioMeta"]
     assert pack["studioMeta"]["generate_ready"] is False
     assert pack["studioMeta"]["called_comfy"] is False
+    assert pack["studioMeta"]["called_imagine"] is False
+    assert pack["studioMeta"]["produced_mp4"] is False
     gates = evaluate_gates(pack)
     assert [gate["id"] for gate in gates] == [row["id"] for row in GATE_DEFS]
     assert all(gate["ok"] for gate in gates) is False
@@ -143,6 +156,9 @@ def test_plan_passthrough_records_no_spend(client, auth, imagine):
             assert sent["prompt"] == "Mara waits."
             assert sent["target_duration_sec"] == 15
             assert sent["aspect_ratio"] == "9:16"
+            assert sent["lock_staging"] is True
+            assert "cast" not in sent
+            assert "cast_notes" not in sent
             return httpx.Response(200, json=PLAN)
         raise AssertionError(f"unexpected {request.method} {request.url.path}")
 
@@ -313,3 +329,316 @@ def test_desk_enqueue_does_not_start_imagine(client, auth, imagine, imagine_call
     assert refused.status_code == 409
     assert refused.json()["detail"]["code"] == "imagine_confirm_required"
     assert [path for _, path in imagine_calls[before:] if path != "/api/health"] == []
+
+
+STAGING = {
+    "scenes": [
+        {
+            "id": "sc1",
+            "shot_ids": ["s1", "s2"],
+            "axis": "the chase runs along the trail; the camera stays on the sun side",
+            "travel": "screen_right",
+            "entities": [
+                {
+                    "id": "jack",
+                    "label": "Jack on his buckskin horse",
+                    "kind": "character",
+                    "cast_id": "jack",
+                    "count": 1,
+                },
+                {
+                    "id": "bandits",
+                    "label": "the three bandits on dark horses",
+                    "kind": "group",
+                    "cast_id": "bandits",
+                    "count": 3,
+                },
+            ],
+            "relations": [{"a": "bandits", "rel": "behind", "b": "jack", "gap": "far"}],
+        }
+    ]
+}
+CAST = [
+    {"id": "jack", "name": "Jack", "role": "character", "markers": "tan hat", "image_path": ""},
+    {
+        "id": "bandits",
+        "name": "the bandits",
+        "role": "character",
+        "markers": "black dusters",
+        "image_path": "",
+    },
+]
+STAGE_S1 = {
+    "scene_id": "sc1",
+    "camera_side": "same",
+    "cross_reason": "",
+    "start": [
+        {
+            "id": "jack",
+            "x": "right_third",
+            "depth": "mid",
+            "facing": "screen_right",
+            "travel": "screen_right",
+            "visible": True,
+        },
+        {
+            "id": "bandits",
+            "x": "left_third",
+            "depth": "far",
+            "facing": "screen_right",
+            "travel": "screen_right",
+            "visible": True,
+        },
+    ],
+    "end": [
+        {
+            "id": "jack",
+            "x": "right_third",
+            "depth": "mid",
+            "facing": "screen_right",
+            "travel": "screen_right",
+            "visible": True,
+        },
+        {
+            "id": "bandits",
+            "x": "left_third",
+            "depth": "far",
+            "facing": "screen_right",
+            "travel": "screen_right",
+            "visible": True,
+        },
+    ],
+}
+STAGE_S2 = {
+    "scene_id": "sc1",
+    "camera_side": "cross",
+    "cross_motivation": "looking back along the trail",
+    "start": [
+        {
+            "id": "jack",
+            "x": "right_third",
+            "depth": "foreground",
+            "facing": "screen_right",
+            "look": "screen_left",
+            "travel": "screen_right",
+            "visible": True,
+        },
+        {
+            "id": "bandits",
+            "x": "left_third",
+            "depth": "background",
+            "facing": "screen_right",
+            "travel": "screen_right",
+            "visible": True,
+        },
+    ],
+    "end": STAGE_S1["end"],
+}
+
+
+def _staged_plan() -> dict:
+    shots = []
+    for shot, stage in zip(PLAN["shots"], (STAGE_S1, STAGE_S2), strict=True):
+        shots.append({**shot, "stage": stage})
+    return {
+        **PLAN,
+        "cast": CAST,
+        "staging": STAGING,
+        "lock_staging": True,
+        "shots": shots,
+    }
+
+
+def test_cast_payload_comes_from_notes_or_story_and_skips_empty():
+    assert cast_payload_for_plan(prompt="Mara waits.") == []
+    notes = cast_payload_for_plan(cast_notes="Jack — tan hat\nthe bandits — black dusters")
+    assert [row["name"] for row in notes] == ["Jack", "the bandits"]
+    assert notes[0]["id"] == "Jack"
+    assert notes[0]["markers"] == "tan hat"
+    assert notes[0]["role"] == "character"
+    assert notes[0]["image_path"] == ""
+    assert notes[1]["id"] == "the_bandits"
+    story = "A lone cowboy rides.\n\nCast:\nJack — tan hat"
+    from_story = cast_payload_for_plan(prompt=story)
+    assert from_story[0]["name"] == "Jack"
+    structured = cast_payload_for_plan(
+        cast=[{"name": "Mara", "role": "hero", "image_path": "../secret.png"}],
+        cast_notes="Jack — tan hat",
+        prompt=story,
+    )
+    assert structured == [
+        {"id": "Mara", "name": "Mara", "role": "character", "markers": "", "image_path": ""}
+    ]
+    kept = cast_payload_for_plan(
+        cast=[{"id": "jack", "name": "Jack", "role": "character", "image_path": "references/jack.png"}]
+    )
+    assert kept[0]["image_path"] == "references/jack.png"
+
+
+def test_mirror_stores_staging_entities_and_blocking_without_greening_gates():
+    plan = _staged_plan()
+    pack = studio_pack_from_imagine(plan)
+    assert pack["editList"][0]["entities"] == "Jack, the bandits"
+    assert pack["editList"][1]["entities"] == "Jack, the bandits"
+    assert pack["editList"][0]["stage"] == STAGE_S1
+    assert pack["editList"][1]["stage"]["cross_motivation"] == "looking back along the trail"
+    assert "cross_reason" not in pack["editList"][1]["stage"]
+    assert pack["studioMeta"]["staging"] == STAGING
+    assert pack["studioMeta"]["lock_staging"] is True
+    assert pack["studioMeta"]["shot_stages"][0]["id"] == "s1"
+    assert pack["studioMeta"]["shot_stages"][0]["stage"] == STAGE_S1
+    assert pack["studioMeta"]["shot_stages"][1]["stage"]["cross_motivation"] == "looking back along the trail"
+    assert pack["studioMeta"]["called_comfy"] is False
+    assert pack["studioMeta"]["called_imagine"] is False
+    assert pack["studioMeta"]["produced_mp4"] is False
+    assert pack["studioMeta"]["generate_ready"] is False
+    where = who_is_where(plan, plan["shots"][0])
+    assert where == "Jack: right third, mid; the bandits: left third, far, behind Jack"
+    assert f"staging: {where}" in pack["editList"][0]["notes"]
+    assert "looking screen-left" in pack["editList"][1]["notes"]
+    assert [row["name"] for row in pack["characters"] if row.get("name")] == ["Jack", "the bandits"]
+    assert pack["characters"][0]["lockParagraph"] == ""
+    gates = evaluate_gates(pack)
+    assert all(gate["ok"] for gate in gates) is False
+    assert {gate["id"]: gate["ok"] for gate in gates}["edit-list"] is False
+
+    cast_only = studio_pack_from_imagine({**PLAN, "cast": CAST})
+    assert cast_only["editList"][0]["entities"] == "Jack, the bandits"
+    assert "staging" not in cast_only["studioMeta"]
+    assert "shot_stages" not in cast_only["studioMeta"]
+    assert "stage" not in cast_only["editList"][0]
+
+    unlabeled = {
+        "staging": {
+            "scenes": [
+                {
+                    "id": "sc1",
+                    "entities": [
+                        {"id": "jack", "label": "Jack on his buckskin horse", "kind": "character"},
+                    ],
+                }
+            ]
+        },
+        "shots": PLAN["shots"],
+    }
+    from_labels = studio_pack_from_imagine({**PLAN, **unlabeled, "cast": []})
+    assert from_labels["editList"][0]["entities"] == "Jack on his buckskin horse"
+    assert from_labels["studioMeta"]["staging"]["scenes"][0]["id"] == "sc1"
+
+
+def test_plan_sends_cast_and_lock_staging(client, auth, imagine):
+    seen: dict[str, dict] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/health":
+            return _health(True)
+        if request.url.path == "/api/packs/plan" and request.method == "POST":
+            seen["body"] = json.loads(request.content.decode())
+            return httpx.Response(200, json=PLAN)
+        raise AssertionError(f"unexpected {request.method} {request.url.path}")
+
+    imagine(handler)
+    notes = client.post(
+        "/api/quick/plan",
+        headers=auth,
+        json={
+            "prompt": "A lone cowboy is chased across the desert.",
+            "target_duration_sec": 30,
+            "aspect_ratio": "16:9",
+            "cast_notes": "Jack — tan hat\nthe bandits — black dusters",
+        },
+    )
+    assert notes.status_code == 200, notes.text
+    sent = seen["body"]
+    assert sent["lock_staging"] is True
+    assert sent["prompt"] == "A lone cowboy is chased across the desert."
+    assert "cast_notes" not in sent
+    assert [row["name"] for row in sent["cast"]] == ["Jack", "the bandits"]
+    assert sent["cast"][0]["markers"] == "tan hat"
+    assert notes.json()["called_imagine"] is False
+    assert notes.json()["produced_mp4"] is False
+    assert notes.json()["estimated_cost_units"] == 0
+
+    story = "A lone cowboy rides.\n\nCast:\nJonah — blue shirt"
+    embedded = client.post(
+        "/api/quick/plan",
+        headers=auth,
+        json={"prompt": story, "target_duration_sec": 15, "aspect_ratio": "16:9"},
+    )
+    assert embedded.status_code == 200, embedded.text
+    assert seen["body"]["prompt"] == story
+    assert seen["body"]["lock_staging"] is True
+    assert seen["body"]["cast"][0]["name"] == "Jonah"
+    assert seen["body"]["cast"][0]["id"] == "Jonah"
+
+
+def test_run_forwards_staging_and_persists_the_mirror(client, auth, imagine):
+    plan = _staged_plan()
+    forwarded: dict[str, dict] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/api/health":
+            return _health(True)
+        if path == "/api/packs" and request.method == "POST":
+            body = json.loads(request.content.decode())
+            forwarded["body"] = body
+            return httpx.Response(201, json={**body, "id": "pack-stage", "created_at": "2026-09-26T00:00:00Z"})
+        if path == "/api/packs/pack-stage/run":
+            return httpx.Response(200, json={"job_id": "job-stage", "pack_id": "pack-stage", "status": "queued"})
+        raise AssertionError(f"unexpected {request.method} {path}")
+
+    imagine(handler)
+    started = client.post("/api/quick/run", headers=auth, json={"plan": plan, "confirm": True})
+    assert started.status_code == 201, started.text
+    run = started.json()
+    assert run["called_imagine"] is True
+    assert run["called_comfy"] is False
+    assert run["produced_mp4"] is False
+    assert run["review_state"] == "draft"
+    sent = forwarded["body"]
+    assert sent["staging"] == plan["staging"]
+    assert sent["lock_staging"] is True
+    assert sent["shots"][0]["stage"] == plan["shots"][0]["stage"]
+    assert sent["shots"][1]["stage"] == plan["shots"][1]["stage"]
+    assert sent["shots"][1]["stage"]["cross_motivation"] == "looking back along the trail"
+    assert "cross_reason" not in sent["shots"][1]["stage"]
+    assert sent["cast"] == []
+
+    episode = client.get(f"/api/episodes/{run['episode_id']}", headers=auth)
+    assert episode.status_code == 200
+    assert episode.json()["review_state"] == "draft"
+    revision_id = episode.json()["latest_revision"]["id"]
+    revision = client.get(
+        f"/api/episodes/{run['episode_id']}/revisions/{revision_id}",
+        headers=auth,
+    )
+    assert revision.status_code == 200, revision.text
+    stored = revision.json()["pack"]
+    assert stored["studioMeta"]["staging"] == STAGING
+    assert stored["studioMeta"]["lock_staging"] is True
+    assert stored["studioMeta"]["called_comfy"] is False
+    assert stored["studioMeta"]["called_imagine"] is False
+    assert stored["studioMeta"]["produced_mp4"] is False
+    assert stored["studioMeta"]["generate_ready"] is False
+    assert stored["editList"][0]["entities"] == "Jack, the bandits"
+    assert stored["editList"][0]["stage"]["start"][0]["x"] == "right_third"
+    assert stored["studioMeta"]["shot_stages"][1]["id"] == "s2"
+    assert stored["studioMeta"]["shot_stages"][1]["stage"]["cross_motivation"] == "looking back along the trail"
+    assert stored["editList"][1]["stage"]["cross_motivation"] == "looking back along the trail"
+    assert "staging: Jack: right third, mid" in stored["editList"][0]["notes"]
+    snapshot = revision.json()["gate_snapshot"]
+    assert snapshot["all_green"] is False
+    gates = evaluate_gates(stored)
+    assert snapshot["all_green"] == all(gate["ok"] for gate in gates)
+    shots = client.get(f"/api/episodes/{run['episode_id']}/shots", headers=auth)
+    assert shots.status_code == 200, shots.text
+    assert shots.json()[0]["entities"] == "Jack, the bandits"
+    assert shots.json()[1]["entities"] == "Jack, the bandits"
+
+    refused = client.put(
+        f"/api/episodes/{run['episode_id']}/review",
+        headers=auth,
+        json={"state": "generate-ok", "note": "staging must not stamp this"},
+    )
+    assert refused.status_code == 409, refused.text
