@@ -114,21 +114,13 @@ Role-tagged Comfy workflows, prompt preview, shot coverage, and continue-from-pr
 - Extract and stitch stay on ffmpeg (`studio/scripts/clip_bridge_conform.sh`, CLIP_BRIDGE §12). They are not Comfy nodes.
 - A stub file is not a render. Filling inject paths does not POST `/prompt`. `called_comfy` stays false until a live lane accepts a prompt. No invented MP4.
 
-## Quick create (Imagine fast path)
+## Quick create (local desk)
 
-One story prompt can render through the separate local Omarchy Grok Imagine app (`smfworks/omarchy-grok-imagine`, HTTP on `:8010`, bearer token). Studio does not start that app.
+One story prompt plans shots on this machine. Studio does not call a cloud image or video API. Grok Imagine stays in the separate `omarchy-grok-imagine` app and is not a Studio engine.
 
-| Env | Default | Meaning |
-|---|---|---|
-| `STUDIO_IMAGINE_URL` | empty | Empty is not live. Example: `http://127.0.0.1:8010` |
-| `STUDIO_IMAGINE_TOKEN` | `local-dev-token` | `Authorization: Bearer` |
-| `STUDIO_IMAGINE_POLL_SECONDS` | `5` | Poll interval for a running Imagine job |
-
-`/api/meta` `imagine_configured` is true only when `GET {url}/api/health` returns `imagine_configured: true` (short timeout, cached briefly).
-
-- `POST /api/quick/plan` proxies `POST /api/packs/plan`. No Studio budget spend. Audit `quick.plan`.
-- `POST /api/quick/run` needs the jobs permission and `{plan, confirm: true}`. Missing confirm or a health check that is not configured returns 409. It creates a project, episode, and pack revision, then `POST /api/packs` and `POST /api/packs/{id}/run`. The job type is `imagine-episode`. Audit `quick.run`. Estimated units use `STUDIO_COST_RATES` key `grok-imagine`.
-- `GET /api/quick/{run_id}` polls Imagine jobs. When `stitched_episode` is true it downloads `episode.mp4` into the media store as a preview asset and sets `produced_mp4` true, `called_imagine` true, `called_comfy` false.
-- The Studio pack mirrors the plan (log line, map clocks from cumulative durations, energy from beat role, edit-list camera verbs from the Imagine camera card). Gates are evaluated as written. Nothing forces them green. generate-ok and sign-off are unchanged.
-- The catalog slot `grok-imagine` is informational (`transport: imagine-http`). Honesty: `xAI Grok Imagine via the local Imagine app. Not H3/Qwen.`
-- This does not start Hermes, does not call Comfy, and does not treat a plan as an MP4.
+- `POST /api/quick/plan` builds a deterministic shot list from the prompt, length, aspect, and optional cast notes. No budget spend. Audit `quick.plan`. `called_comfy` stays false. `produced_mp4` stays false.
+- Named cast is placed on one local scene. The mirror copies that into `entities`, `studioMeta.staging`, and `studioMeta.shot_stages`. Each shot can show a read-only who-is-where line. A plan with no cast leaves staging unset.
+- `POST /api/quick/run` needs the jobs permission and `{plan, confirm: true}`. Missing confirm returns 409. It creates a project, episode, and pack revision on the local desk and binds the project's still and clip adapters (stub, or Comfy when a private lane is set). It does not enqueue a render. Audit `quick.run`.
+- `GET /api/quick/{run_id}` reads that episode. `produced_mp4` stays false. `called_comfy` stays false. Gates, sign-off, and generate-ok are unchanged.
+- The pack mirror maps log line, map clocks from cumulative durations, energy from beat role, and edit-list camera verbs when a shot already has a camera card. Gates are evaluated as written. Nothing forces them green.
+- This does not start Hermes, does not call a cloud renderer, and does not treat a plan as an MP4.

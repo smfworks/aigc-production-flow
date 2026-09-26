@@ -5,6 +5,7 @@ test("create wizard prunes a task tree, shows lanes and checkpoints, and reloads
   request,
 }) => {
   await page.goto("/#/create");
+  await page.getByTestId("full-wizard").click();
   await expect(page.getByTestId("create-wizard")).toBeVisible();
   await page.getByTestId("wizard-prompt").fill("Mara waits in the hall. She turns.");
   await page.getByTestId("wizard-continue").click();
@@ -59,8 +60,7 @@ test("create wizard prunes a task tree, shows lanes and checkpoints, and reloads
   await expect(page.getByTestId("hermes-handoff")).toBeVisible();
   await expect(page.getByTestId("hermes-handoff")).toContainText("hermes://aigc/brief?run=");
 
-  const wizardUrl = page.url();
-  const wizardId = wizardUrl.split("/create/")[1];
+  const wizardId = new URL(page.url()).hash.split("/").filter(Boolean).pop();
   expect(wizardId).toBeTruthy();
   const headers = {
     Authorization: "Bearer local-dev-token",

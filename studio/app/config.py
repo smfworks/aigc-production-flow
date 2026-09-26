@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     comfy_h3_width: int = 960
     comfy_h3_height: int = 544
     auth_mode: str = "local"
-    cost_rates: str = "stub:0.1,webhook:1,cli:1,comfy-h3:2,comfy-qwen:0.5,grok-imagine:4"
+    cost_rates: str = "stub:0.1,webhook:1,cli:1,comfy-h3:2,comfy-qwen:0.5"
     cost_currency: str = "credits"
     cost_usd_per_unit: float = 0.0
     budget_cap_units: float | None = None
@@ -93,10 +93,6 @@ class Settings(BaseSettings):
     workflow_root: str = ""
     # Still and clip enqueue requires a prompt preview unless this is turned off.
     require_prompt_preview: bool = True
-    # Local Omarchy Grok Imagine app. Empty URL means the fast path is not live.
-    imagine_url: str = ""
-    imagine_token: str = "local-dev-token"
-    imagine_poll_seconds: float = 5.0
 
     @property
     def cors_origin_list(self) -> list[str]:

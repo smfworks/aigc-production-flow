@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from ..local_only import is_cloud_generation_host
+
 from ..config import Settings
 from .base import AdapterResult, JobContext
 from .stub import StubClipFactory, StubStillFactory
@@ -162,6 +164,15 @@ def run_live(settings: Settings, ctx: JobContext, wanted: str) -> AdapterResult:
                 ok=False,
                 adapter=STUB_NAME,
                 error="adapter webhook URL must be http(s) with a host.",
+            )
+        if is_cloud_generation_host(parsed.hostname):
+            return AdapterResult(
+                ok=False,
+                adapter=STUB_NAME,
+                error=(
+                    f"adapter webhook host {parsed.hostname} is a cloud generation API. "
+                    "Studio stays on local inference."
+                ),
             )
         try:
             response = httpx.post(

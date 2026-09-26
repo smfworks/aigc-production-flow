@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { api, downloadMedia, fetchMediaBlob } from "./api.ts";
+import { useState } from "react";
+import { api } from "./api.ts";
 import { whoIsWhere } from "./stagingLine.ts";
-import type { ImaginePlan, ImagineShot, QuickStatus, StudioUser } from "./types.ts";
+import type { QuickPlan, QuickShot, QuickStatus, StudioUser } from "./types.ts";
 
 const LENGTHS = [15, 30, 60] as const;
 const ASPECTS = ["9:16", "16:9", "1:1"] as const;
@@ -23,65 +23,12 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
   const [castNotes, setCastNotes] = useState("");
   const [lengthSec, setLengthSec] = useState<(typeof LENGTHS)[number]>(30);
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>("9:16");
-  const [plan, setPlan] = useState<ImaginePlan | null>(null);
+  const [plan, setPlan] = useState<QuickPlan | null>(null);
   const [planning, setPlanning] = useState(false);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState<QuickStatus | null>(null);
-  const [polling, setPolling] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const jobs = can(me, "jobs");
-
-  useEffect(() => {
-    if (!polling || !status?.run_id) return;
-    let stop = false;
-    let timer = 0;
-    const runId = status.run_id;
-    const tick = async () => {
-      try {
-        const next = await api.quickStatus(runId);
-        if (stop) return;
-        setStatus(next);
-        if (next.produced_mp4 || next.status === "failed" || next.status === "cancelled") {
-          setPolling(false);
-          if (next.produced_mp4) onNotice("episode.mp4 is in the Studio media store.");
-          return;
-        }
-        const wait = Math.max(1, next.poll_seconds || 5) * 1000;
-        timer = window.setTimeout(() => void tick(), wait);
-      } catch (err) {
-        if (!stop) onError(err);
-        setPolling(false);
-      }
-    };
-    timer = window.setTimeout(() => void tick(), Math.max(1, status.poll_seconds || 5) * 1000);
-    return () => {
-      stop = true;
-      window.clearTimeout(timer);
-    };
-  }, [polling, status?.run_id, status?.poll_seconds, onError, onNotice]);
-
-  useEffect(() => {
-    if (!status?.produced_mp4 || !status.media_id) {
-      setVideoUrl(null);
-      return;
-    }
-    let url = "";
-    let stop = false;
-    void fetchMediaBlob(status.media_id)
-      .then((blob) => {
-        if (stop) return;
-        url = URL.createObjectURL(blob);
-        setVideoUrl(url);
-      })
-      .catch((err) => {
-        if (!stop) onError(err);
-      });
-    return () => {
-      stop = true;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [status?.produced_mp4, status?.media_id, onError]);
 
   async function planStory() {
     const prompt = story.trim();
@@ -92,7 +39,6 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
     setPlanning(true);
     setPlan(null);
     setStatus(null);
-    setPolling(false);
     try {
       const planned = await api.quickPlan({
         prompt,
@@ -109,7 +55,7 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
     }
   }
 
-  function updateShot(index: number, patch: Partial<ImagineShot>) {
+  function updateShot(index: number, patch: Partial<QuickShot>) {
     setPlan((current) => {
       if (!current) return current;
       const shots = current.shots.map((shot, shotIndex) =>
@@ -125,8 +71,7 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
     try {
       const started = await api.quickRun(plan);
       setStatus(started);
-      setPolling(!started.produced_mp4 && started.status !== "failed");
-      onNotice("Imagine accepted the run. Comfy was not called.");
+      onNotice("Episode saved on the local desk.");
     } catch (err) {
       onError(err);
     } finally {
@@ -140,8 +85,9 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
         <p className="hint">Fast path</p>
         <h2>Quick create</h2>
         <p className="hint">
-          One story prompt. The local Imagine app plans the shots, then a confirmed run renders
-          episode.mp4 into Studio&apos;s media store. Gates and generate-ok stay as they are.
+          One story prompt. Studio plans the shots on this machine. Run saves the episode on the
+          local desk. Stills and clips use the configured local engines. Gates and generate-ok stay
+          as they are.
         </p>
         <button type="button" className="text-btn" data-testid="full-wizard" onClick={onFullWizard}>
           Full wizard
@@ -256,18 +202,18 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
               );
             })}
           </ol>
-          <p className="paid-note" data-testid="quick-paid-note">
-            Run starts a paid xAI render through the local Imagine app. Studio does not call Comfy.
+          <p className="hint" data-testid="quick-run-note">
+            Run saves this plan as an episode. Generate stills and clips from the desk.
           </p>
           <div className="wizard-actions">
             <button
               type="button"
               className="btn btn-go"
               data-testid="quick-run"
-              disabled={running || polling || !jobs}
+              disabled={running || !jobs}
               onClick={() => void runPlan()}
             >
-              {running ? "Starting…" : "Run"}
+              {running ? "Saving…" : "Run"}
             </button>
             {!jobs ? <span className="hint">The jobs permission is required to run.</span> : null}
           </div>
@@ -276,13 +222,8 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
 
       {status ? (
         <div className="wizard-card" data-testid="quick-progress">
-          <h3>Progress</h3>
-          <p>
-            {status.status} · {status.progress}%
-            {status.called_comfy ? "" : " · Comfy was not called"}
-          </p>
-          <progress value={status.progress} max={100} />
-          {status.message ? <p>{status.message}</p> : null}
+          <h3>Saved</h3>
+          <p>{status.message}</p>
           {status.error ? <p className="hint">{status.error}</p> : null}
           {status.project_id && status.episode_id ? (
             <button
@@ -293,21 +234,6 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
               Open episode
             </button>
           ) : null}
-        </div>
-      ) : null}
-
-      {videoUrl && status?.media_id ? (
-        <div className="wizard-card" data-testid="quick-player">
-          <h3>episode.mp4</h3>
-          <video src={videoUrl} controls />
-          <button
-            type="button"
-            className="btn"
-            data-testid="quick-download"
-            onClick={() => void downloadMedia(status.media_id as string, "episode.mp4").catch(onError)}
-          >
-            Download
-          </button>
         </div>
       ) : null}
     </section>

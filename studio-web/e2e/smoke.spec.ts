@@ -66,12 +66,30 @@ test("demo seed shows continuity and identity signals, then stub precheck", asyn
   await expect(page.getByText("batch-precheck · failed")).toBeVisible();
 });
 
-test("quick create degrades when Imagine is unconfigured", async ({ page }) => {
+test("quick create is the local create screen", async ({ page }) => {
   await page.goto("/#/create");
-  await expect(page.getByTestId("quick-create-unconfigured")).toBeVisible();
-  await expect(page.getByTestId("quick-create-unconfigured")).toContainText("STUDIO_IMAGINE_URL");
-  await expect(page.getByTestId("quick-create")).toHaveCount(0);
+  await expect(page.getByTestId("quick-create")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quick create" })).toBeVisible();
+  await expect(page.getByTestId("full-wizard")).toBeVisible();
+  await expect(page.getByTestId("quick-create-unconfigured")).toHaveCount(0);
+  await page.getByTestId("full-wizard").click();
   await expect(page.getByTestId("create-wizard")).toBeVisible();
+});
+
+test("quick create plans on this machine and saves the episode", async ({ page }) => {
+  await page.goto("/#/create");
+  await page.getByTestId("quick-story").fill("Mara waits in the hall. The light turns.");
+  await page.getByTestId("quick-cast").fill("Mara — tired eyes");
+  await page.getByTestId("quick-plan").click();
+  await expect(page.getByTestId("quick-shots")).toBeVisible();
+  await expect(page.getByTestId("quick-where-0")).toContainText("Mara");
+  await expect(page.getByTestId("quick-run-note")).toContainText("desk");
+  await expect(page.getByTestId("quick-run")).toBeEnabled();
+  await page.getByTestId("quick-run").click();
+  await expect(page.getByTestId("quick-progress")).toContainText("local desk");
+  await expect(page.getByTestId("quick-progress")).toContainText("produced_mp4 is false");
+  await page.getByRole("button", { name: "Open episode" }).click();
+  await expect(page).toHaveURL(/episodes\//);
 });
 
 test("new project opens pack stages without a zip", async ({ page }) => {
