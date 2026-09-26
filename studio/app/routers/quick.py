@@ -23,6 +23,7 @@ from ..imagine_bridge import (
     IMAGINE_ADAPTER,
     ImagineError,
     ImagineNotConfigured,
+    cast_payload_for_plan,
     get_imagine_client,
     imagine_configured,
     pack_body_for_create,
@@ -44,11 +45,32 @@ class QuickPlanIn(BaseModel):
     resolution: str | None = None
     title: str | None = None
     style_preset: str | None = None
+    cast: list[dict[str, Any]] | None = None
+    cast_notes: str | None = None
 
 
 class QuickRunIn(BaseModel):
     plan: dict[str, Any]
     confirm: bool = False
+
+
+def _plan_payload(body: QuickPlanIn) -> dict[str, Any]:
+    """Imagine plan body. ``lock_staging`` is always on. Cast is sent only when named.
+
+    ``cast_notes`` is Studio's optional free text. Imagine does not receive that key.
+    """
+    payload = body.model_dump(exclude_none=True)
+    payload.pop("cast", None)
+    payload.pop("cast_notes", None)
+    cast = cast_payload_for_plan(
+        cast=body.cast,
+        cast_notes=body.cast_notes or "",
+        prompt=body.prompt,
+    )
+    if cast:
+        payload["cast"] = cast
+    payload["lock_staging"] = True
+    return payload
 
 
 def _refuse_unconfigured() -> None:
@@ -74,7 +96,7 @@ def _http_from_imagine(exc: ImagineError) -> HTTPException:
 def plan_quick(body: QuickPlanIn, user: ReadUser, db: DbDep) -> dict[str, Any]:
     """Proxy POST /api/packs/plan. No Studio budget units. Does not render."""
     _refuse_unconfigured()
-    payload = body.model_dump(exclude_none=True)
+    payload = _plan_payload(body)
     try:
         planned = get_imagine_client().plan(payload)
     except ImagineNotConfigured as exc:

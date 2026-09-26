@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, downloadMedia, fetchMediaBlob } from "./api.ts";
+import { whoIsWhere } from "./stagingLine.ts";
 import type { ImaginePlan, ImagineShot, QuickStatus, StudioUser } from "./types.ts";
 
 const LENGTHS = [15, 30, 60] as const;
@@ -19,6 +20,7 @@ function can(user: StudioUser | null, perm: string): boolean {
 
 export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice }: Props) {
   const [story, setStory] = useState("");
+  const [castNotes, setCastNotes] = useState("");
   const [lengthSec, setLengthSec] = useState<(typeof LENGTHS)[number]>(30);
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>("9:16");
   const [plan, setPlan] = useState<ImaginePlan | null>(null);
@@ -96,6 +98,7 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
         prompt,
         target_duration_sec: lengthSec,
         aspect_ratio: aspect,
+        ...(castNotes.trim() ? { cast_notes: castNotes.trim() } : {}),
       });
       setPlan(planned.plan);
       onNotice("Plan only. Nothing was rendered.");
@@ -154,6 +157,17 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
             onChange={(event) => setStory(event.target.value)}
           />
         </label>
+        <label>
+          Cast
+          <textarea
+            rows={2}
+            value={castNotes}
+            data-testid="quick-cast"
+            placeholder="Optional. Jack — tan hat"
+            onChange={(event) => setCastNotes(event.target.value)}
+          />
+        </label>
+        <p className="hint">Optional. Names here go with the plan. Leave this blank to plan from the story alone.</p>
         <fieldset>
           <legend>Length</legend>
           <div className="choice-row">
@@ -206,33 +220,41 @@ export function QuickCreate({ me, onFullWizard, onOpenEpisode, onError, onNotice
           <h3>{plan.title || "Shot list"}</h3>
           {plan.logline ? <p>{plan.logline}</p> : null}
           <ol className="quick-shots">
-            {plan.shots.map((shot, index) => (
-              <li key={shot.id || index}>
-                <p>
-                  {shot.id || `Shot ${index + 1}`}
-                  {shot.duration_sec ? ` · ${shot.duration_sec}s` : ""}
-                  {shot.camera?.move ? ` · ${shot.camera.move}` : ""}
-                </p>
-                <label>
-                  Still prompt
-                  <textarea
-                    rows={3}
-                    value={shot.prompt_still}
-                    data-testid={`quick-still-${index}`}
-                    onChange={(event) => updateShot(index, { prompt_still: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Motion prompt
-                  <textarea
-                    rows={3}
-                    value={shot.prompt_motion}
-                    data-testid={`quick-motion-${index}`}
-                    onChange={(event) => updateShot(index, { prompt_motion: event.target.value })}
-                  />
-                </label>
-              </li>
-            ))}
+            {plan.shots.map((shot, index) => {
+              const where = whoIsWhere(shot, plan.staging, plan.cast);
+              return (
+                <li key={shot.id || index}>
+                  <p>
+                    {shot.id || `Shot ${index + 1}`}
+                    {shot.duration_sec ? ` · ${shot.duration_sec}s` : ""}
+                    {shot.camera?.move ? ` · ${shot.camera.move}` : ""}
+                  </p>
+                  {where ? (
+                    <p className="quick-where" data-testid={`quick-where-${index}`}>
+                      {where}
+                    </p>
+                  ) : null}
+                  <label>
+                    Still prompt
+                    <textarea
+                      rows={3}
+                      value={shot.prompt_still}
+                      data-testid={`quick-still-${index}`}
+                      onChange={(event) => updateShot(index, { prompt_still: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Motion prompt
+                    <textarea
+                      rows={3}
+                      value={shot.prompt_motion}
+                      data-testid={`quick-motion-${index}`}
+                      onChange={(event) => updateShot(index, { prompt_motion: event.target.value })}
+                    />
+                  </label>
+                </li>
+              );
+            })}
           </ol>
           <p className="paid-note" data-testid="quick-paid-note">
             Run starts a paid xAI render through the local Imagine app. Studio does not call Comfy.

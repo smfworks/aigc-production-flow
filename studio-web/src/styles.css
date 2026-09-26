@@ -1117,6 +1117,12 @@ a.btn {
   padding-left: 18px;
 }
 
+.quick-where {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 .paid-note {
   color: var(--ember);
   margin: 0;
