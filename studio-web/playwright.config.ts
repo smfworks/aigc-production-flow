@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { E2E_TOKEN } from "./e2e/token.ts";
 
 const api = "http://127.0.0.1:8000";
 const web = "http://127.0.0.1:5174";
@@ -27,6 +28,8 @@ export default defineConfig({
       env: {
         STUDIO_DATABASE_URL: "sqlite:////tmp/aigc-phase9-e2e.db",
         STUDIO_MEDIA_ROOT: "/tmp/aigc-phase9-e2e-media",
+        STUDIO_API_TOKEN: E2E_TOKEN,
+        STUDIO_BIND_HOST: "127.0.0.1",
         STUDIO_JOB_WORKER: "thread",
         STUDIO_AUTH_MODE: "local",
       },
@@ -36,6 +39,9 @@ export default defineConfig({
       url: web,
       reuseExistingServer: false,
       timeout: 60_000,
+      env: {
+        VITE_API_TOKEN: E2E_TOKEN,
+      },
     },
   ],
 });

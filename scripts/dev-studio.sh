@@ -10,11 +10,12 @@ ROLE="${1:-api}"
 
 export STUDIO_DATABASE_URL="${STUDIO_DATABASE_URL:-sqlite:///${ROOT}/data/studio.db}"
 export STUDIO_MEDIA_ROOT="${STUDIO_MEDIA_ROOT:-${ROOT}/data/media}"
-export STUDIO_API_TOKEN="${STUDIO_API_TOKEN:-local-dev-token}"
+export STUDIO_BIND_HOST="${STUDIO_BIND_HOST:-127.0.0.1}"
 export STUDIO_PACK_BUILDER_URL="${STUDIO_PACK_BUILDER_URL:-http://localhost:5173}"
 export STUDIO_JOB_WORKER="${STUDIO_JOB_WORKER:-thread}"
 export STUDIO_STILL_ADAPTER="${STUDIO_STILL_ADAPTER:-stub}"
 export STUDIO_CLIP_ADAPTER="${STUDIO_CLIP_ADAPTER:-stub}"
+export STUDIO_PORT="${STUDIO_PORT:-8000}"
 
 mkdir -p "$ROOT/data/media"
 
@@ -25,12 +26,40 @@ ensure_studio_venv() {
   fi
 }
 
-start_api() {
+# Resolve the API token without exporting a generated value as STUDIO_API_TOKEN.
+# An exported generated token would look operator-configured and could satisfy
+# a non-loopback bind. Vite receives VITE_* only.
+read_api_token() {
   ensure_studio_venv
-  echo "Studio API  http://localhost:8000/docs  (token: $STUDIO_API_TOKEN)"
+  local token
+  token="$(
+    cd "$ROOT/studio"
+    "$ROOT/studio/.venv/bin/python" -m app.print_token
+  )"
+  if [[ -z "$token" ]]; then
+    echo "Studio did not produce an API token." >&2
+    exit 1
+  fi
+  printf '%s' "$token"
+}
+
+publish_token_to_vite() {
+  local token="$1"
+  export VITE_API_TOKEN="$token"
+  export VITE_STUDIO_TOKEN="$token"
+}
+
+start_api() {
+  local token
+  token="$(read_api_token)"
+  publish_token_to_vite "$token"
+  echo "Studio API  http://127.0.0.1:${STUDIO_PORT}/docs"
+  echo "Listen      ${STUDIO_BIND_HOST}"
+  echo "Token       ${token}"
   echo "Job worker  in-process (${STUDIO_JOB_WORKER}); adapter still=${STUDIO_STILL_ADAPTER} clip=${STUDIO_CLIP_ADAPTER}"
   cd "$ROOT/studio"
-  exec "$ROOT/studio/.venv/bin/uvicorn" app.main:app --reload --host 0.0.0.0 --port 8000
+  export STUDIO_RELOAD="${STUDIO_RELOAD:-1}"
+  exec "$ROOT/studio/.venv/bin/python" -m app.serve
 }
 
 start_worker() {
@@ -86,13 +115,18 @@ start_all() {
   }
   trap cleanup INT TERM EXIT
 
-  echo "API     http://localhost:8000/docs  (in-process job worker)"
-  echo "Studio  http://localhost:5174"
-  echo "Builder http://localhost:5173"
-  echo "Token   $STUDIO_API_TOKEN"
+  local token
+  token="$(read_api_token)"
+  publish_token_to_vite "$token"
+  echo "API     http://127.0.0.1:${STUDIO_PORT}/docs  (in-process job worker)"
+  echo "Listen  ${STUDIO_BIND_HOST}"
+  echo "Studio  http://127.0.0.1:5174"
+  echo "Builder http://127.0.0.1:5173"
+  echo "Token   ${token}"
   (
     cd "$ROOT/studio"
-    "$ROOT/studio/.venv/bin/uvicorn" app.main:app --reload --host 0.0.0.0 --port 8000
+    export STUDIO_RELOAD="${STUDIO_RELOAD:-1}"
+    "$ROOT/studio/.venv/bin/python" -m app.serve
   ) &
   (cd "$ROOT/studio-web" && npm run dev) &
   (cd "$ROOT/app" && npm run dev) &

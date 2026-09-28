@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { E2E_TOKEN } from "./token.ts";
 
 test("create wizard prunes a task tree, shows lanes and checkpoints, and reloads a recipe", async ({
   page,
@@ -63,7 +64,7 @@ test("create wizard prunes a task tree, shows lanes and checkpoints, and reloads
   const wizardId = new URL(page.url()).hash.split("/").filter(Boolean).pop();
   expect(wizardId).toBeTruthy();
   const headers = {
-    Authorization: "Bearer local-dev-token",
+    Authorization: `Bearer ${E2E_TOKEN}`,
   };
   const runList = await request.get(`/api/create/wizard/${wizardId}`, { headers });
   expect(runList.ok()).toBeTruthy();

@@ -1,4 +1,13 @@
+import os
 from pathlib import Path
+
+# Pin the listen address before importing the app. Importing app.main builds
+# the ASGI app and resolves the API token. An ambient non-loopback bind, or
+# the retired token, would refuse that import.
+os.environ["STUDIO_BIND_HOST"] = "127.0.0.1"
+os.environ["STUDIO_ALLOW_NON_LOOPBACK"] = "0"
+if os.environ.get("STUDIO_API_TOKEN") == "local-dev-token":
+    del os.environ["STUDIO_API_TOKEN"]
 
 import pytest
 from fastapi.testclient import TestClient
@@ -16,6 +25,8 @@ def _build_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, worker: str) 
     monkeypatch.setenv("STUDIO_DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("STUDIO_MEDIA_ROOT", str(media))
     monkeypatch.setenv("STUDIO_API_TOKEN", TOKEN)
+    monkeypatch.setenv("STUDIO_BIND_HOST", "127.0.0.1")
+    monkeypatch.setenv("STUDIO_ALLOW_NON_LOOPBACK", "0")
     monkeypatch.setenv("STUDIO_DEFAULT_USER", "tester")
     monkeypatch.setenv("STUDIO_JOB_WORKER", worker)
     monkeypatch.setenv("STUDIO_JOB_POLL_SECONDS", "0.05")

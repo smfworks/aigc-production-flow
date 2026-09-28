@@ -13,7 +13,14 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./data/studio.db"
     media_root: str = "./data/media"
-    api_token: str = "local-dev-token"
+    # Empty means "not configured": first run generates a token and stores it
+    # mode 0600. The retired value local-dev-token refuses startup.
+    api_token: str = ""
+    # Default listen address. Non-loopback also needs STUDIO_ALLOW_NON_LOOPBACK
+    # and an environment token. See app.runtime_security.
+    bind_host: str = "127.0.0.1"
+    allow_non_loopback: bool = False
+    token_file: str = ""
     default_user: str = "local-dev"
     default_org_name: str = "SMF Works (local)"
     pack_builder_url: str = "http://localhost:5173"
@@ -112,4 +119,9 @@ def get_settings() -> Settings:
         raw = settings.database_url.removeprefix("sqlite:///")
         if raw not in {":memory:", ""} and not raw.startswith("/"):
             Path(raw).expanduser().parent.mkdir(parents=True, exist_ok=True)
+    # Imported here so this module can finish loading before runtime_security
+    # imports Settings.
+    from .runtime_security import apply_runtime_security
+
+    apply_runtime_security(settings)
     return settings

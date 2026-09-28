@@ -135,7 +135,7 @@ Two pieces, one contract:
 |---|---|---|
 | Job | Four-stage walk and zip round-trip. Export markdown zip + `pack.json`. **Open in Studio** is optional. | Create wizard is the front door: scope, a prunable task tree, craft-lane labels, checkpoints, then **Send to Hermes** (stills, clips, stitch) with zip export as fallback. Local Create recipes prefill the wizard. Blank, template, and brain dump stay available. Plus pack diff, identity, sign-off, jobs, playlist scrubber, budget, audit, roles, multi-org lite. Optional Celery / OIDC / local LLM endpoint. |
 | Where | Client-side Vite app (still the live demo). | Local FastAPI + thin studio shell. Compose pack: `docker-compose.studio.yml`. |
-| Auth | None (browser `localStorage`). | Local-dev API token + optional `X-Forwarded-User` + app-level org roles (`writer` / `art` plus the Phase 5 four). Optional OIDC JWKS (**off by default**). Roles stay app-level unless the OIDC claim map is on. Multi-org lite is membership isolation, not SaaS. [docs/AUTH.md](docs/AUTH.md). |
+| Auth | None (browser `localStorage`). | Bearer `STUDIO_API_TOKEN`. Unset generates a mode-0600 token on first run. `local-dev-token` refuses startup. Default bind is `127.0.0.1`; a non-loopback bind needs `STUDIO_ALLOW_NON_LOOPBACK=1` and a token you set. Optional `X-Forwarded-User` only from a proxy that overwrites it. App-level org roles (`writer` / `art` plus the Phase 5 four). Optional OIDC JWKS (**off by default**). [docs/AUTH.md](docs/AUTH.md). |
 | Generate | Refuses export-as-complete until every gate is green. | Refuses `generate-ok` unless gates are green, hop-1 receipts are preview-watched, **and** a reviewer/producer has signed off. Default adapter=`stub`. Quick create saves a local episode and does not stamp generate-ok. Budget units are operator credits, not a cloud bill. Media is local disk unless S3 is configured. |
 | Not this | NLE, GPU, MP4. | Full NLE, CapCut clone, SaaS billing. Celery and OIDC stay opt-in. Comfy stays stub until its lanes are set. |
 
@@ -143,20 +143,25 @@ Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/
 
 ```bash
 ./scripts/dev-studio.sh all
-# API     http://localhost:8000/docs
-# Studio  http://localhost:5174
-# Builder http://localhost:5173
+# API     http://127.0.0.1:8000/docs
+# Studio  http://127.0.0.1:5174
+# Builder http://127.0.0.1:5173
 ```
+
+The dev script listens on `127.0.0.1`. The first run writes an API token next to the SQLite file (mode `0600`) and passes it to the Vite shells. Set `STUDIO_API_TOKEN` yourself when you want a chosen secret. `local-dev-token` will not start.
 
 Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. Assign **writer** and **art** as different roles (script vs identity). Reorder episodes. Scrub the shot playlist against a stub preview. Unapprove or edit identity keywords, then re-approve. Create a second org, switch, confirm the member cannot see it. Seed a demo episode. Approve a sheet, link a plate, open Continuity into identity. Diff two pack revisions before import (shared entity-schedule rows stay distinct). Open in Studio auto-imports after episode pick when configured. Bell on a stub job. `/readyz` green. Download a backup zip (season/sequence kept). A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, sign-off is missing, or approved identity keywords conflict. Unset comfy-* lanes stay stub / not live. With `STUDIO_COMFY_STILL_LANES` and `STUDIO_COMFY_CLIP_LANES` set to a private ComfyUI, Studio runs Qwen-Image stills and MiniMax H3 clips itself (path text, not pixels in the receipt). See [docs/STUDIO.md](docs/STUDIO.md) and [NOTICE](NOTICE).
 
 CI: GitHub Actions runs `studio` pytest, `app` `npm test`, `studio-web` `tsc --noEmit`, and a Playwright smoke (skips with `E2E_SKIP` if Chromium is unavailable) on every pull request and fails the PR on red.
 
 ```bash
+export STUDIO_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose -f docker-compose.studio.yml up --build
-# API     http://localhost:8000/docs
-# Studio  http://localhost:5174  (/api proxied)
+# API     http://127.0.0.1:8000/docs
+# Studio  http://127.0.0.1:5174  (/api proxied)
 ```
+
+Compose publishes those ports on `127.0.0.1` only. The API process listens on all container interfaces so the web container can reach it, which requires the token above and `STUDIO_ALLOW_NON_LOOPBACK` (already set in the compose file). The image does not contain a token. The web container writes it into `studio-token.js` at start for the shell.
 
 ## Layout
 

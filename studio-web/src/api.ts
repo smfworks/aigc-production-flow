@@ -47,9 +47,55 @@ import type {
 const TOKEN_KEY = "smf.aigc-studio.token";
 const USER_KEY = "smf.aigc-studio.user";
 const ORG_KEY = "smf.aigc-studio.org";
+const RETIRED_API_TOKEN = "local-dev-token";
+
+function storedToken(): string {
+  try {
+    return (localStorage.getItem(TOKEN_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function injectedToken(): string {
+  if (typeof window === "undefined") return "";
+  const value = window.__STUDIO_TOKEN__;
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function usableToken(value: string): string {
+  const token = value.trim();
+  if (!token || token === RETIRED_API_TOKEN) return "";
+  return token;
+}
 
 export function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) || import.meta.env?.VITE_API_TOKEN || "local-dev-token";
+  const saved = storedToken();
+  if (saved === RETIRED_API_TOKEN) {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  const fromEnv = usableToken(import.meta.env?.VITE_API_TOKEN || "");
+  return usableToken(saved) || fromEnv || usableToken(injectedToken());
+}
+
+export async function ensureLocalToken(): Promise<string> {
+  const existing = getToken();
+  if (existing) return existing;
+  try {
+    const response = await fetch("/api/local-token");
+    if (!response.ok) return "";
+    const body = (await response.json()) as { token?: unknown };
+    const token = usableToken(typeof body.token === "string" ? body.token : "");
+    if (!token) return "";
+    setToken(token);
+    return token;
+  } catch {
+    return "";
+  }
 }
 
 export function setToken(token: string): void {

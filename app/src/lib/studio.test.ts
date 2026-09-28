@@ -6,6 +6,7 @@ import {
   studioBaseUrl,
   studioHandoffUrl,
   studioImportUrl,
+  studioToken,
 } from "./studio.ts";
 
 test("studio handoff defaults to local studio-web with import hint", () => {
@@ -15,6 +16,11 @@ test("studio handoff defaults to local studio-web with import hint", () => {
 
 test("studio API URL defaults to local FastAPI for Vite studio-web", () => {
   assert.equal(studioApiUrl(), "http://localhost:8000");
+});
+
+test("studio token does not fall back to the retired default", () => {
+  assert.equal(studioToken(), "");
+  assert.notEqual(studioToken(), "local-dev-token");
 });
 
 test("handoff URL carries the staged zip id", () => {

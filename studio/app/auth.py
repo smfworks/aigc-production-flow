@@ -1,3 +1,4 @@
+import hmac
 from typing import Annotated
 
 from fastapi import Header, HTTPException, status
@@ -42,12 +43,22 @@ def _sso_note(mode: str) -> str:
     return f"local-dev token. OIDC remains opt-in and off by default — {SSO_NOTE}"
 
 
+def bearer_matches(presented: str | None, expected: str) -> bool:
+    """Constant-time compare. Empty tokens never match."""
+    if not presented or not expected:
+        return False
+    try:
+        return hmac.compare_digest(presented, expected)
+    except (TypeError, ValueError):
+        return False
+
+
 def get_current_user(
     authorization: Annotated[str | None, Header()] = None,
     x_user_name: Annotated[str | None, Header()] = None,
     x_forwarded_user: Annotated[str | None, Header()] = None,
 ) -> UserOut:
-    """Identity gate. Default is local-dev Bearer. OIDC is opt-in.
+    """Identity gate. Default is a Bearer token. OIDC is opt-in.
 
     ``STUDIO_AUTH_MODE=local`` (default): token required; display name from
     ``X-User-Name`` or ``STUDIO_DEFAULT_USER``.
@@ -80,12 +91,12 @@ def get_current_user(
             oidc_role=oidc_role,
         )
 
-    if token != settings.api_token:
+    if not bearer_matches(token, settings.api_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=(
-                "Invalid or missing API token. Local-dev auth: "
-                "Authorization: Bearer $STUDIO_API_TOKEN (default local-dev-token). "
+                "Invalid or missing API token. "
+                "Authorization: Bearer $STUDIO_API_TOKEN. "
                 f"OIDC is opt-in and off by default — {SSO_NOTE}."
             ),
             headers={"WWW-Authenticate": "Bearer"},

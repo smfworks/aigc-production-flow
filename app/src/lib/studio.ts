@@ -36,18 +36,38 @@ export function studioApiUrl(): string {
   return "http://localhost:8000";
 }
 
+const RETIRED_API_TOKEN = "local-dev-token";
+
 export function studioToken(): string {
   const fromEnv = envString("VITE_STUDIO_TOKEN");
-  if (fromEnv) return fromEnv;
+  if (fromEnv && fromEnv !== RETIRED_API_TOKEN) return fromEnv;
+  return "";
+}
+
+function loopbackApi(url: string): boolean {
   try {
-    const host = new URL(studioApiUrl()).hostname;
-    if (host === "localhost" || host === "127.0.0.1") {
-      return "local-dev-token";
-    }
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
+}
+
+async function resolveStudioToken(): Promise<string> {
+  const existing = studioToken();
+  if (existing) return existing;
+  const api = studioApiUrl();
+  if (!loopbackApi(api)) return "";
+  try {
+    const response = await fetch(`${api}/api/local-token`);
+    if (!response.ok) return "";
+    const body = (await response.json()) as { token?: unknown };
+    const token = typeof body.token === "string" ? body.token.trim() : "";
+    if (!token || token === RETIRED_API_TOKEN) return "";
+    return token;
   } catch {
     return "";
   }
-  return "";
 }
 
 export function studioImportUrl(): string {
@@ -88,7 +108,7 @@ export function handoffFailureMessage(failure: StudioHandoffFailure): string {
 
 async function stageHandoff(blob: Blob, filename: string): Promise<{ id?: string; failure: StudioHandoffFailure }> {
   const api = studioApiUrl();
-  const token = studioToken();
+  const token = await resolveStudioToken();
   try {
     const data = new FormData();
     data.append("file", blob, filename);
