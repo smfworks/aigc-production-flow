@@ -44,29 +44,13 @@ export function studioToken(): string {
   return "";
 }
 
-function loopbackApi(url: string): boolean {
+/** URL.hostname keeps the brackets on an IPv6 literal (`[::1]`, not `::1`). */
+export function isLoopbackStudioHost(url: string): boolean {
   try {
     const host = new URL(url).hostname;
-    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
   } catch {
     return false;
-  }
-}
-
-async function resolveStudioToken(): Promise<string> {
-  const existing = studioToken();
-  if (existing) return existing;
-  const api = studioApiUrl();
-  if (!loopbackApi(api)) return "";
-  try {
-    const response = await fetch(`${api}/api/local-token`);
-    if (!response.ok) return "";
-    const body = (await response.json()) as { token?: unknown };
-    const token = typeof body.token === "string" ? body.token.trim() : "";
-    if (!token || token === RETIRED_API_TOKEN) return "";
-    return token;
-  } catch {
-    return "";
   }
 }
 
@@ -92,9 +76,12 @@ export type StudioHandoffResult = {
 
 export function handoffFailureMessage(failure: StudioHandoffFailure): string {
   if (failure === "auth") {
+    const where = isLoopbackStudioHost(studioApiUrl())
+      ? "Set VITE_STUDIO_TOKEN to the same value as STUDIO_API_TOKEN. The dev script does this. A manual run copies the token from the studio.api-token file next to the database."
+      : "Set VITE_STUDIO_TOKEN to the same value as STUDIO_API_TOKEN.";
     return (
-      "Studio refused the zip (auth). Set VITE_STUDIO_TOKEN to the same value as STUDIO_API_TOKEN, " +
-      "or pick a project/episode and Import pack zip by hand. Never auto-generate."
+      `Studio refused the zip (auth). ${where} ` +
+      "Or pick a project/episode and Import pack zip by hand. Never auto-generate."
     );
   }
   if (failure === "studio-down") {
@@ -108,7 +95,7 @@ export function handoffFailureMessage(failure: StudioHandoffFailure): string {
 
 async function stageHandoff(blob: Blob, filename: string): Promise<{ id?: string; failure: StudioHandoffFailure }> {
   const api = studioApiUrl();
-  const token = await resolveStudioToken();
+  const token = studioToken();
   try {
     const data = new FormData();
     data.append("file", blob, filename);

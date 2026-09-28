@@ -20,11 +20,17 @@ There is no shipped default token. If `STUDIO_API_TOKEN` is empty, the first run
 
 The API listens on `127.0.0.1` (`STUDIO_BIND_HOST`). Binding any other address requires both `STUDIO_ALLOW_NON_LOOPBACK=1` and `STUDIO_API_TOKEN` set in the environment. A generated file token is not enough for that bind.
 
-Studio's own clients pick up the token in three ways:
+`TrustedHostMiddleware` accepts `127.0.0.1`, `localhost`, and `[::1]`. Add more names with `STUDIO_TRUSTED_HOSTS` (comma-separated). A lone `*` is rejected. Any other `Host` gets `400`.
 
-- `./scripts/dev-studio.sh` exports it to the Vite shells as `VITE_API_TOKEN` and `VITE_STUDIO_TOKEN`.
-- On a loopback bind, `GET /api/local-token` returns the token to a loopback peer (`127.0.0.1` or `::1`). The route is 404 for any other peer, and it is 404 when the process is not bound to loopback. It is omitted from the OpenAPI schema.
-- Docker Compose injects the configured token into `studio-token.js` when the web container starts. Set `STUDIO_API_TOKEN` before `docker compose up`. The host ports are `127.0.0.1:8000` and `127.0.0.1:5174`. Inside the container the API listens on all interfaces so the web container can reach it; that listen is the opt-in above.
+Studio's own clients pick up the token without an HTTP route that returns it:
+
+- `./scripts/dev-studio.sh` exports it to the Vite shells as `VITE_API_TOKEN` and `VITE_STUDIO_TOKEN`. The script prints the token file path, not the token.
+- A manual run pastes the value from `data/studio.api-token` (mode `0600`) into the studio shell token field, and sets `VITE_STUDIO_TOKEN` for the pack builder.
+- Docker Compose requires `STUDIO_API_TOKEN`. The web container does not write `studio-token.js`. Nginx adds `Authorization: Bearer …` on `/api` only for `Host` `127.0.0.1`, `localhost`, or `[::1]`. Any other Host hits a `default_server` that returns `444`. The host ports are `127.0.0.1:8000` and `127.0.0.1:5174`. Inside the container the API listens on all interfaces so the web container can reach it; that listen is the opt-in above.
+
+There is no `GET /api/local-token`.
+
+Moving an existing `.env`, compose file, or script off `local-dev-token`: [MIGRATION.md](MIGRATION.md).
 
 Multi-org lite isolates memberships; it is not SaaS security.
 
@@ -107,7 +113,7 @@ When you want the proxy to authenticate humans and the API to trust a header:
 2. Set `STUDIO_AUTH_MODE` to `forward-header`.
 3. Have the proxy **overwrite** `X-Forwarded-User` (never pass it through from the public internet).
 4. Keep the studio API off the public network except through that proxy.
-5. Set `STUDIO_API_TOKEN` to a secret you choose and inject it only on the trusted path. The shipped nginx config clears `X-Forwarded-User` (it does not copy the client header). `X-User-Name` is still forwarded because local mode uses it as a display name behind the bearer token.
+5. Set `STUDIO_API_TOKEN` to a secret you choose and inject it only on the trusted path. The shipped nginx config clears `X-Forwarded-User` and `X-User-Name` (it does not copy either client header). Local mode still reads `X-User-Name` on a direct connection, such as `./scripts/dev-studio.sh`. Through the shipped proxy the shell acts as `STUDIO_DEFAULT_USER`.
 6. Map proxy names onto org members (producers still add roles in the studio).
 
 Until that exists, use `local`. The studio shell still shows a token field and a local user field.

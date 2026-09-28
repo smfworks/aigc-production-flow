@@ -148,7 +148,7 @@ Pack zip remains the collaboration object. Do not skip gates. How to run: [docs/
 # Builder http://127.0.0.1:5173
 ```
 
-The dev script listens on `127.0.0.1`. The first run writes an API token next to the SQLite file (mode `0600`) and passes it to the Vite shells. Set `STUDIO_API_TOKEN` yourself when you want a chosen secret. `local-dev-token` will not start.
+The dev script listens on `127.0.0.1`. The first run writes an API token next to the SQLite file (mode `0600`) and passes it to the Vite shells. The script prints that file path, not the token. Set `STUDIO_API_TOKEN` yourself when you want a chosen secret. `local-dev-token` will not start. See [docs/MIGRATION.md](docs/MIGRATION.md) if an old `.env` still has that value.
 
 Set adapter defaults + budget cap → run stub jobs → see spend on Budget → audit trail → Export EDL → New from template. Add a member as viewer (cannot enqueue) → promote to editor → comment on a shot → presence chips. Assign **writer** and **art** as different roles (script vs identity). Reorder episodes. Scrub the shot playlist against a stub preview. Unapprove or edit identity keywords, then re-approve. Create a second org, switch, confirm the member cannot see it. Seed a demo episode. Approve a sheet, link a plate, open Continuity into identity. Diff two pack revisions before import (shared entity-schedule rows stay distinct). Open in Studio auto-imports after episode pick when configured. Bell on a stub job. `/readyz` green. Download a backup zip (season/sequence kept). A reviewer/producer **signs off**, then `generate-ok`. `generate-ok` stays blocked while any gate is red, a required hop-1 has no receipt, sign-off is missing, or approved identity keywords conflict. Unset comfy-* lanes stay stub / not live. With `STUDIO_COMFY_STILL_LANES` and `STUDIO_COMFY_CLIP_LANES` set to a private ComfyUI, Studio runs Qwen-Image stills and MiniMax H3 clips itself (path text, not pixels in the receipt). See [docs/STUDIO.md](docs/STUDIO.md) and [NOTICE](NOTICE).
 
@@ -161,7 +161,7 @@ docker compose -f docker-compose.studio.yml up --build
 # Studio  http://127.0.0.1:5174  (/api proxied)
 ```
 
-Compose publishes those ports on `127.0.0.1` only. The API process listens on all container interfaces so the web container can reach it, which requires the token above and `STUDIO_ALLOW_NON_LOOPBACK` (already set in the compose file). The image does not contain a token. The web container writes it into `studio-token.js` at start for the shell.
+Compose publishes those ports on `127.0.0.1` only. The API process listens on all container interfaces so the web container can reach it, which requires the token above and `STUDIO_ALLOW_NON_LOOPBACK` (already set in the compose file). The image does not contain a token. Nginx adds that token as `Authorization` on `/api` for loopback `Host` names only, and returns `444` for any other Host. It does not write `studio-token.js`.
 
 ## Layout
 

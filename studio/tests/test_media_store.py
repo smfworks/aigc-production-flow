@@ -31,7 +31,7 @@ def test_s3_without_bucket_stays_local(tmp_path, monkeypatch, auth):
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
     app = create_app()
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         meta = client.get("/api/meta")
         assert meta.status_code == 200
         assert meta.json()["media_backend"] == BACKEND_LOCAL

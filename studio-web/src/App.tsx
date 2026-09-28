@@ -5,7 +5,6 @@ import {
   downloadMedia,
   downloadPack,
   downloadBackup,
-  ensureLocalToken,
   getOrgId,
   getToken,
   getUserName,
@@ -170,18 +169,6 @@ export default function App() {
     },
     [createFullWizard],
   );
-
-  useEffect(() => {
-    if (getToken()) return;
-    let live = true;
-    ensureLocalToken().then((value) => {
-      if (!live || !value) return;
-      setTokenState(value);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
 
   useEffect(() => {
     return onStaleOrgCleared(() => {

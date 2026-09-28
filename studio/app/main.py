@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import PlainTextResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text
 
 from . import database as database_module
@@ -21,7 +22,6 @@ from .notify import webhook_configured
 from .observability import StructuredLogMiddleware, prometheus_text
 from .oidc import oidc_configured
 from .rbac import role_matrix
-from .runtime_security import local_token_visible
 from .routers import (
     adapters,
     audit,
@@ -142,6 +142,12 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Added last so it runs first. Loopback hosts plus STUDIO_TRUSTED_HOSTS.
+    application.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.trusted_host_list(),
+        www_redirect=False,
+    )
     application.include_router(wizard.router)
     application.include_router(quick.router)
     application.include_router(workflows.router)
@@ -191,22 +197,6 @@ def create_app() -> FastAPI:
             "notify_webhook_configured": webhook_configured(cfg),
             "budget": DISCLAIMER,
         }
-
-    @application.get("/api/local-token", include_in_schema=False)
-    def local_token(request: Request) -> JSONResponse:
-        """Token for Studio clients on this machine.
-
-        Returned only when the process is bound to loopback and the peer is
-        loopback. A published listen address does not reveal the token here.
-        """
-        cfg = get_settings()
-        peer = request.client.host if request.client else None
-        if not local_token_visible(cfg.bind_host, peer):
-            raise HTTPException(status_code=404, detail="Not found")
-        return JSONResponse(
-            {"token": cfg.api_token},
-            headers={"Cache-Control": "no-store"},
-        )
 
     @application.get("/health", tags=["meta"])
     def health() -> dict:

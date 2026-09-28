@@ -49,13 +49,23 @@ publish_token_to_vite() {
   export VITE_STUDIO_TOKEN="$token"
 }
 
+# Path of the on-disk token, or a note that STUDIO_API_TOKEN is set.
+# Does not print the secret.
+token_location() {
+  ensure_studio_venv
+  (
+    cd "$ROOT/studio"
+    "$ROOT/studio/.venv/bin/python" -m app.print_token --path
+  )
+}
+
 start_api() {
   local token
   token="$(read_api_token)"
   publish_token_to_vite "$token"
   echo "Studio API  http://127.0.0.1:${STUDIO_PORT}/docs"
   echo "Listen      ${STUDIO_BIND_HOST}"
-  echo "Token       ${token}"
+  echo "Token file  $(token_location)"
   echo "Job worker  in-process (${STUDIO_JOB_WORKER}); adapter still=${STUDIO_STILL_ADAPTER} clip=${STUDIO_CLIP_ADAPTER}"
   cd "$ROOT/studio"
   export STUDIO_RELOAD="${STUDIO_RELOAD:-1}"
@@ -122,7 +132,7 @@ start_all() {
   echo "Listen  ${STUDIO_BIND_HOST}"
   echo "Studio  http://127.0.0.1:5174"
   echo "Builder http://127.0.0.1:5173"
-  echo "Token   ${token}"
+  echo "Token file  $(token_location)"
   (
     cd "$ROOT/studio"
     export STUDIO_RELOAD="${STUDIO_RELOAD:-1}"

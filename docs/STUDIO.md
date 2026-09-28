@@ -49,7 +49,7 @@ Do not start `api` (thread worker) and `worker` together unless the API worker i
 
 ## Auth + RBAC lite (honest)
 
-Local-dev: `Authorization: Bearer $STUDIO_API_TOKEN`. If that variable is unset, the first run generates a token and stores it mode `0600` next to the SQLite file. The retired value `local-dev-token` refuses startup. The process listens on `127.0.0.1` unless `STUDIO_ALLOW_NON_LOOPBACK=1` and `STUDIO_API_TOKEN` are both set. Display name: `X-User-Name` or `STUDIO_DEFAULT_USER`. On a loopback bind, `GET /api/local-token` gives that token to a loopback client. See [AUTH.md](AUTH.md).
+Local-dev: `Authorization: Bearer $STUDIO_API_TOKEN`. If that variable is unset, the first run generates a token and stores it mode `0600` next to the SQLite file. The retired value `local-dev-token` refuses startup. The process listens on `127.0.0.1` unless `STUDIO_ALLOW_NON_LOOPBACK=1` and `STUDIO_API_TOKEN` are both set. The API accepts `Host` `127.0.0.1`, `localhost`, and `[::1]`, plus `STUDIO_TRUSTED_HOSTS`. Display name: `X-User-Name` or `STUDIO_DEFAULT_USER` on a direct connection. The shipped nginx proxy clears `X-User-Name`. There is no `GET /api/local-token`. See [AUTH.md](AUTH.md) and [MIGRATION.md](MIGRATION.md).
 
 `STUDIO_AUTH_MODE` is `local` (default), `forward-header` (trust `X-Forwarded-User`), or `oidc` (Bearer JWT via issuer JWKS). **OIDC is opt-in and off by default.** This repo does not ship a production IdP. See [AUTH.md](AUTH.md).
 
@@ -240,14 +240,14 @@ Handoff from the pack builder: **Open in Studio** (`VITE_STUDIO_URL`, default ht
 |---|---|---|
 | `VITE_STUDIO_URL` | `http://localhost:5174` | Studio shell to open |
 | `VITE_STUDIO_API_URL` | `http://localhost:8000` (derived from Vite 5174) | FastAPI for `POST /api/handoffs` |
-| `VITE_STUDIO_TOKEN` | empty | Must match `STUDIO_API_TOKEN` when you set one. On localhost the builder reads `GET /api/local-token` from a loopback API |
+| `VITE_STUDIO_TOKEN` | empty | Must match `STUDIO_API_TOKEN`. `./scripts/dev-studio.sh` sets it. A manual run copies the token from the `studio.api-token` file |
 
 CORS: `STUDIO_CORS_ORIGINS` already includes `http://localhost:5173`. Studio-web consumes `?handoff=<id>` after you pick a project/episode — import does **not** re-ask for the file. You still Confirm the pack diff. Query `?import=1` remains a hint if staging failed.
 
 Failure modes (documented in the builder toast — never claimed as auto-generate):
 
 - **Studio down / CORS**: zip is not staged; export the zip and Import pack zip by hand
-- **Auth 401/403**: set `VITE_STUDIO_TOKEN` to the same value as `STUDIO_API_TOKEN`, or use the loopback `GET /api/local-token` response
+- **Auth 401/403**: set `VITE_STUDIO_TOKEN` to the same value as `STUDIO_API_TOKEN` (the dev script does this; otherwise copy the token from the `studio.api-token` file)
 - **Expired / already imported handoff**: stage a new zip from Open in Studio
 
 `POST /api/handoffs` · `GET /api/handoffs/{id}` · `POST /api/episodes/{id}/pack` with `handoff_id`

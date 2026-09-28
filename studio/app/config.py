@@ -1,7 +1,46 @@
+import ipaddress
 from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _trusted_host(raw: str) -> str | None:
+    """One Host pattern for TrustedHostMiddleware, or None when blank.
+
+    IPv6 literals are stored with brackets because that is the form Starlette
+    compares against. A lone ``*`` is refused.
+    """
+    name = raw.strip()
+    if not name:
+        return None
+    if name == "*":
+        raise ValueError("STUDIO_TRUSTED_HOSTS cannot be '*'. Name each host.")
+    if name.startswith("[") and name.endswith("]"):
+        inner = name[1:-1].split("%", 1)[0]
+        try:
+            ipaddress.IPv6Address(inner)
+        except ValueError as exc:
+            raise ValueError(f"STUDIO_TRUSTED_HOSTS has an invalid host {raw!r}") from exc
+        return f"[{inner}]"
+    bare = name.split("%", 1)[0]
+    try:
+        ipaddress.IPv6Address(bare)
+    except ValueError:
+        pass
+    else:
+        return f"[{bare}]"
+    if name.startswith("*") and not name.startswith("*."):
+        raise ValueError(
+            f"STUDIO_TRUSTED_HOSTS wildcard must look like *.example.com, not {name!r}"
+        )
+    if "*" in name[1:]:
+        raise ValueError(
+            f"STUDIO_TRUSTED_HOSTS wildcard must look like *.example.com, not {name!r}"
+        )
+    if any(ch.isspace() for ch in name) or "/" in name:
+        raise ValueError(f"STUDIO_TRUSTED_HOSTS has an invalid host {name!r}")
+    return name.lower()
 
 
 class Settings(BaseSettings):
@@ -19,6 +58,9 @@ class Settings(BaseSettings):
     # Default listen address. Non-loopback also needs STUDIO_ALLOW_NON_LOOPBACK
     # and an environment token. See app.runtime_security.
     bind_host: str = "127.0.0.1"
+    # Extra Host names for TrustedHostMiddleware, comma-separated.
+    # 127.0.0.1, localhost, and [::1] are always allowed. "*" is not.
+    trusted_hosts: str = ""
     allow_non_loopback: bool = False
     token_file: str = ""
     default_user: str = "local-dev"
@@ -104,6 +146,22 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    def trusted_host_list(self) -> list[str]:
+        """Hosts TrustedHostMiddleware accepts.
+
+        Loopback names are always included. ``STUDIO_TRUSTED_HOSTS`` adds more.
+        A lone ``*`` is rejected so the check cannot be turned off by accident.
+        """
+        hosts = ["127.0.0.1", "localhost", "[::1]"]
+        seen = set(hosts)
+        for item in self.trusted_hosts.split(","):
+            name = _trusted_host(item)
+            if name is None or name in seen:
+                continue
+            seen.add(name)
+            hosts.append(name)
+        return hosts
 
     @property
     def media_path(self) -> Path:

@@ -43,7 +43,8 @@ def _build_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, worker: str) 
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
     app = create_app()
-    return TestClient(app)
+    # Host must be a loopback name. TestClient's default host is testserver.
+    return TestClient(app, base_url="http://127.0.0.1")
 
 
 @pytest.fixture

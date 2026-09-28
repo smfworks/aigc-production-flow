@@ -10,6 +10,9 @@
 # That listen is opt-in (STUDIO_ALLOW_NON_LOOPBACK) and requires
 # STUDIO_API_TOKEN from the environment. The image does not bake a token.
 # The retired default token is refused.
+# studio-web does not write studio-token.js. Nginx adds Authorization on /api
+# for Host 127.0.0.1, localhost, and [::1], and returns 444 for any other Host.
+# It clears X-User-Name and X-Forwarded-User.
 #
 # Optional profiles (not started by default):
 #   --profile worker    standalone thread poller. Set STUDIO_JOB_WORKER=off on the API first.

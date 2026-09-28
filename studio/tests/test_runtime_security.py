@@ -195,15 +195,17 @@ def test_bearer_prefix_is_rejected(client):
     assert response.status_code == 401
 
 
-def test_local_token_route_is_omitted_from_openapi(client):
+def test_local_token_route_is_gone(client):
+    response = client.get("/api/local-token")
+    assert response.status_code == 404
+    assert "test-token" not in response.text
     body = client.get("/openapi.json").json()
     assert "/api/local-token" not in body["paths"]
 
 
-def _invoke(app, client_host: str) -> tuple[int, bytes, list[tuple[bytes, bytes]]]:
+def _status(app, host: str | None, path: str = "/health") -> tuple[int, bytes]:
     status = 0
     chunks: list[bytes] = []
-    headers: list[tuple[bytes, bytes]] = []
 
     async def receive():
         return {"type": "http.request", "body": b"", "more_body": False}
@@ -212,21 +214,23 @@ def _invoke(app, client_host: str) -> tuple[int, bytes, list[tuple[bytes, bytes]
         nonlocal status
         if message["type"] == "http.response.start":
             status = int(message["status"])
-            headers.extend(message.get("headers") or [])
         elif message["type"] == "http.response.body":
             chunks.append(message.get("body") or b"")
 
+    headers: list[tuple[bytes, bytes]] = []
+    if host is not None:
+        headers.append((b"host", host.encode("ascii")))
     scope = {
         "type": "http",
         "asgi": {"spec_version": "2.3", "version": "3.0"},
         "http_version": "1.1",
         "method": "GET",
         "scheme": "http",
-        "path": "/api/local-token",
-        "raw_path": b"/api/local-token",
+        "path": path,
+        "raw_path": path.encode("ascii"),
         "query_string": b"",
-        "headers": [],
-        "client": (client_host, 50000),
+        "headers": headers,
+        "client": ("127.0.0.1", 50000),
         "server": ("127.0.0.1", 8000),
         "root_path": "",
     }
@@ -235,41 +239,71 @@ def _invoke(app, client_host: str) -> tuple[int, bytes, list[tuple[bytes, bytes]
         await app(scope, receive, send)
 
     asyncio.run(call())
-    return status, b"".join(chunks), headers
+    return status, b"".join(chunks)
 
 
-def test_local_token_is_visible_to_loopback_clients_only(
+def test_trusted_host_allows_loopback_names_only(client):
+    app = client.app
+    for host in ("127.0.0.1", "127.0.0.1:8000", "localhost", "[::1]", "[::1]:8000"):
+        status, body = _status(app, host)
+        assert status == 200, host
+        assert b"Invalid host header" not in body
+    for host in ("evil.example", "10.1.2.3", "studio-api", None):
+        status, body = _status(app, host)
+        assert status == 400, host
+        assert b"Invalid host header" in body
+        assert b"test-token" not in body
+
+
+def test_trusted_host_accepts_configured_names(
     token_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.setenv("STUDIO_API_TOKEN", "loopback-client-token")
+    monkeypatch.setenv("STUDIO_API_TOKEN", "configured-host-token")
+    monkeypatch.setenv("STUDIO_TRUSTED_HOSTS", "studio.internal, ::1")
     get_settings.cache_clear()
     app = create_app()
-    status, body, headers = _invoke(app, "127.0.0.1")
+    status, body = _status(app, "studio.internal")
     assert status == 200
-    assert b"loopback-client-token" in body
-    assert any(
-        key.lower() == b"cache-control" and b"no-store" in value.lower()
-        for key, value in headers
-    )
-    status, body, _headers = _invoke(app, "10.1.2.3")
-    assert status == 404
-    assert b"loopback-client-token" not in body
-    status, body, _headers = _invoke(app, "::1")
+    assert b"configured-host-token" not in body
+    status, _body = _status(app, "[::1]")
     assert status == 200
-    assert b"loopback-client-token" in body
+    status, body = _status(app, "other.example")
+    assert status == 400
+    assert b"configured-host-token" not in body
 
 
-def test_local_token_stays_hidden_when_bind_is_not_loopback(
+def test_trusted_host_rejects_a_wildcard(
     token_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.setenv("STUDIO_API_TOKEN", "published-token")
-    monkeypatch.setenv("STUDIO_BIND_HOST", "0.0.0.0")
-    monkeypatch.setenv("STUDIO_ALLOW_NON_LOOPBACK", "1")
+    monkeypatch.setenv("STUDIO_API_TOKEN", "wildcard-token")
+    monkeypatch.setenv("STUDIO_TRUSTED_HOSTS", "*")
     get_settings.cache_clear()
-    app = create_app()
-    status, body, _headers = _invoke(app, "127.0.0.1")
-    assert status == 404
-    assert b"published-token" not in body
+    with pytest.raises(ValueError, match="cannot be"):
+        create_app()
+
+
+def test_print_token_path_does_not_echo_the_secret(
+    token_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    import sys
+
+    from app.print_token import main
+
+    monkeypatch.delenv("STUDIO_API_TOKEN", raising=False)
+    get_settings.cache_clear()
+    monkeypatch.setattr(sys, "argv", ["print_token", "--path"])
+    main()
+    secret = get_settings().api_token
+    out = capsys.readouterr().out
+    assert str(token_path) in out
+    assert secret not in out
+
+    monkeypatch.setenv("STUDIO_API_TOKEN", "chosen-secret-value")
+    get_settings.cache_clear()
+    main()
+    out = capsys.readouterr().out
+    assert "chosen-secret-value" not in out
+    assert "STUDIO_API_TOKEN is set" in out
 
 
 def test_serve_uses_the_resolved_loopback_host(
@@ -312,6 +346,10 @@ def test_shipped_entrypoints_do_not_bake_the_retired_token():
     assert "0.0.0.0" not in script
     assert "app.serve" in script
     assert "app.print_token" in script
+    assert "--path" in script
+    assert 'echo "Token       ${token}"' not in script
+    assert 'echo "Token   ${token}"' not in script
+    assert "Token file  $(token_location)" in script
 
     for name in ("docker-compose.yml", "docker-compose.studio.yml"):
         text = (ROOT / name).read_text(encoding="utf-8")
@@ -330,9 +368,24 @@ def test_shipped_entrypoints_do_not_bake_the_retired_token():
 
     nginx = (ROOT / "studio-web" / "nginx.conf").read_text(encoding="utf-8")
     assert "$http_x_forwarded_user" not in nginx
+    assert "$http_x_user_name" not in nginx
+    assert "$http_authorization" not in nginx
     assert 'proxy_set_header X-Forwarded-User "";' in nginx
+    assert 'proxy_set_header X-User-Name "";' in nginx
+    assert "return 444;" in nginx
+    assert "default_server" in nginx
+    assert "server_name 127.0.0.1 localhost [::1];" in nginx
+    assert "studio-auth.conf" in nginx
+    assert "studio-token.js" not in nginx
 
     entry = (ROOT / "studio-web" / "docker-entrypoint.sh").read_text(encoding="utf-8")
     assert "local-dev-token" not in entry
     assert "STUDIO_API_TOKEN" in entry
-    assert "studio-token.js" in entry
+    assert "studio-token.js" not in entry
+    assert "window.__STUDIO_TOKEN__" not in entry
+    assert "/usr/share/nginx/html" not in entry
+    assert "studio-auth.conf" in entry
+
+    index = (ROOT / "studio-web" / "index.html").read_text(encoding="utf-8")
+    assert "studio-token.js" not in index
+    assert not (ROOT / "studio-web" / "public" / "studio-token.js").exists()

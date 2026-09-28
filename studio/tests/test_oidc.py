@@ -73,7 +73,7 @@ def _oidc_client(tmp_path, monkeypatch, *, apply_role=False):
     clear_jwks_cache()
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
-    return private, TestClient(create_app())
+    return private, TestClient(create_app(), base_url="http://127.0.0.1")
 
 
 def test_parse_role_map_named_pairs():
@@ -92,7 +92,7 @@ def test_oidc_missing_config_is_honest(tmp_path, monkeypatch):
     monkeypatch.setenv("STUDIO_OIDC_AUDIENCE", "")
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(), base_url="http://127.0.0.1") as client:
         response = client.get("/api/me", headers={"Authorization": "Bearer not-a-jwt"})
         assert response.status_code == 401
         assert "opt-in" in response.json()["detail"]

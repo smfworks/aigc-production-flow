@@ -9,7 +9,3 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
-
-interface Window {
-  __STUDIO_TOKEN__?: string;
-}

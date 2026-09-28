@@ -51,15 +51,6 @@ def is_loopback_host(host: str | None) -> bool:
     return bool(parsed.is_loopback)
 
 
-def local_token_visible(bind_host: str, client_host: str | None) -> bool:
-    """Hand the token to Studio's own clients only on a loopback listen.
-
-    A non-loopback bind keeps the token off this route. Callers on another
-    interface get the same answer, including a proxy that connected locally.
-    """
-    return is_loopback_host(bind_host) and is_loopback_host(client_host)
-
-
 def apply_runtime_security(settings: Settings) -> None:
     host = (settings.bind_host or "").strip() or "127.0.0.1"
     settings.bind_host = host
