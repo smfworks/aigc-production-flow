@@ -54,7 +54,7 @@ def test_forward_header_mode(tmp_path, monkeypatch, auth):
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
     app = create_app()
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         missing = client.get("/api/me", headers=auth)
         assert missing.status_code == 401
         ok = client.get(

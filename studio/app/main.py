@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text
 
 from . import database as database_module
@@ -140,6 +141,12 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    # Added last so it runs first. Loopback hosts plus STUDIO_TRUSTED_HOSTS.
+    application.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.trusted_host_list(),
+        www_redirect=False,
     )
     application.include_router(wizard.router)
     application.include_router(quick.router)

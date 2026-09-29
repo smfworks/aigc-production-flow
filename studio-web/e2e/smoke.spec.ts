@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { E2E_TOKEN } from "./token.ts";
 
-const TOKEN = process.env.STUDIO_API_TOKEN || "local-dev-token";
+const TOKEN = E2E_TOKEN;
 
 function apiHeaders(): Record<string, string> {
   return {

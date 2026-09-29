@@ -33,14 +33,15 @@ Operator docs: [../docs/STUDIO.md](../docs/STUDIO.md). Auth: [../docs/AUTH.md](.
 
 ```bash
 # from repo root
-./scripts/dev-studio.sh api      # HTTP + in-process job worker (default)
+./scripts/dev-studio.sh api      # HTTP + in-process job worker (default), bind 127.0.0.1
 ./scripts/dev-studio.sh worker   # optional standalone thread poller (API should set STUDIO_JOB_WORKER=off)
 ./scripts/dev-studio.sh celery   # optional Celery worker (STUDIO_CELERY_BROKER_URL + STUDIO_JOB_WORKER=celery on the API)
+export STUDIO_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
 docker compose -f docker-compose.studio.yml up --build
 ```
 
-OpenAPI: http://localhost:8000/docs
+OpenAPI: http://127.0.0.1:8000/docs
 
-Auth is **local-dev** (`Authorization: Bearer $STUDIO_API_TOKEN`) plus optional `STUDIO_AUTH_MODE=forward-header` or `oidc`, and **app-level** org roles. Multi-org lite is membership isolation (`X-Org-Id`), not SaaS billing. OIDC is opt-in and off by default. This is not a production IdP.
+Auth is a bearer token (`Authorization: Bearer $STUDIO_API_TOKEN`). An empty token is generated on first run and stored mode 0600 next to the SQLite file. `local-dev-token` refuses startup. The default bind is `127.0.0.1`. A non-loopback bind needs `STUDIO_ALLOW_NON_LOOPBACK=1` and a token set in the environment. `TrustedHostMiddleware` allows `127.0.0.1`, `localhost`, `[::1]`, and `STUDIO_TRUSTED_HOSTS`. There is no `GET /api/local-token`. Optional `STUDIO_AUTH_MODE=forward-header` or `oidc`, and **app-level** org roles. Multi-org lite is membership isolation (`X-Org-Id`), not SaaS billing. OIDC is opt-in and off by default. This is not a production IdP. See [../docs/AUTH.md](../docs/AUTH.md) and [../docs/MIGRATION.md](../docs/MIGRATION.md).
 
 Default adapter is `stub`. It writes fixture receipts and never claims H3 or Qwen ran. Budget units are an operator rate table, not a cloud invoice. Media is local disk unless S3/MinIO is configured. Default job worker is `thread`. Celery is opt-in.

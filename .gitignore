@@ -17,3 +17,4 @@ studio-web/blob-report/
 data/
 *.db
 .env
+studio.api-token

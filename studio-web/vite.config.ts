@@ -8,7 +8,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true,
+    host: "127.0.0.1",
     port: 5174,
     fs: {
       allow: [root, path.resolve(root, ".."), path.resolve(root, "../app")],
@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   preview: {
-    host: true,
+    host: "127.0.0.1",
     port: 4174,
   },
 });

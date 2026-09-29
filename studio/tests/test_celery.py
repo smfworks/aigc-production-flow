@@ -46,7 +46,7 @@ def test_celery_enqueue_dispatches_same_job_row(tmp_path, monkeypatch, auth):
 
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(), base_url="http://127.0.0.1") as client:
         _, episode, _ = green_ready_episode(client, auth, "Celery mock")
         response = client.post(
             "/api/jobs",
@@ -83,7 +83,7 @@ def test_celery_dispatch_failure_is_honest(tmp_path, monkeypatch, auth):
 
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(), base_url="http://127.0.0.1") as client:
         _, episode, _ = green_ready_episode(client, auth, "Celery down")
         response = client.post(
             "/api/jobs",
@@ -114,7 +114,7 @@ def test_celery_task_executes_job_row_when_redis_available(tmp_path, monkeypatch
 
     get_settings.cache_clear()
     reset_engine(get_settings().database_url)
-    with TestClient(create_app()) as client:
+    with TestClient(create_app(), base_url="http://127.0.0.1") as client:
         _, episode, _ = green_ready_episode(client, auth, "Celery live")
         response = client.post(
             "/api/jobs",

@@ -2,9 +2,17 @@
 #
 #   docker compose -f docker-compose.studio.yml up --build
 #
-# Ports:
-#   studio-api   8000  FastAPI + in-process thread worker (default)
-#   studio-web   5174  nginx SPA; /api proxies to studio-api
+# Ports (published on the host loopback only):
+#   studio-api   127.0.0.1:8000  FastAPI + in-process thread worker (default)
+#   studio-web   127.0.0.1:5174  nginx SPA; /api proxies to studio-api
+#
+# The API listens on all container interfaces so studio-web can reach it.
+# That listen is opt-in (STUDIO_ALLOW_NON_LOOPBACK) and requires
+# STUDIO_API_TOKEN from the environment. The image does not bake a token.
+# The retired default token is refused.
+# studio-web does not write studio-token.js. Nginx adds Authorization on /api
+# for Host 127.0.0.1, localhost, and [::1], and returns 444 for any other Host.
+# It clears X-User-Name and X-Forwarded-User.
 #
 # Optional profiles (not started by default):
 #   --profile worker    standalone thread poller. Set STUDIO_JOB_WORKER=off on the API first.
@@ -24,7 +32,7 @@ services:
     build:
       context: ./studio
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-sqlite:////data/studio.db}
       STUDIO_MEDIA_ROOT: /data/media
@@ -33,7 +41,9 @@ services:
       STUDIO_S3_ENDPOINT: ${STUDIO_S3_ENDPOINT:-}
       STUDIO_S3_PREFIX: ${STUDIO_S3_PREFIX:-}
       STUDIO_S3_REGION: ${STUDIO_S3_REGION:-us-east-1}
-      STUDIO_API_TOKEN: ${STUDIO_API_TOKEN:-local-dev-token}
+      STUDIO_BIND_HOST: 0.0.0.0
+      STUDIO_ALLOW_NON_LOOPBACK: "1"
+      STUDIO_API_TOKEN: "${STUDIO_API_TOKEN:?Set STUDIO_API_TOKEN to a secret you choose}"
       STUDIO_DEFAULT_USER: ${STUDIO_DEFAULT_USER:-local-dev}
       STUDIO_PACK_BUILDER_URL: ${STUDIO_PACK_BUILDER_URL:-http://localhost:5173}
       STUDIO_CORS_ORIGINS: ${STUDIO_CORS_ORIGINS:-http://localhost:5174,http://127.0.0.1:5174,http://localhost:8000}
@@ -68,7 +78,9 @@ services:
     build:
       context: ./studio-web
     ports:
-      - "5174:80"
+      - "127.0.0.1:5174:80"
+    environment:
+      STUDIO_API_TOKEN: "${STUDIO_API_TOKEN:?Set STUDIO_API_TOKEN to a secret you choose}"
     depends_on:
       studio-api:
         condition: service_healthy
@@ -86,6 +98,7 @@ services:
       STUDIO_S3_ENDPOINT: ${STUDIO_S3_ENDPOINT:-}
       STUDIO_S3_PREFIX: ${STUDIO_S3_PREFIX:-}
       STUDIO_JOB_WORKER: thread
+      STUDIO_API_TOKEN: "${STUDIO_API_TOKEN:?Set STUDIO_API_TOKEN to a secret you choose}"
       STUDIO_STILL_ADAPTER: ${STUDIO_STILL_ADAPTER:-stub}
       STUDIO_CLIP_ADAPTER: ${STUDIO_CLIP_ADAPTER:-stub}
       STUDIO_COMFY_STILL_LANES: ${STUDIO_COMFY_STILL_LANES:-}
@@ -118,6 +131,7 @@ services:
       STUDIO_S3_ENDPOINT: ${STUDIO_S3_ENDPOINT:-}
       STUDIO_S3_PREFIX: ${STUDIO_S3_PREFIX:-}
       STUDIO_JOB_WORKER: celery
+      STUDIO_API_TOKEN: "${STUDIO_API_TOKEN:?Set STUDIO_API_TOKEN to a secret you choose}"
       STUDIO_CELERY_BROKER_URL: ${STUDIO_CELERY_BROKER_URL:-redis://redis:6379/0}
       STUDIO_STILL_ADAPTER: ${STUDIO_STILL_ADAPTER:-stub}
       STUDIO_CLIP_ADAPTER: ${STUDIO_CLIP_ADAPTER:-stub}

@@ -47,9 +47,33 @@ import type {
 const TOKEN_KEY = "smf.aigc-studio.token";
 const USER_KEY = "smf.aigc-studio.user";
 const ORG_KEY = "smf.aigc-studio.org";
+const RETIRED_API_TOKEN = "local-dev-token";
+
+function storedToken(): string {
+  try {
+    return (localStorage.getItem(TOKEN_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function usableToken(value: string): string {
+  const token = value.trim();
+  if (!token || token === RETIRED_API_TOKEN) return "";
+  return token;
+}
 
 export function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) || import.meta.env?.VITE_API_TOKEN || "local-dev-token";
+  const saved = storedToken();
+  if (saved === RETIRED_API_TOKEN) {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+  }
+  const fromEnv = usableToken(import.meta.env?.VITE_API_TOKEN || "");
+  return usableToken(saved) || fromEnv;
 }
 
 export function setToken(token: string): void {

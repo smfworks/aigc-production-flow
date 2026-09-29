@@ -36,18 +36,22 @@ export function studioApiUrl(): string {
   return "http://localhost:8000";
 }
 
+const RETIRED_API_TOKEN = "local-dev-token";
+
 export function studioToken(): string {
   const fromEnv = envString("VITE_STUDIO_TOKEN");
-  if (fromEnv) return fromEnv;
-  try {
-    const host = new URL(studioApiUrl()).hostname;
-    if (host === "localhost" || host === "127.0.0.1") {
-      return "local-dev-token";
-    }
-  } catch {
-    return "";
-  }
+  if (fromEnv && fromEnv !== RETIRED_API_TOKEN) return fromEnv;
   return "";
+}
+
+/** URL.hostname keeps the brackets on an IPv6 literal (`[::1]`, not `::1`). */
+export function isLoopbackStudioHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 export function studioImportUrl(): string {
@@ -72,9 +76,12 @@ export type StudioHandoffResult = {
 
 export function handoffFailureMessage(failure: StudioHandoffFailure): string {
   if (failure === "auth") {
+    const where = isLoopbackStudioHost(studioApiUrl())
+      ? "Set VITE_STUDIO_TOKEN to the same value as STUDIO_API_TOKEN. The dev script does this. A manual run copies the token from the studio.api-token file next to the database."
+      : "Set VITE_STUDIO_TOKEN to the same value as STUDIO_API_TOKEN.";
     return (
-      "Studio refused the zip (auth). Set VITE_STUDIO_TOKEN to the same value as STUDIO_API_TOKEN, " +
-      "or pick a project/episode and Import pack zip by hand. Never auto-generate."
+      `Studio refused the zip (auth). ${where} ` +
+      "Or pick a project/episode and Import pack zip by hand. Never auto-generate."
     );
   }
   if (failure === "studio-down") {
